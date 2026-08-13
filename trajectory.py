@@ -1,3 +1,8 @@
+# REPRISE :
+# Prochaine etape : elargir la plage de temps de vol testee
+# pour Terre-Saturne a 4-8 ans, puis revalider contre
+# v_inf depart ~10.3 km/s theorique.
+
 import math
 from datetime import date, datetime
 
