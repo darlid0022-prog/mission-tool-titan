@@ -251,6 +251,26 @@ class TestLambertGridComputation(unittest.TestCase):
                 msg="arrival_mjd2000 must be > departure_mjd2000",
             )
 
+    def test_grid_contains_exactly_12_departure_dates(self):
+        """The launch window is sampled at exactly 12 distinct departure dates."""
+        departure_dates = sorted({solution["departure_mjd2000"] for solution in self.solutions})
+        self.assertEqual(len(departure_dates), 12)
+
+    def test_grid_time_of_flight_range_covers_about_4_to_8_years(self):
+        """TOF values span roughly the configured 4.0-8.0 year mission range."""
+        unique_tof = sorted({solution["tof_years"] for solution in self.solutions})
+        self.assertAlmostEqual(unique_tof[0], 4.0, delta=1e-9)
+        self.assertGreater(unique_tof[-1], 7.9)
+        self.assertLess(unique_tof[-1], 8.0)
+
+    def test_grid_tof_steps_are_approximately_15_days(self):
+        """Consecutive unique TOF values should differ by ~15 days."""
+        unique_tof = sorted({solution["tof_years"] for solution in self.solutions})
+        diffs_days = [(next_tof - tof) * 365.25 for tof, next_tof in zip(unique_tof, unique_tof[1:])]
+        self.assertTrue(diffs_days)
+        for diff_days in diffs_days:
+            self.assertAlmostEqual(diff_days, 15.0, delta=1e-6)
+
     def test_grid_solutions_have_positive_tof(self):
         """Time-of-flight must be positive and reasonable."""
         for solution in self.solutions:
@@ -350,20 +370,26 @@ class TestParetoFrontier(unittest.TestCase):
         for p in pareto:
             self.assertIn(p, self.solutions)
 
-    def test_pareto_solutions_are_non_dominated(self):
-        """No Pareto solution should be dominated by another."""
+    def test_pareto_solutions_are_non_dominated_against_full_grid(self):
+        """Each Pareto solution must not be dominated by any solution in the full grid."""
         pareto = select_pareto_frontier(
             self.solutions,
             objectives=["dv_depart", "v_infinity_saturn"],
         )
         for p in pareto:
-            for other in pareto:
-                if p is not other:
-                    # p should NOT be dominated by other
-                    p_not_worse_depart = p["dv_depart"] <= other["dv_depart"]
-                    p_not_worse_arrival = p["v_infinity_saturn"] <= other["v_infinity_saturn"]
-                    # At least one must be true (p is not strictly worse in both)
-                    self.assertTrue(p_not_worse_depart or p_not_worse_arrival)
+            for other in self.solutions:
+                if p is other:
+                    continue
+                other_better_or_equal = all(
+                    other[obj] <= p[obj] for obj in ["dv_depart", "v_infinity_saturn"]
+                )
+                other_strictly_better = any(
+                    other[obj] < p[obj] for obj in ["dv_depart", "v_infinity_saturn"]
+                )
+                self.assertFalse(
+                    other_better_or_equal and other_strictly_better,
+                    msg="Pareto solution is dominated by another solution in the full grid",
+                )
 
     def test_pareto_frontier_empty_list_returns_empty(self):
         """Pareto frontier of empty list should return empty list."""

@@ -113,10 +113,14 @@ with col_results:
     st.header("Résultats (mis à jour en direct)")
     st.info(traj["note"])
 
-    st.subheader("Budget ΔV")
-    dv_table = pd.DataFrame(traj["dv_budget"].items(), columns=["Manoeuvre", "ΔV (m/s)"])
+    st.subheader("Budget (provisoire - valeurs v∞, pas ΔV propulsif)")
+    st.caption(
+        "Les valeurs affichées sont des vitesses d'exces heliocentriques (v∞) "
+        "et non des Delta-V propulsifs complets (LEO escape / capture non calcules)."
+    )
+    dv_table = pd.DataFrame(traj["dv_budget"].items(), columns=["Manoeuvre", "v∞ (m/s)"])
     st.dataframe(dv_table, use_container_width=True)
-    st.metric("ΔV total", f"{traj['dv_total']:.0f} m/s")
+    st.metric("Somme des v∞ (provisoire)", f"{traj['dv_total']:.0f} m/s")
 
     st.subheader("Budget de masse")
     c1, c2, c3, c4 = st.columns(4)

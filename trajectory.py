@@ -8,6 +8,8 @@ from datetime import date, datetime
 
 import pykep as pk
 
+from mission.leg_solver import compute_lambert_leg
+
 
 def norm(v):
     """Norme d'un vecteur 3D."""
@@ -50,126 +52,33 @@ def _compute_lambert_earth_saturn_grid(
 ) -> list:
     """
     Compute all feasible Earth→Saturn Lambert trajectories over a grid.
-    
-    Args:
-        launch_start: Python date or datetime (launch window start)
-        launch_end: Python date or datetime (launch window end)
-        n_departures: Number of departure dates to sample (default: 12)
-        tof_min_years: Minimum time of flight in years (default: 4.0)
-        tof_max_years: Maximum time of flight in years (default: 8.0)
-        tof_step_days: TOF sampling step in days (default: 15.0)
-    
-    Returns:
-        list of solution dicts:
-        {
-            "dv_depart": float,                # m/s, heliocentric excess
-            "v_infinity_saturn": float,        # m/s, relative velocity at Saturn
-            "departure_mjd2000": float,        # epoch in MJD2000 format
-            "arrival_mjd2000": float,          # epoch in MJD2000 format
-            "tof_years": float,                # time-of-flight in years
-        }
-    
-    Raises:
-        ValueError: if launch_end < launch_start
-        RuntimeError: if no valid solutions found
-    
-    Note:
-        - All solutions (both feasible and infeasible Lambert problems) are excluded
-        - Grid is deterministic: same inputs produce same output in same order
-        - No PyKEP epoch objects in returned solutions (only raw floats)
+
+    This is a compatibility wrapper around the generic Lambert leg solver. The
+    numerical output remains identical, but the actual Lambert computation is now
+    delegated to mission.leg_solver.compute_lambert_leg().
     """
-    # Corps celestes
-    earth = pk.planet(pk.udpla.jpl_lp("earth"))
-    saturn = pk.planet(pk.udpla.jpl_lp("saturn"))
-
-    # Conversion des dates fournies
-    t_start = to_pk_epoch(launch_start)
-    t_end = to_pk_epoch(launch_end)
-
-    launch_window_days = (
-        t_end.mjd2000 - t_start.mjd2000
+    results = compute_lambert_leg(
+        "Earth",
+        "Saturn",
+        launch_start,
+        launch_end,
+        n_departures=n_departures,
+        tof_min_years=tof_min_years,
+        tof_max_years=tof_max_years,
+        tof_step_days=tof_step_days,
     )
 
-    if launch_window_days < 0:
-        raise ValueError(
-            "La date de fin de fenetre doit etre posterieure "
-            "a la date de debut."
-        )
-
-    # Dates de depart a tester
-    if n_departures == 1:
-        departure_offsets = [0.0]
-    else:
-        departure_offsets = [
-            launch_window_days * i / (n_departures - 1)
-            for i in range(n_departures)
-        ]
-
-    # Temps de vol a tester
-    tof_years_list = []
-    tof_years = tof_min_years
-    while tof_years <= tof_max_years + 1e-9:
-        tof_years_list.append(tof_years)
-        tof_years += tof_step_days / 365.25
-
     solutions = []
-
-    for departure_offset in departure_offsets:
-
-        departure_mjd2000 = (
-            t_start.mjd2000 + departure_offset
-        )
-
-        # Etat heliocentrique de la Terre au depart
-        r0, v_earth = earth.eph(departure_mjd2000)
-
-        for tof_years in tof_years_list:
-
-            tof_seconds = tof_years * 365.25 * 86400.0
-
-            arrival_mjd2000 = (
-                departure_mjd2000
-                + tof_seconds / 86400.0
-            )
-
-            # Etat heliocentrique de Saturne a l'arrivee
-            r1, v_saturn = saturn.eph(arrival_mjd2000)
-
-            try:
-                lp = pk.lambert_problem(
-                    r0,
-                    r1,
-                    tof_seconds,
-                    earth.get_mu_central_body(),
-                    multi_revs=0,
-                )
-            except Exception:
-                continue
-
-            if len(lp.v0) == 0:
-                continue
-
-            v_depart = lp.v0[0]
-            v_arrivee = lp.v1[0]
-
-            # Exces hyperbolique heliocentrique au depart
-            dv_depart = norm(
-                sub(v_depart, v_earth)
-            )
-
-            # Vitesse relative a Saturne a l'arrivee
-            v_infinity_saturn = norm(
-                sub(v_arrivee, v_saturn)
-            )
-
-            solution = {
-                "dv_depart": dv_depart,
-                "v_infinity_saturn": v_infinity_saturn,
-                "departure_mjd2000": departure_mjd2000,
-                "arrival_mjd2000": arrival_mjd2000,
-                "tof_years": tof_years,
+    for result in results:
+        solutions.append(
+            {
+                "dv_depart": result.v_inf_depart,
+                "v_infinity_saturn": result.v_inf_arrival,
+                "departure_mjd2000": result.departure_mjd2000,
+                "arrival_mjd2000": result.arrival_mjd2000,
+                "tof_years": result.tof_years,
             }
-            solutions.append(solution)
+        )
 
     if not solutions:
         raise RuntimeError(
@@ -345,14 +254,10 @@ def compute_trajectory(
     # Select best solution (minimum departure v-infinity)
     best = select_best_by_departure_v_infinity(solutions)
 
-    # Budget compatible avec app.py.
-    #
-    # ATTENTION:
-    # v_infinity_saturn est provisoirement place dans
-    # "dV Capture at Destination" uniquement pour
-    # conserver le format attendu par l'application.
-    # Ce n'est PAS encore un calcul physique de capture
-    # autour de Saturne. Il sera remplace plus tard.
+    # Budget compatible avec app.py. NOTE: the values stored here are
+    # heliocentric excess velocities (v-infinity) and NOT complete
+    # propulsive ΔV calculations. Keys remain for backward compatibility
+    # but the UI and notes clarify the semantics.
     dv_budget = {
         "dV from LEO": best["dv_depart"],
         "dV DSM/Fly-By": 0.0,
@@ -375,13 +280,15 @@ def compute_trajectory(
     )
 
     note = (
-        "Premiere version Terre -> Saturne avec Lambert "
-        "(multi_revs=0). "
-        "La vitesse relative a Saturne est affichee "
-        "provisoirement dans le budget; la capture "
-        "physique sera calculee dans une etape ulterieure. "
-        "Saturne -> Titan, flyby, transfert lunaire et "
-        "atterrissage ne sont pas encore implementes."
+        "Premiere version Terre -> Saturne avec Lambert (multi_revs=0). "
+        "Important : les valeurs actuellement presentes dans le budget "
+        "sont des vitesses d'exces heliocentriques (v∞), PAS des Delta-V "
+        "propulsifs completes. Concretement :\n"
+        "- departure v∞ : heliocentric excess velocity relative a la Terre.\n"
+        "- arrival v∞ : relative velocity at Saturn on arrival.\n"
+        "Le calcul complet de dV pour l'evasion depuis LEO ou la capture "
+        "a Saturne n'est pas encore implemente. Saturne -> Titan, flybys, "
+        "transferts lunaires et atterrissages seront ajoutes ulterieurement."
     )
 
     return {
@@ -463,7 +370,9 @@ def compute_trajectory_alternatives(
         launch_end,
     )
 
-    # Apply all selection strategies to the same grid
+    # Apply all selection strategies to the same grid. Selection helpers
+    # continue to operate using legacy key names for compatibility but
+    # the solution dicts also carry the explicit `v_inf_*` keys.
     best_by_dep = select_best_by_departure_v_infinity(all_solutions)
     best_by_arr = select_best_by_arrival_v_infinity(all_solutions)
     best_by_tof = select_best_by_shortest_mission_duration(all_solutions)
