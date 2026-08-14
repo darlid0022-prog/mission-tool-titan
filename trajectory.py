@@ -10,6 +10,8 @@ import pykep as pk
 
 from mission.models import TrajectoryResult
 from mission.pykep_trajectory_engine import PyKEPTrajectoryEngine
+from mission.bodies import resolve_body
+from mission import physics
 
 
 def norm(v):
@@ -248,6 +250,8 @@ def compute_trajectory(
     has_landing: bool,
     is_flyby_only: bool,
     dv_per_flyby: float,
+    leo_altitude_km: float,
+    capture_altitude_km: float,
 ) -> dict:
 
     # Premiere version du moteur:
@@ -289,14 +293,32 @@ def compute_trajectory(
     best_departure_mjd2000 = _result_value(best, "departure_mjd2000")
     best_arrival_mjd2000 = _result_value(best, "arrival_mjd2000")
 
-    # Budget compatible avec app.py. NOTE: the values stored here are
-    # heliocentric excess velocities (v-infinity) and NOT complete
-    # propulsive ΔV calculations. Keys remain for backward compatibility
-    # but the UI and notes clarify the semantics.
+    # Compute propulsive ΔV where applicable (LEO injection and Saturn capture).
+    # Use body-provided radii and mu values; altitudes are provided by the UI
+    # in kilometres and must be converted to metres.
+    earth = resolve_body("Earth")
+    saturn = resolve_body("Saturn")
+
+    # Convert altitudes from km to m
+    r_leo = earth.pykep_body.get_radius() + float(leo_altitude_km) * 1000.0
+    r_capture = saturn.pykep_body.get_radius() + float(capture_altitude_km) * 1000.0
+
+    mu_earth = earth.get_mu_central_body()
+    mu_saturn = saturn.get_mu_central_body()
+
+    # For LEO departures compute actual injection ΔV; for Direct keep legacy v_inf value
+    if str(departure_type).lower() == "leo":
+        dv_from_leo = physics.delta_v_injection(best_departure_v_inf, mu_earth, r_leo)
+    else:
+        dv_from_leo = best_departure_v_inf
+
+    # Always compute capture ΔV at destination (Saturn)
+    dv_capture_dest = physics.delta_v_capture(best_arrival_v_inf, mu_saturn, r_capture)
+
     dv_budget = {
-        "dV from LEO": best_departure_v_inf,
+        "dV from LEO": dv_from_leo,
         "dV DSM/Fly-By": 0.0,
-        "dV Capture at Destination": best_arrival_v_inf,
+        "dV Capture at Destination": dv_capture_dest,
         "dV Transfer to Moon": 0.0,
         "dV Capture at Moon": 0.0,
         "dV Lower to Final Orbit": 0.0,
@@ -316,14 +338,10 @@ def compute_trajectory(
 
     note = (
         "Premiere version Terre -> Saturne avec Lambert (multi_revs=0). "
-        "Important : les valeurs actuellement presentes dans le budget "
-        "sont des vitesses d'exces heliocentriques (v∞), PAS des Delta-V "
-        "propulsifs completes. Concretement :\n"
-        "- departure v∞ : heliocentric excess velocity relative a la Terre.\n"
-        "- arrival v∞ : relative velocity at Saturn on arrival.\n"
-        "Le calcul complet de dV pour l'evasion depuis LEO ou la capture "
-        "a Saturne n'est pas encore implemente. Saturne -> Titan, flybys, "
-        "transferts lunaires et atterrissages seront ajoutes ulterieurement."
+        "Les valeurs suivantes dans le budget sont des Delta-V propulsifs :\n"
+        "- 'dV from LEO' : impulsive ΔV pour evasion depuis LEO (si selection LEO).\n"
+        "- 'dV Capture at Destination' : impulsive ΔV de capture a Saturne (provisoire).\n"
+        "Les autres lignes restent provisoires ou non implementees pour l'instant."
     )
 
     return {

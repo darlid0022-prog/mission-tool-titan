@@ -44,6 +44,12 @@ DEFAULT_KWARGS = dict(
     dv_per_flyby=1000.0,
 )
 
+# Provide UI-like altitude parameters (km) used by the compute_trajectory call.
+DEFAULT_KWARGS.update({
+    "leo_altitude_km": 250,
+    "capture_altitude_km": 2000,
+})
+
 
 def _call_saturn_baseline(**overrides):
     params = {**DEFAULT_KWARGS, **overrides}
@@ -130,19 +136,64 @@ class TestEarthSaturnTrajectoryRegression(unittest.TestCase):
 
     def test_earth_saturn_arrival_v_infinity_regression(self):
         """Lock arrival v-infinity at Saturn (provisional capture slot)."""
-        v_inf = self.result["dv_budget"]["dV Capture at Destination"]
-        self.assertAlmostEqual(
-            v_inf,
-            REGRESSION_V_INF_SATURN_M_S,
-            delta=ABS_TOL_M_S,
+        # The Lambert-derived arrival v_inf should remain available via the
+        # alternatives API; compute_trajectory now stores the propulsive
+        # capture ΔV in the budget entry.
+        alternatives = compute_trajectory_alternatives(
+            "Saturn",
+            "Direct",
+            LAUNCH_START,
+            LAUNCH_END,
+            True,
+            False,
+            False,
+            1000.0,
         )
+        lambert_best = alternatives["best_by_departure_v_inf"]
+        lambert_v_inf = lambert_best["v_infinity_saturn"]
+
+        # Confirm the Lambert v_inf matches the historical regression value
+        self.assertAlmostEqual(lambert_v_inf, REGRESSION_V_INF_SATURN_M_S, delta=ABS_TOL_M_S)
+
+        # And the stored budget entry is the computed capture delta-v
+        from mission.bodies import resolve_body
+        from mission import physics
+
+        saturn = resolve_body("Saturn")
+        r_capture = saturn.pykep_body.get_radius() + DEFAULT_KWARGS["capture_altitude_km"] * 1000.0
+        mu_saturn = saturn.get_mu_central_body()
+        expected_capture = physics.delta_v_capture(lambert_v_inf, mu_saturn, r_capture)
+
+        self.assertAlmostEqual(self.result["dv_budget"]["dV Capture at Destination"], expected_capture, delta=ABS_TOL_M_S)
 
     def test_earth_saturn_total_dv_regression(self):
-        self.assertAlmostEqual(
-            self.result["dv_total"],
-            REGRESSION_DV_TOTAL_M_S,
-            delta=ABS_TOL_M_S,
+        # Compute expected total: for the default Direct departure we keep the
+        # Lambert v_inf as the 'dV from LEO' entry; the capture entry is the
+        # propulsive ΔV. Sum them for the expected total.
+        alternatives = compute_trajectory_alternatives(
+            "Saturn",
+            "Direct",
+            LAUNCH_START,
+            LAUNCH_END,
+            True,
+            False,
+            False,
+            1000.0,
         )
+        lambert_best = alternatives["best_by_departure_v_inf"]
+        v_inf_depart = lambert_best["dv_depart"]
+        v_inf_arrival = lambert_best["v_infinity_saturn"]
+
+        from mission.bodies import resolve_body
+        from mission import physics
+
+        saturn = resolve_body("Saturn")
+        r_capture = saturn.pykep_body.get_radius() + DEFAULT_KWARGS["capture_altitude_km"] * 1000.0
+        mu_saturn = saturn.get_mu_central_body()
+        expected_capture = physics.delta_v_capture(v_inf_arrival, mu_saturn, r_capture)
+
+        expected_total = v_inf_depart + expected_capture
+        self.assertAlmostEqual(self.result["dv_total"], expected_total, delta=ABS_TOL_M_S)
 
     def test_best_launch_date_regression(self):
         self.assertIsInstance(self.result["best_launch_date"], pk.epoch)
@@ -508,6 +559,8 @@ class TestBackwardCompatibility(unittest.TestCase):
             False,
             False,
             1000.0,
+            DEFAULT_KWARGS["leo_altitude_km"],
+            DEFAULT_KWARGS["capture_altitude_km"],
         )
         new = compute_trajectory_alternatives(
             "Saturn",
@@ -529,7 +582,79 @@ class TestBackwardCompatibility(unittest.TestCase):
         
         # They must match
         self.assertAlmostEqual(old_dv_depart, new_dv_depart, delta=ABS_TOL_M_S)
-        self.assertAlmostEqual(old_v_inf_saturn, new_v_inf_saturn, delta=ABS_TOL_M_S)
+
+        # The alternatives API exposes the Lambert v_infinity; compute_trajectory
+        # now stores the propulsive capture ΔV in the budget entry. Verify both.
+        self.assertAlmostEqual(new_v_inf_saturn, REGRESSION_V_INF_SATURN_M_S, delta=ABS_TOL_M_S)
+        from mission.bodies import resolve_body
+        from mission import physics
+
+        saturn = resolve_body("Saturn")
+        r_capture = saturn.pykep_body.get_radius() + DEFAULT_KWARGS["capture_altitude_km"] * 1000.0
+        mu_saturn = saturn.get_mu_central_body()
+        expected_capture = physics.delta_v_capture(new_v_inf_saturn, mu_saturn, r_capture)
+        self.assertAlmostEqual(old_v_inf_saturn, expected_capture, delta=ABS_TOL_M_S)
+
+
+@unittest.skipUnless(PYKEP_AVAILABLE, "pykep is required for trajectory tests")
+class TestDeltaVIntegration(unittest.TestCase):
+    """Verify the new ΔV primitives are integrated into compute_trajectory()."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.alternatives = compute_trajectory_alternatives(
+            "Saturn",
+            "Direct",
+            LAUNCH_START,
+            LAUNCH_END,
+            True,
+            False,
+            False,
+            1000.0,
+        )
+
+    def test_v_infinity_values_remain_unchanged(self):
+        # The Lambert-derived v_inf should remain available via the alternatives API
+        best = self.alternatives["best_by_departure_v_inf"]
+        self.assertAlmostEqual(best["dv_depart"], REGRESSION_DV_DEPART_M_S, delta=ABS_TOL_M_S)
+
+    def test_dv_from_leo_uses_delta_v_injection(self):
+        # Compute with explicit LEO selection and altitudes
+        params = {**DEFAULT_KWARGS, "departure_type": "LEO"}
+        result = compute_trajectory(**params)
+
+        # Extract the Lambert v_inf from alternatives (unchanged)
+        lambert_best = self.alternatives["best_by_departure_v_inf"]
+        v_inf = lambert_best["dv_depart"]
+
+        from mission.bodies import resolve_body
+        from mission import physics
+
+        earth = resolve_body("Earth")
+        r_leo = earth.pykep_body.get_radius() + params["leo_altitude_km"] * 1000.0
+        mu_earth = earth.get_mu_central_body()
+
+        expected = physics.delta_v_injection(v_inf, mu_earth, r_leo)
+        self.assertAlmostEqual(result["dv_budget"]["dV from LEO"], expected, delta=1e-6)
+        # And it should differ from the bare v_inf value
+        self.assertNotAlmostEqual(result["dv_budget"]["dV from LEO"], v_inf)
+
+    def test_dv_capture_matches_delta_v_capture(self):
+        params = {**DEFAULT_KWARGS, "departure_type": "LEO"}
+        result = compute_trajectory(**params)
+
+        lambert_best = self.alternatives["best_by_departure_v_inf"]
+        v_inf_arrival = lambert_best["v_infinity_saturn"]
+
+        from mission.bodies import resolve_body
+        from mission import physics
+
+        saturn = resolve_body("Saturn")
+        r_capture = saturn.pykep_body.get_radius() + params["capture_altitude_km"] * 1000.0
+        mu_saturn = saturn.get_mu_central_body()
+
+        expected_capture = physics.delta_v_capture(v_inf_arrival, mu_saturn, r_capture)
+        self.assertAlmostEqual(result["dv_budget"]["dV Capture at Destination"], expected_capture, delta=1e-6)
 
 
 if __name__ == "__main__":

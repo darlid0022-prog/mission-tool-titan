@@ -42,8 +42,12 @@ with col_inputs:
     st.header("1. Architecture de mission")
     destination = st.selectbox("Destination", PLANETS, index=PLANETS.index("Titan"))
     departure_type = st.radio("Type de départ", ["Direct", "LEO"])
+    # Expose LEO altitude when relevant; provide a default value so the
+    # compute_trajectory() call always receives the parameter.
     if departure_type == "LEO":
         leo_altitude_km = st.number_input("Altitude LEO initiale (km)", min_value=250, value=250)
+    else:
+        leo_altitude_km = 250
     capture_altitude_km = st.number_input("Altitude de capture (km)", value=2000)
     final_orbit_altitude_km = st.number_input("Altitude orbite finale (km)", value=100)
     has_moon_transfer = st.checkbox("Transfert vers une lune (ex: Titan autour de Saturne)", value=True)
@@ -104,8 +108,16 @@ def compute_mass_budget(dv_total: float, isp_s: float, instruments_df: pd.DataFr
 # 5. CALCUL EN DIRECT (relancé automatiquement par Streamlit)
 # -----------------------------------------------------------------------
 traj = compute_trajectory(
-    destination, departure_type, launch_window_start, launch_window_end,
-    has_moon_transfer, has_landing, is_flyby_only, dv_per_flyby,
+    destination,
+    departure_type,
+    launch_window_start,
+    launch_window_end,
+    has_moon_transfer,
+    has_landing,
+    is_flyby_only,
+    dv_per_flyby,
+    leo_altitude_km,
+    capture_altitude_km,
 )
 mass = compute_mass_budget(traj["dv_total"], isp_s, instruments_df)
 
@@ -113,14 +125,15 @@ with col_results:
     st.header("Résultats (mis à jour en direct)")
     st.info(traj["note"])
 
-    st.subheader("Budget (provisoire - valeurs v∞, pas ΔV propulsif)")
+    st.subheader("Budget (provisoire)")
     st.caption(
-        "Les valeurs affichées sont des vitesses d'exces heliocentriques (v∞) "
-        "et non des Delta-V propulsifs complets (LEO escape / capture non calcules)."
+        "Les valeurs affichées incluent désormais les ΔV propulsifs calcules pour "
+        "l'evasion depuis LEO (si selection LEO) et la capture a Saturne. Les autres "
+        "lignes restent provisoires."
     )
-    dv_table = pd.DataFrame(traj["dv_budget"].items(), columns=["Manoeuvre", "v∞ (m/s)"])
+    dv_table = pd.DataFrame(traj["dv_budget"].items(), columns=["Manoeuvre", "Valeur (m/s)"])
     st.dataframe(dv_table, use_container_width=True)
-    st.metric("Somme des v∞ (provisoire)", f"{traj['dv_total']:.0f} m/s")
+    st.metric("Somme des ΔV / valeurs budget", f"{traj['dv_total']:.0f} m/s")
 
     st.subheader("Budget de masse")
     c1, c2, c3, c4 = st.columns(4)
