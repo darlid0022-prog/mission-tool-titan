@@ -1,0 +1,14 @@
+.PHONY: test check run clean
+
+test:
+	python -m pytest
+
+check:
+	./check.sh
+
+run:
+	./run.sh
+
+clean:
+	find . -type d -name "__pycache__" -prune -exec rm -rf {} +
+	find . -type f \( -name "*.pyc" -o -name "*.pyo" \) -delete
