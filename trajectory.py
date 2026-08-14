@@ -8,8 +8,8 @@ from datetime import date, datetime
 
 import pykep as pk
 
-from mission.leg_solver import compute_lambert_leg
 from mission.models import TrajectoryResult
+from mission.pykep_trajectory_engine import PyKEPTrajectoryEngine
 
 
 def norm(v):
@@ -108,7 +108,8 @@ def _compute_lambert_earth_saturn_grid(
     this compatibility boundary we convert back to the legacy dict shape expected
     by the current callers/tests.
     """
-    results = compute_lambert_leg(
+    engine = PyKEPTrajectoryEngine()
+    results = engine.compute_trajectory(
         "Earth",
         "Saturn",
         launch_start,
