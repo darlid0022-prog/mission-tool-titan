@@ -9,6 +9,7 @@ from datetime import date, datetime
 import pykep as pk
 
 from mission.leg_solver import compute_lambert_leg
+from mission.models import TrajectoryResult
 
 
 def norm(v):
@@ -42,6 +43,56 @@ def to_pk_epoch(value):
     )
 
 
+def _legacy_solution_dict(result: TrajectoryResult) -> dict:
+    """Convert the canonical internal TrajectoryResult into the legacy dict shape."""
+    return {
+        "dv_depart": result.v_inf_depart,
+        "v_infinity_saturn": result.v_inf_arrival,
+        "departure_mjd2000": result.departure_mjd2000,
+        "arrival_mjd2000": result.arrival_mjd2000,
+        "tof_years": result.tof_years,
+    }
+
+
+def _legacy_solution_list(results: list[TrajectoryResult]) -> list[dict]:
+    """Compatibility boundary: convert internal TrajectoryResult objects to legacy dicts."""
+    return [_legacy_solution_dict(result) for result in results]
+
+
+def _legacy_dict_to_trajectory_result(solution: dict) -> TrajectoryResult:
+    """Compatibility boundary: convert a legacy dict back to the canonical internal result type."""
+    return TrajectoryResult(
+        departure_mjd2000=solution.get("departure_mjd2000"),
+        arrival_mjd2000=solution.get("arrival_mjd2000"),
+        tof_years=solution.get("tof_years"),
+        v_inf_depart=solution.get("dv_depart"),
+        v_inf_arrival=solution.get("v_infinity_saturn"),
+        delta_v=None,
+        method="lambert",
+        notes="Legacy compatibility conversion.",
+    )
+
+
+def _result_value(solution, key_name: str):
+    """Read either a legacy dict or a TrajectoryResult using the relevant field name."""
+    if isinstance(solution, dict):
+        if key_name == "dv_depart":
+            return solution.get("dv_depart")
+        if key_name == "v_infinity_saturn":
+            return solution.get("v_infinity_saturn")
+        return solution.get(key_name)
+
+    if hasattr(solution, key_name):
+        return getattr(solution, key_name)
+
+    if key_name == "dv_depart":
+        return getattr(solution, "v_inf_depart", None)
+    if key_name == "v_infinity_saturn":
+        return getattr(solution, "v_inf_arrival", None)
+
+    raise ValueError(f"key_name '{key_name}' not found on solution")
+
+
 def _compute_lambert_earth_saturn_grid(
     launch_start,
     launch_end,
@@ -49,13 +100,13 @@ def _compute_lambert_earth_saturn_grid(
     tof_min_years=4.0,
     tof_max_years=8.0,
     tof_step_days=15.0,
-) -> list:
+) -> list[dict]:
     """
     Compute all feasible Earth→Saturn Lambert trajectories over a grid.
 
-    This is a compatibility wrapper around the generic Lambert leg solver. The
-    numerical output remains identical, but the actual Lambert computation is now
-    delegated to mission.leg_solver.compute_lambert_leg().
+    Internally the solver uses the canonical TrajectoryResult representation; at
+    this compatibility boundary we convert back to the legacy dict shape expected
+    by the current callers/tests.
     """
     results = compute_lambert_leg(
         "Earth",
@@ -68,143 +119,122 @@ def _compute_lambert_earth_saturn_grid(
         tof_step_days=tof_step_days,
     )
 
-    solutions = []
-    for result in results:
-        solutions.append(
-            {
-                "dv_depart": result.v_inf_depart,
-                "v_infinity_saturn": result.v_inf_arrival,
-                "departure_mjd2000": result.departure_mjd2000,
-                "arrival_mjd2000": result.arrival_mjd2000,
-                "tof_years": result.tof_years,
-            }
-        )
-
-    if not solutions:
+    if not results:
         raise RuntimeError(
             "Aucune solution Lambert Terre -> Saturne "
             "n'a ete trouvee."
         )
 
-    return solutions
+    return _legacy_solution_list(results)
 
 
 def select_best_by_criterion(solutions, key_name):
     """
     Select solution with minimum value for given criterion.
-    
-    Args:
-        solutions: list of solution dicts from _compute_lambert_earth_saturn_grid()
-        key_name: str, one of "dv_depart", "v_infinity_saturn", "tof_years"
-    
-    Returns:
-        Single solution dict with minimum key_name value
-    
-    Raises:
-        ValueError: if solutions is empty or key_name not found
+
+    Internal canonical representation is TrajectoryResult, but legacy dict-based
+    inputs remain supported at the selection boundary for compatibility.
     """
     if not solutions:
         raise ValueError("solutions list cannot be empty")
-    
-    if key_name not in solutions[0]:
-        raise ValueError(f"key_name '{key_name}' not found in solution dict")
-    
-    return min(solutions, key=lambda s: s[key_name])
+
+    if key_name in {"dv_depart", "v_infinity_saturn"}:
+        legacy_key = key_name
+    else:
+        legacy_key = key_name
+
+    if isinstance(solutions[0], dict):
+        if legacy_key not in solutions[0]:
+            raise ValueError(f"key_name '{key_name}' not found in solution dict")
+        return min(solutions, key=lambda s: s[legacy_key])
+
+    if not hasattr(solutions[0], key_name):
+        if key_name == "dv_depart":
+            if not hasattr(solutions[0], "v_inf_depart"):
+                raise ValueError(f"key_name '{key_name}' not found in solution")
+        elif key_name == "v_infinity_saturn":
+            if not hasattr(solutions[0], "v_inf_arrival"):
+                raise ValueError(f"key_name '{key_name}' not found in solution")
+        else:
+            raise ValueError(f"key_name '{key_name}' not found in solution")
+
+    return min(solutions, key=lambda s: _result_value(s, key_name))
 
 
 def select_best_by_departure_v_infinity(solutions):
-    """
-    Select solution with lowest departure v-infinity.
-    
-    Args:
-        solutions: list of solution dicts
-    
-    Returns:
-        Single solution dict (minimum dv_depart)
-    """
+    """Select solution with lowest departure v-infinity."""
     return select_best_by_criterion(solutions, "dv_depart")
 
 
 def select_best_by_arrival_v_infinity(solutions):
-    """
-    Select solution with lowest arrival v-infinity at Saturn.
-    
-    Args:
-        solutions: list of solution dicts
-    
-    Returns:
-        Single solution dict (minimum v_infinity_saturn)
-    """
+    """Select solution with lowest arrival v-infinity at Saturn."""
     return select_best_by_criterion(solutions, "v_infinity_saturn")
 
 
 def select_best_by_shortest_mission_duration(solutions):
-    """
-    Select solution with shortest time-of-flight.
-    
-    Args:
-        solutions: list of solution dicts
-    
-    Returns:
-        Single solution dict (minimum tof_years)
-    """
+    """Select solution with shortest time-of-flight."""
     return select_best_by_criterion(solutions, "tof_years")
 
 
 def select_pareto_frontier(solutions, objectives=None):
     """
     Filter to Pareto-optimal solutions (non-dominated).
-    
-    A solution is Pareto-optimal if no other solution is better
-    in all objectives simultaneously.
-    
-    Args:
-        solutions: list of solution dicts
-        objectives: list of criterion names to minimize, default: ["dv_depart", "v_infinity_saturn"]
-    
-    Returns:
-        list of non-dominated solutions (subset of input)
-    
-    Note:
-        - Empty solutions list returns empty list
-        - All solutions non-dominated returns full list
-        - Result is NOT sorted (preserves grid order)
+
+    Internal canonical representation is TrajectoryResult, but legacy dicts remain
+    accepted for compatibility.
     """
     if not solutions:
         return []
-    
+
     if objectives is None:
         objectives = ["dv_depart", "v_infinity_saturn"]
-    
-    # Verify all objectives exist in first solution
-    for obj in objectives:
-        if obj not in solutions[0]:
-            raise ValueError(f"objective '{obj}' not found in solution dict")
-    
+
+    canonical_objectives = []
+    for objective in objectives:
+        if objective == "dv_depart":
+            canonical_objectives.append("v_inf_depart")
+        elif objective == "v_infinity_saturn":
+            canonical_objectives.append("v_inf_arrival")
+        else:
+            canonical_objectives.append(objective)
+
+    for objective in objectives:
+        if isinstance(solutions[0], dict):
+            if objective not in solutions[0]:
+                raise ValueError(f"objective '{objective}' not found in solution dict")
+        else:
+            if objective == "dv_depart" and not hasattr(solutions[0], "v_inf_depart"):
+                raise ValueError(f"objective '{objective}' not found in solution")
+            if objective == "v_infinity_saturn" and not hasattr(solutions[0], "v_inf_arrival"):
+                raise ValueError(f"objective '{objective}' not found in solution")
+            if objective == "tof_years" and not hasattr(solutions[0], "tof_years"):
+                raise ValueError(f"objective '{objective}' not found in solution")
+
     pareto = []
-    
+
     for candidate in solutions:
         is_dominated = False
-        
+
         for other in solutions:
             if candidate is other:
                 continue
-            
-            # Check if other dominates candidate (better or equal in all objectives, strictly better in at least one)
+
             candidate_worse_or_equal = all(
-                other[obj] <= candidate[obj] for obj in objectives
+                _result_value(other, objective) <= _result_value(candidate, objective)
+                for objective in objectives
             )
             other_strictly_better = any(
-                other[obj] < candidate[obj] for obj in objectives
+                _result_value(other, objective) < _result_value(candidate, objective)
+                for objective in objectives
             )
-            
+
             if candidate_worse_or_equal and other_strictly_better:
                 is_dominated = True
                 break
-        
+
         if not is_dominated:
             pareto.append(candidate)
-    
+
     return pareto
 
 
@@ -253,15 +283,19 @@ def compute_trajectory(
 
     # Select best solution (minimum departure v-infinity)
     best = select_best_by_departure_v_infinity(solutions)
+    best_departure_v_inf = _result_value(best, "dv_depart")
+    best_arrival_v_inf = _result_value(best, "v_infinity_saturn")
+    best_departure_mjd2000 = _result_value(best, "departure_mjd2000")
+    best_arrival_mjd2000 = _result_value(best, "arrival_mjd2000")
 
     # Budget compatible avec app.py. NOTE: the values stored here are
     # heliocentric excess velocities (v-infinity) and NOT complete
     # propulsive ΔV calculations. Keys remain for backward compatibility
     # but the UI and notes clarify the semantics.
     dv_budget = {
-        "dV from LEO": best["dv_depart"],
+        "dV from LEO": best_departure_v_inf,
         "dV DSM/Fly-By": 0.0,
-        "dV Capture at Destination": best["v_infinity_saturn"],
+        "dV Capture at Destination": best_arrival_v_inf,
         "dV Transfer to Moon": 0.0,
         "dV Capture at Moon": 0.0,
         "dV Lower to Final Orbit": 0.0,
@@ -272,11 +306,11 @@ def compute_trajectory(
     dv_total = sum(dv_budget.values())
 
     best_launch_date = pk.epoch(
-        best["departure_mjd2000"]
+        best_departure_mjd2000
     )
 
     arrival_date = pk.epoch(
-        best["arrival_mjd2000"]
+        best_arrival_mjd2000
     )
 
     note = (
@@ -364,20 +398,19 @@ def compute_trajectory_alternatives(
             ),
         }
 
-    # Compute all Lambert solutions once
-    all_solutions = _compute_lambert_earth_saturn_grid(
+    # Compute all Lambert solutions once. Internally we convert to the canonical
+    # TrajectoryResult representation so the selection logic works on consistent objects.
+    all_legacy_solutions = _compute_lambert_earth_saturn_grid(
         launch_start,
         launch_end,
     )
+    all_results = [_legacy_dict_to_trajectory_result(solution) for solution in all_legacy_solutions]
 
-    # Apply all selection strategies to the same grid. Selection helpers
-    # continue to operate using legacy key names for compatibility but
-    # the solution dicts also carry the explicit `v_inf_*` keys.
-    best_by_dep = select_best_by_departure_v_infinity(all_solutions)
-    best_by_arr = select_best_by_arrival_v_infinity(all_solutions)
-    best_by_tof = select_best_by_shortest_mission_duration(all_solutions)
+    best_by_dep = select_best_by_departure_v_infinity(all_results)
+    best_by_arr = select_best_by_arrival_v_infinity(all_results)
+    best_by_tof = select_best_by_shortest_mission_duration(all_results)
     pareto = select_pareto_frontier(
-        all_solutions,
+        all_results,
         objectives=["dv_depart", "v_infinity_saturn"]
     )
 
@@ -389,12 +422,12 @@ def compute_trajectory_alternatives(
     )
 
     return {
-        "all_solutions": all_solutions,
-        "solution_count": len(all_solutions),
-        "best_by_departure_v_inf": best_by_dep,
-        "best_by_arrival_v_inf": best_by_arr,
-        "best_by_shortest_tof": best_by_tof,
-        "pareto_frontier": pareto,
+        "all_solutions": _legacy_solution_list(all_results),
+        "solution_count": len(all_results),
+        "best_by_departure_v_inf": _legacy_solution_dict(best_by_dep) if best_by_dep is not None else None,
+        "best_by_arrival_v_inf": _legacy_solution_dict(best_by_arr) if best_by_arr is not None else None,
+        "best_by_shortest_tof": _legacy_solution_dict(best_by_tof) if best_by_tof is not None else None,
+        "pareto_frontier": _legacy_solution_list(pareto),
         "pareto_count": len(pareto),
         "note": note,
     }
