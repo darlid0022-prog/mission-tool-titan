@@ -16,7 +16,15 @@ try:
 except ImportError:
     PYKEP_AVAILABLE = False
 
-from trajectory import compute_trajectory
+from trajectory import (
+    compute_trajectory,
+    compute_trajectory_alternatives,
+    _compute_lambert_earth_saturn_grid,
+    select_best_by_departure_v_infinity,
+    select_best_by_arrival_v_infinity,
+    select_best_by_shortest_mission_duration,
+    select_pareto_frontier,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -73,11 +81,11 @@ EXPECTED_MANEUVER_KEYS = frozenset({
 ABS_TOL_M_S = 1e-6
 ABS_TOL_MJD2000 = 1e-6
 
-REGRESSION_DV_DEPART_M_S = 11588.374686233732
-REGRESSION_V_INF_SATURN_M_S = 8643.436621212077
-REGRESSION_DV_TOTAL_M_S = 20231.81130744581
-REGRESSION_BEST_LAUNCH_MJD2000 = 9648.0
-REGRESSION_ARRIVAL_MJD2000 = 10926.375
+REGRESSION_DV_DEPART_M_S = 10432.306468285773
+REGRESSION_V_INF_SATURN_M_S = 6490.744714263188
+REGRESSION_DV_TOTAL_M_S = 16923.05118254896
+REGRESSION_BEST_LAUNCH_MJD2000 = 9681.181818181818
+REGRESSION_ARRIVAL_MJD2000 = 12537.181818181829
 
 
 @unittest.skipUnless(PYKEP_AVAILABLE, "pykep is required for trajectory tests")
@@ -198,6 +206,304 @@ class TestEarthSaturnTrajectoryEdgeCases(unittest.TestCase):
                 launch_start=date(2027, 6, 1),
                 launch_end=date(2026, 6, 1),
             )
+
+
+@unittest.skipUnless(PYKEP_AVAILABLE, "pykep is required for trajectory tests")
+class TestLambertGridComputation(unittest.TestCase):
+    """Test the Lambert grid computation function."""
+
+    @classmethod
+    def setUpClass(cls):
+        """Compute grid once for all tests in this class."""
+        cls.solutions = _compute_lambert_earth_saturn_grid(
+            LAUNCH_START,
+            LAUNCH_END,
+        )
+
+    def test_grid_returns_nonempty_list(self):
+        """Grid should return hundreds of solutions."""
+        self.assertGreater(len(self.solutions), 500)
+
+    def test_grid_solutions_have_required_keys(self):
+        """Each solution dict must have all 5 required keys."""
+        required_keys = {
+            "dv_depart",
+            "v_infinity_saturn",
+            "departure_mjd2000",
+            "arrival_mjd2000",
+            "tof_years",
+        }
+        for solution in self.solutions:
+            self.assertEqual(set(solution.keys()), required_keys)
+
+    def test_grid_solutions_have_positive_v_infinity(self):
+        """All v-infinity values must be positive."""
+        for solution in self.solutions:
+            self.assertGreater(solution["dv_depart"], 0.0, msg="dv_depart must be > 0")
+            self.assertGreater(solution["v_infinity_saturn"], 0.0, msg="v_infinity_saturn must be > 0")
+
+    def test_grid_solutions_have_valid_dates(self):
+        """Arrival date must be after departure date."""
+        for solution in self.solutions:
+            self.assertLess(
+                solution["departure_mjd2000"],
+                solution["arrival_mjd2000"],
+                msg="arrival_mjd2000 must be > departure_mjd2000",
+            )
+
+    def test_grid_solutions_have_positive_tof(self):
+        """Time-of-flight must be positive and reasonable."""
+        for solution in self.solutions:
+            self.assertGreater(solution["tof_years"], 0.0, msg="tof_years must be > 0")
+            self.assertLess(solution["tof_years"], 15.0, msg="tof_years should be < 15 years")
+
+    def test_grid_computation_is_deterministic(self):
+        """Same input window produces identical solution list."""
+        second_run = _compute_lambert_earth_saturn_grid(
+            LAUNCH_START,
+            LAUNCH_END,
+        )
+        self.assertEqual(len(self.solutions), len(second_run))
+        for sol1, sol2 in zip(self.solutions, second_run):
+            self.assertAlmostEqual(sol1["dv_depart"], sol2["dv_depart"], delta=ABS_TOL_M_S)
+            self.assertAlmostEqual(sol1["v_infinity_saturn"], sol2["v_infinity_saturn"], delta=ABS_TOL_M_S)
+            self.assertAlmostEqual(sol1["departure_mjd2000"], sol2["departure_mjd2000"], delta=ABS_TOL_MJD2000)
+
+
+@unittest.skipUnless(PYKEP_AVAILABLE, "pykep is required for trajectory tests")
+class TestTrajectorySelection(unittest.TestCase):
+    """Test the selection functions."""
+
+    @classmethod
+    def setUpClass(cls):
+        """Compute grid once for all tests in this class."""
+        cls.solutions = _compute_lambert_earth_saturn_grid(
+            LAUNCH_START,
+            LAUNCH_END,
+        )
+
+    def test_select_best_by_departure_minimizes_dv_depart(self):
+        """Selected solution must have minimum dv_depart."""
+        best = select_best_by_departure_v_infinity(self.solutions)
+        min_dv = min(s["dv_depart"] for s in self.solutions)
+        self.assertAlmostEqual(best["dv_depart"], min_dv, delta=ABS_TOL_M_S)
+
+    def test_select_best_by_arrival_minimizes_v_inf_saturn(self):
+        """Selected solution must have minimum v_infinity_saturn."""
+        best = select_best_by_arrival_v_infinity(self.solutions)
+        min_v_inf = min(s["v_infinity_saturn"] for s in self.solutions)
+        self.assertAlmostEqual(best["v_infinity_saturn"], min_v_inf, delta=ABS_TOL_M_S)
+
+    def test_select_best_by_shortest_tof_minimizes_tof(self):
+        """Selected solution must have minimum tof_years."""
+        best = select_best_by_shortest_mission_duration(self.solutions)
+        min_tof = min(s["tof_years"] for s in self.solutions)
+        self.assertAlmostEqual(best["tof_years"], min_tof, delta=1e-9)
+
+    def test_selected_best_departure_belongs_to_solutions(self):
+        """Best-by-departure must exist in original list."""
+        best = select_best_by_departure_v_infinity(self.solutions)
+        self.assertIn(best, self.solutions)
+
+    def test_selected_best_arrival_belongs_to_solutions(self):
+        """Best-by-arrival must exist in original list."""
+        best = select_best_by_arrival_v_infinity(self.solutions)
+        self.assertIn(best, self.solutions)
+
+    def test_selected_best_tof_belongs_to_solutions(self):
+        """Best-by-TOF must exist in original list."""
+        best = select_best_by_shortest_mission_duration(self.solutions)
+        self.assertIn(best, self.solutions)
+
+    def test_selection_on_empty_list_raises_error(self):
+        """Selecting from empty list should raise ValueError."""
+        with self.assertRaises(ValueError):
+            select_best_by_departure_v_infinity([])
+
+
+@unittest.skipUnless(PYKEP_AVAILABLE, "pykep is required for trajectory tests")
+class TestParetoFrontier(unittest.TestCase):
+    """Test the Pareto frontier selection function."""
+
+    @classmethod
+    def setUpClass(cls):
+        """Compute grid once for all tests in this class."""
+        cls.solutions = _compute_lambert_earth_saturn_grid(
+            LAUNCH_START,
+            LAUNCH_END,
+        )
+
+    def test_pareto_frontier_is_nonempty(self):
+        """Pareto frontier should contain at least one solution."""
+        pareto = select_pareto_frontier(self.solutions)
+        self.assertGreater(len(pareto), 0)
+
+    def test_pareto_frontier_is_reasonable_size(self):
+        """Pareto frontier should be much smaller than full grid."""
+        pareto = select_pareto_frontier(self.solutions)
+        self.assertLess(len(pareto), len(self.solutions) / 10)
+        self.assertLess(len(pareto), 30)  # Typically 5-20 for 2 objectives
+
+    def test_pareto_solutions_belong_to_original_list(self):
+        """All Pareto solutions must exist in original grid."""
+        pareto = select_pareto_frontier(self.solutions)
+        for p in pareto:
+            self.assertIn(p, self.solutions)
+
+    def test_pareto_solutions_are_non_dominated(self):
+        """No Pareto solution should be dominated by another."""
+        pareto = select_pareto_frontier(
+            self.solutions,
+            objectives=["dv_depart", "v_infinity_saturn"],
+        )
+        for p in pareto:
+            for other in pareto:
+                if p is not other:
+                    # p should NOT be dominated by other
+                    p_not_worse_depart = p["dv_depart"] <= other["dv_depart"]
+                    p_not_worse_arrival = p["v_infinity_saturn"] <= other["v_infinity_saturn"]
+                    # At least one must be true (p is not strictly worse in both)
+                    self.assertTrue(p_not_worse_depart or p_not_worse_arrival)
+
+    def test_pareto_frontier_empty_list_returns_empty(self):
+        """Pareto frontier of empty list should return empty list."""
+        pareto = select_pareto_frontier([])
+        self.assertEqual(pareto, [])
+
+
+@unittest.skipUnless(PYKEP_AVAILABLE, "pykep is required for trajectory tests")
+class TestAlternativesAPI(unittest.TestCase):
+    """Test the compute_trajectory_alternatives() API."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.alternatives = compute_trajectory_alternatives(
+            "Saturn",
+            "Direct",
+            LAUNCH_START,
+            LAUNCH_END,
+            True,
+            False,
+            False,
+            1000.0,
+        )
+
+    def test_alternatives_dict_has_expected_keys(self):
+        """Return dict must have all 8 expected keys."""
+        expected_keys = {
+            "all_solutions",
+            "solution_count",
+            "best_by_departure_v_inf",
+            "best_by_arrival_v_inf",
+            "best_by_shortest_tof",
+            "pareto_frontier",
+            "pareto_count",
+            "note",
+        }
+        self.assertEqual(set(self.alternatives.keys()), expected_keys)
+
+    def test_solution_count_matches_all_solutions(self):
+        """solution_count must equal len(all_solutions)."""
+        self.assertEqual(
+            self.alternatives["solution_count"],
+            len(self.alternatives["all_solutions"]),
+        )
+
+    def test_pareto_count_matches_pareto_frontier(self):
+        """pareto_count must equal len(pareto_frontier)."""
+        self.assertEqual(
+            self.alternatives["pareto_count"],
+            len(self.alternatives["pareto_frontier"]),
+        )
+
+    def test_best_by_departure_is_member_of_all_solutions(self):
+        """best_by_departure_v_inf must exist in all_solutions."""
+        best = self.alternatives["best_by_departure_v_inf"]
+        self.assertIn(best, self.alternatives["all_solutions"])
+
+    def test_best_by_arrival_is_member_of_all_solutions(self):
+        """best_by_arrival_v_inf must exist in all_solutions."""
+        best = self.alternatives["best_by_arrival_v_inf"]
+        self.assertIn(best, self.alternatives["all_solutions"])
+
+    def test_best_by_shortest_tof_is_member_of_all_solutions(self):
+        """best_by_shortest_tof must exist in all_solutions."""
+        best = self.alternatives["best_by_shortest_tof"]
+        self.assertIn(best, self.alternatives["all_solutions"])
+
+    def test_best_by_departure_really_minimizes_departure(self):
+        """Verify best_by_departure has minimum dv_depart."""
+        best = self.alternatives["best_by_departure_v_inf"]
+        min_dv = min(s["dv_depart"] for s in self.alternatives["all_solutions"])
+        self.assertAlmostEqual(best["dv_depart"], min_dv, delta=ABS_TOL_M_S)
+
+    def test_best_by_arrival_really_minimizes_arrival(self):
+        """Verify best_by_arrival has minimum v_infinity_saturn."""
+        best = self.alternatives["best_by_arrival_v_inf"]
+        min_v_inf = min(s["v_infinity_saturn"] for s in self.alternatives["all_solutions"])
+        self.assertAlmostEqual(best["v_infinity_saturn"], min_v_inf, delta=ABS_TOL_M_S)
+
+    def test_best_by_shortest_tof_really_minimizes_tof(self):
+        """Verify best_by_shortest_tof has minimum tof_years."""
+        best = self.alternatives["best_by_shortest_tof"]
+        min_tof = min(s["tof_years"] for s in self.alternatives["all_solutions"])
+        self.assertAlmostEqual(best["tof_years"], min_tof, delta=1e-9)
+
+    def test_non_saturn_destination_returns_empty_alternatives(self):
+        """Non-Saturn destination should return empty alternatives."""
+        result = compute_trajectory_alternatives(
+            "Titan",
+            "Direct",
+            LAUNCH_START,
+            LAUNCH_END,
+            True,
+            False,
+            False,
+            1000.0,
+        )
+        self.assertEqual(result["solution_count"], 0)
+        self.assertEqual(len(result["all_solutions"]), 0)
+        self.assertIsNone(result["best_by_departure_v_inf"])
+
+
+@unittest.skipUnless(PYKEP_AVAILABLE, "pykep is required for trajectory tests")
+class TestBackwardCompatibility(unittest.TestCase):
+    """Verify compute_trajectory() remains backward compatible."""
+
+    def test_compute_trajectory_best_by_departure_matches_alternatives(self):
+        """The best solution from compute_trajectory() should match
+        best_by_departure_v_inf from compute_trajectory_alternatives()."""
+        old = compute_trajectory(
+            "Saturn",
+            "Direct",
+            LAUNCH_START,
+            LAUNCH_END,
+            True,
+            False,
+            False,
+            1000.0,
+        )
+        new = compute_trajectory_alternatives(
+            "Saturn",
+            "Direct",
+            LAUNCH_START,
+            LAUNCH_END,
+            True,
+            False,
+            False,
+            1000.0,
+        )
+        # Extract values from old API
+        old_dv_depart = old["dv_budget"]["dV from LEO"]
+        old_v_inf_saturn = old["dv_budget"]["dV Capture at Destination"]
+        
+        # Extract values from new API best
+        new_dv_depart = new["best_by_departure_v_inf"]["dv_depart"]
+        new_v_inf_saturn = new["best_by_departure_v_inf"]["v_infinity_saturn"]
+        
+        # They must match
+        self.assertAlmostEqual(old_dv_depart, new_dv_depart, delta=ABS_TOL_M_S)
+        self.assertAlmostEqual(old_v_inf_saturn, new_v_inf_saturn, delta=ABS_TOL_M_S)
 
 
 if __name__ == "__main__":
