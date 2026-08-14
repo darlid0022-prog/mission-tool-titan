@@ -106,18 +106,15 @@ def compute_trajectory(
             for i in range(n_departures)
         ]
 
-    # Temps de vol a tester.
-    tof_years_list = [
-        1.0,
-        1.5,
-        2.0,
-        2.5,
-        3.0,
-        3.5,
-        4.0,
-        4.5,
-        5.0,
-    ]
+    # Temps de vol a tester (4-8 ans, pas ~15 jours).
+    tof_step_days = 15.0
+    tof_min_years = 4.0
+    tof_max_years = 8.0
+    tof_years_list = []
+    tof_years = tof_min_years
+    while tof_years <= tof_max_years + 1e-9:
+        tof_years_list.append(tof_years)
+        tof_years += tof_step_days / 365.25
 
     best = None
 
