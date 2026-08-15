@@ -1,0 +1,8 @@
+# Reproducible development-only quality toolchain.
+# Runtime dependencies remain in requirements.txt and PyKEP is managed by conda.
+detect-secrets==1.5.0
+mypy==1.17.1
+pip-audit==2.9.0
+pytest==9.1.1
+pytest-cov==6.2.1
+ruff==0.12.8

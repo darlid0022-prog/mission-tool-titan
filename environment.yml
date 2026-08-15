@@ -1,0 +1,12 @@
+name: mission-tool-dev
+channels:
+  - conda-forge
+dependencies:
+  - python=3.13
+  - pykep=3.0.0
+  - streamlit=1.61.1
+  - pandas=3.0.5
+  - numpy=2.5.2
+  - pip
+  - pip:
+      - -r requirements-dev.txt

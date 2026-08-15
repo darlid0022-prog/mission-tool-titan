@@ -1,2 +1,7 @@
 __pycache__/
 *.py[cod]
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/

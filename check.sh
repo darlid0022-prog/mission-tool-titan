@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
 echo "================================"
 echo " Mission Tool - Health Check"
@@ -15,8 +15,16 @@ echo ">>> PyKEP"
 python -c "import pykep; print('PyKEP OK')"
 
 echo ""
+echo ">>> Dependencies"
+python -m pip check
+
+echo ""
+echo ">>> Compile"
+python -m compileall -q app.py trajectory.py mission tests
+
+echo ""
 echo ">>> Tests"
-python -m pytest
+python -m pytest -q
 
 echo ""
 echo ">>> Git"
