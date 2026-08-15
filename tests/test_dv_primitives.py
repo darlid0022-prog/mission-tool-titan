@@ -1,14 +1,16 @@
-import math
 import importlib
+import math
 import unittest
 
 # Conventions used in these tests:
-# - Units are SI: meters (m) for distance, seconds (s) for time, meters per second (m/s) for velocities.
+# - Units are SI: meters (m) for distance, seconds (s) for time, and
+#   meters per second (m/s) for velocities.
 # - Gravitational parameter `mu` is therefore in m^3 / s^2.
 # The tests intentionally do not provide an implementation; they assert the
 # mathematical contract that future primitives must satisfy. They will fail
 # (with an explicit message) if `mission.physics` or the expected functions
 # are not present.
+
 
 class TestDVPrimitives(unittest.TestCase):
     def setUp(self):
@@ -30,7 +32,7 @@ class TestDVPrimitives(unittest.TestCase):
         """A. Injection with v_inf = 0: ΔV = sqrt(2*mu/r) - sqrt(mu/r) (SI units)."""
         self.fail_if_no_physics()
         mu = 3.986004418e14  # Earth's mu in m^3/s^2 (SI)
-        r = (6371e3 + 700e3)  # 700 km above Earth's surface => meters
+        r = 6371e3 + 700e3  # 700 km above Earth's surface => meters
         v_inf = 0.0
 
         expected = math.sqrt(2 * mu / r) - math.sqrt(mu / r)
@@ -42,7 +44,7 @@ class TestDVPrimitives(unittest.TestCase):
         """B. Injection with v_inf > 0: formula holds and ΔV > case v_inf=0."""
         self.fail_if_no_physics()
         mu = 3.986004418e14
-        r = (6371e3 + 700e3)
+        r = 6371e3 + 700e3
         v_inf = 1000.0  # m/s
 
         expected = math.sqrt(v_inf * v_inf + 2 * mu / r) - math.sqrt(mu / r)
@@ -56,7 +58,7 @@ class TestDVPrimitives(unittest.TestCase):
         """C. Capture with v_inf = 0: ΔV = sqrt(2*mu/r) - sqrt(mu/r)."""
         self.fail_if_no_physics()
         mu = 3.986004418e14
-        r = (6371e3 + 2000e3)  # 2000 km above Earth
+        r = 6371e3 + 2000e3  # 2000 km above Earth
         v_inf = 0.0
 
         expected = math.sqrt(2 * mu / r) - math.sqrt(mu / r)
@@ -68,7 +70,7 @@ class TestDVPrimitives(unittest.TestCase):
         """D. Capture with v_inf > 0: formula holds numerically."""
         self.fail_if_no_physics()
         mu = 3.986004418e14
-        r = (6371e3 + 2000e3)
+        r = 6371e3 + 2000e3
         v_inf = 500.0
 
         expected = math.sqrt(v_inf * v_inf + 2 * mu / r) - math.sqrt(mu / r)

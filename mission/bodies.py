@@ -34,9 +34,7 @@ class CelestialBody:
             return self.gravitational_parameter
         if self.pykep_body is not None:
             return self.pykep_body.get_mu_central_body()
-        raise NotImplementedError(
-            f"Gravitational parameter for {self.name} is not defined."
-        )
+        raise NotImplementedError(f"Gravitational parameter for {self.name} is not defined.")
 
 
 def _build_earth() -> CelestialBody:
@@ -90,6 +88,4 @@ def resolve_body(body_name: str) -> CelestialBody:
         return SUPPORTED_BODIES[normalized]
     except KeyError as exc:
         supported = ", ".join([body.name for body in SUPPORTED_BODIES.values()])
-        raise ValueError(
-            f"Unsupported body '{body_name}'. Supported bodies: {supported}."
-        ) from exc
+        raise ValueError(f"Unsupported body '{body_name}'. Supported bodies: {supported}.") from exc

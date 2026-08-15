@@ -16,9 +16,7 @@ class TestAppCapabilities(unittest.TestCase):
         self.assertNotIn("Titan", SUPPORTED_DESTINATIONS)
 
     def test_supported_and_planned_destinations_do_not_overlap(self):
-        self.assertTrue(
-            set(SUPPORTED_DESTINATIONS).isdisjoint(PLANNED_DESTINATIONS)
-        )
+        self.assertTrue(set(SUPPORTED_DESTINATIONS).isdisjoint(PLANNED_DESTINATIONS))
 
     def test_unimplemented_mission_features_are_declared_as_planned(self):
         self.assertIn("Saturn to Titan transfer", PLANNED_MISSION_FEATURES)

@@ -1,8 +1,8 @@
 """Streamlit interface for the Mission Design Calculator."""
 
-import streamlit as st
-import pandas as pd
 import numpy as np
+import pandas as pd
+import streamlit as st
 
 from mission.capabilities import (
     PLANNED_DESTINATIONS,
@@ -38,9 +38,7 @@ with col_inputs:
     # Expose LEO altitude when relevant; provide a default value so the
     # compute_trajectory() call always receives the parameter.
     if departure_type == "LEO":
-        leo_altitude_km = st.number_input(
-            "Altitude LEO initiale (km)", min_value=100, value=250
-        )
+        leo_altitude_km = st.number_input("Altitude LEO initiale (km)", min_value=100, value=250)
     else:
         leo_altitude_km = 250
     capture_altitude_km = st.number_input(
@@ -61,9 +59,17 @@ with col_inputs:
 
     st.header("4. Instruments")
     st.caption("Ajoute/édite les lignes directement dans le tableau ci-dessous.")
-    default_instruments = pd.DataFrame([
-        {"Instrument": "", "Cible": "Orbiter", "Masse (kg)": 0.0, "Puissance (W)": 0.0, "Débit (bps)": 0.0},
-    ])
+    default_instruments = pd.DataFrame(
+        [
+            {
+                "Instrument": "",
+                "Cible": "Orbiter",
+                "Masse (kg)": 0.0,
+                "Puissance (W)": 0.0,
+                "Débit (bps)": 0.0,
+            },
+        ]
+    )
     instruments_df = st.data_editor(
         default_instruments,
         num_rows="dynamic",
@@ -75,12 +81,19 @@ with col_inputs:
         },
     )
 
+
 # -----------------------------------------------------------------------
 # 4. MOTEUR DE DIMENSIONNEMENT (transcription de la logique Excel)
 #    -> celui-ci est déjà fonctionnel, pas besoin d'attendre Hermès
 # -----------------------------------------------------------------------
-def compute_mass_budget(dv_total: float, isp_s: float, instruments_df: pd.DataFrame,
-                         harness_frac=0.10, structure_frac=0.20, margin_frac=0.20) -> dict:
+def compute_mass_budget(
+    dv_total: float,
+    isp_s: float,
+    instruments_df: pd.DataFrame,
+    harness_frac=0.10,
+    structure_frac=0.20,
+    margin_frac=0.20,
+) -> dict:
     g0 = 9.80665
     instrument_mass = instruments_df["Masse (kg)"].fillna(0).sum()
 

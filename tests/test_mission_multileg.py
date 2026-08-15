@@ -41,8 +41,12 @@ class TestMissionMultilegModel(unittest.TestCase):
         self.assertEqual(mission.legs[1].destination, "Titan")
         self.assertEqual(mission.legs[0].destination, mission.legs[1].origin)
 
-        self.assertEqual(mission.legs[0].trajectory.arrival_mjd2000, leg1.trajectory.arrival_mjd2000)
-        self.assertEqual(mission.legs[1].trajectory.departure_mjd2000, leg2.trajectory.departure_mjd2000)
+        self.assertEqual(
+            mission.legs[0].trajectory.arrival_mjd2000, leg1.trajectory.arrival_mjd2000
+        )
+        self.assertEqual(
+            mission.legs[1].trajectory.departure_mjd2000, leg2.trajectory.departure_mjd2000
+        )
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
 import unittest
 from datetime import date
 
-from trajectory import _compute_lambert_earth_saturn_grid
 from mission.leg_solver import compute_lambert_leg
+from trajectory import _compute_lambert_earth_saturn_grid
 
 
 class TestLambertLegSolver(unittest.TestCase):

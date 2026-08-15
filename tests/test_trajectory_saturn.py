@@ -17,15 +17,14 @@ except ImportError:
     PYKEP_AVAILABLE = False
 
 from trajectory import (
+    _compute_lambert_earth_saturn_grid,
     compute_trajectory,
     compute_trajectory_alternatives,
-    _compute_lambert_earth_saturn_grid,
-    select_best_by_departure_v_infinity,
     select_best_by_arrival_v_infinity,
+    select_best_by_departure_v_infinity,
     select_best_by_shortest_mission_duration,
     select_pareto_frontier,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixed, deterministic inputs for the regression scenario
@@ -45,10 +44,12 @@ DEFAULT_KWARGS = dict(
 )
 
 # Provide UI-like altitude parameters (km) used by the compute_trajectory call.
-DEFAULT_KWARGS.update({
-    "leo_altitude_km": 250,
-    "capture_altitude_km": 2000,
-})
+DEFAULT_KWARGS.update(
+    {
+        "leo_altitude_km": 250,
+        "capture_altitude_km": 2000,
+    }
+)
 
 
 def _call_saturn_baseline(**overrides):
@@ -59,24 +60,28 @@ def _call_saturn_baseline(**overrides):
 # ---------------------------------------------------------------------------
 # API contract
 # ---------------------------------------------------------------------------
-EXPECTED_TOP_LEVEL_KEYS = frozenset({
-    "dv_budget",
-    "dv_total",
-    "best_launch_date",
-    "arrival_date",
-    "note",
-})
+EXPECTED_TOP_LEVEL_KEYS = frozenset(
+    {
+        "dv_budget",
+        "dv_total",
+        "best_launch_date",
+        "arrival_date",
+        "note",
+    }
+)
 
-EXPECTED_MANEUVER_KEYS = frozenset({
-    "dV from LEO",
-    "dV DSM/Fly-By",
-    "dV Capture at Destination",
-    "dV Transfer to Moon",
-    "dV Capture at Moon",
-    "dV Lower to Final Orbit",
-    "dV Break for landing",
-    "dV Soft Landing",
-})
+EXPECTED_MANEUVER_KEYS = frozenset(
+    {
+        "dV from LEO",
+        "dV DSM/Fly-By",
+        "dV Capture at Destination",
+        "dV Transfer to Moon",
+        "dV Capture at Moon",
+        "dV Lower to Final Orbit",
+        "dV Break for landing",
+        "dV Soft Landing",
+    }
+)
 
 
 # ---------------------------------------------------------------------------
@@ -156,15 +161,19 @@ class TestEarthSaturnTrajectoryRegression(unittest.TestCase):
         self.assertAlmostEqual(lambert_v_inf, REGRESSION_V_INF_SATURN_M_S, delta=ABS_TOL_M_S)
 
         # And the stored budget entry is the computed capture delta-v
-        from mission.bodies import resolve_body
         from mission import physics
+        from mission.bodies import resolve_body
 
         saturn = resolve_body("Saturn")
         r_capture = saturn.pykep_body.get_radius() + DEFAULT_KWARGS["capture_altitude_km"] * 1000.0
         mu_saturn = saturn.get_mu_central_body()
         expected_capture = physics.delta_v_capture(lambert_v_inf, mu_saturn, r_capture)
 
-        self.assertAlmostEqual(self.result["dv_budget"]["dV Capture at Destination"], expected_capture, delta=ABS_TOL_M_S)
+        self.assertAlmostEqual(
+            self.result["dv_budget"]["dV Capture at Destination"],
+            expected_capture,
+            delta=ABS_TOL_M_S,
+        )
 
     def test_earth_saturn_total_dv_regression(self):
         # Compute expected total: for the default Direct departure we keep the
@@ -184,8 +193,8 @@ class TestEarthSaturnTrajectoryRegression(unittest.TestCase):
         v_inf_depart = lambert_best["dv_depart"]
         v_inf_arrival = lambert_best["v_infinity_saturn"]
 
-        from mission.bodies import resolve_body
         from mission import physics
+        from mission.bodies import resolve_body
 
         saturn = resolve_body("Saturn")
         r_capture = saturn.pykep_body.get_radius() + DEFAULT_KWARGS["capture_altitude_km"] * 1000.0
@@ -291,7 +300,9 @@ class TestLambertGridComputation(unittest.TestCase):
         """All v-infinity values must be positive."""
         for solution in self.solutions:
             self.assertGreater(solution["dv_depart"], 0.0, msg="dv_depart must be > 0")
-            self.assertGreater(solution["v_infinity_saturn"], 0.0, msg="v_infinity_saturn must be > 0")
+            self.assertGreater(
+                solution["v_infinity_saturn"], 0.0, msg="v_infinity_saturn must be > 0"
+            )
 
     def test_grid_solutions_have_valid_dates(self):
         """Arrival date must be after departure date."""
@@ -317,7 +328,9 @@ class TestLambertGridComputation(unittest.TestCase):
     def test_grid_tof_steps_are_approximately_15_days(self):
         """Consecutive unique TOF values should differ by ~15 days."""
         unique_tof = sorted({solution["tof_years"] for solution in self.solutions})
-        diffs_days = [(next_tof - tof) * 365.25 for tof, next_tof in zip(unique_tof, unique_tof[1:])]
+        diffs_days = [
+            (next_tof - tof) * 365.25 for tof, next_tof in zip(unique_tof, unique_tof[1:])
+        ]
         self.assertTrue(diffs_days)
         for diff_days in diffs_days:
             self.assertAlmostEqual(diff_days, 15.0, delta=1e-6)
@@ -337,8 +350,12 @@ class TestLambertGridComputation(unittest.TestCase):
         self.assertEqual(len(self.solutions), len(second_run))
         for sol1, sol2 in zip(self.solutions, second_run):
             self.assertAlmostEqual(sol1["dv_depart"], sol2["dv_depart"], delta=ABS_TOL_M_S)
-            self.assertAlmostEqual(sol1["v_infinity_saturn"], sol2["v_infinity_saturn"], delta=ABS_TOL_M_S)
-            self.assertAlmostEqual(sol1["departure_mjd2000"], sol2["departure_mjd2000"], delta=ABS_TOL_MJD2000)
+            self.assertAlmostEqual(
+                sol1["v_infinity_saturn"], sol2["v_infinity_saturn"], delta=ABS_TOL_M_S
+            )
+            self.assertAlmostEqual(
+                sol1["departure_mjd2000"], sol2["departure_mjd2000"], delta=ABS_TOL_MJD2000
+            )
 
 
 @unittest.skipUnless(PYKEP_AVAILABLE, "pykep is required for trajectory tests")
@@ -575,19 +592,19 @@ class TestBackwardCompatibility(unittest.TestCase):
         # Extract values from old API
         old_dv_depart = old["dv_budget"]["dV from LEO"]
         old_v_inf_saturn = old["dv_budget"]["dV Capture at Destination"]
-        
+
         # Extract values from new API best
         new_dv_depart = new["best_by_departure_v_inf"]["dv_depart"]
         new_v_inf_saturn = new["best_by_departure_v_inf"]["v_infinity_saturn"]
-        
+
         # They must match
         self.assertAlmostEqual(old_dv_depart, new_dv_depart, delta=ABS_TOL_M_S)
 
         # The alternatives API exposes the Lambert v_infinity; compute_trajectory
         # now stores the propulsive capture ΔV in the budget entry. Verify both.
         self.assertAlmostEqual(new_v_inf_saturn, REGRESSION_V_INF_SATURN_M_S, delta=ABS_TOL_M_S)
-        from mission.bodies import resolve_body
         from mission import physics
+        from mission.bodies import resolve_body
 
         saturn = resolve_body("Saturn")
         r_capture = saturn.pykep_body.get_radius() + DEFAULT_KWARGS["capture_altitude_km"] * 1000.0
@@ -627,8 +644,8 @@ class TestDeltaVIntegration(unittest.TestCase):
         lambert_best = self.alternatives["best_by_departure_v_inf"]
         v_inf = lambert_best["dv_depart"]
 
-        from mission.bodies import resolve_body
         from mission import physics
+        from mission.bodies import resolve_body
 
         earth = resolve_body("Earth")
         r_leo = earth.pykep_body.get_radius() + params["leo_altitude_km"] * 1000.0
@@ -646,15 +663,17 @@ class TestDeltaVIntegration(unittest.TestCase):
         lambert_best = self.alternatives["best_by_departure_v_inf"]
         v_inf_arrival = lambert_best["v_infinity_saturn"]
 
-        from mission.bodies import resolve_body
         from mission import physics
+        from mission.bodies import resolve_body
 
         saturn = resolve_body("Saturn")
         r_capture = saturn.pykep_body.get_radius() + params["capture_altitude_km"] * 1000.0
         mu_saturn = saturn.get_mu_central_body()
 
         expected_capture = physics.delta_v_capture(v_inf_arrival, mu_saturn, r_capture)
-        self.assertAlmostEqual(result["dv_budget"]["dV Capture at Destination"], expected_capture, delta=1e-6)
+        self.assertAlmostEqual(
+            result["dv_budget"]["dV Capture at Destination"], expected_capture, delta=1e-6
+        )
 
 
 if __name__ == "__main__":

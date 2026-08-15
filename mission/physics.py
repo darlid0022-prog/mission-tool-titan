@@ -25,15 +25,13 @@ from __future__ import annotations
 
 import math
 
-from typing import Any
-
 
 def _validate_inputs(v_inf: float, mu: float, r: float) -> None:
-    if not isinstance(v_inf, (int, float)):
+    if not isinstance(v_inf, int | float):
         raise ValueError("v_inf must be a number (m/s) and >= 0")
-    if not isinstance(mu, (int, float)):
+    if not isinstance(mu, int | float):
         raise ValueError("mu must be a positive number (m^3/s^2)")
-    if not isinstance(r, (int, float)):
+    if not isinstance(r, int | float):
         raise ValueError("r must be a positive number (m)")
 
     if mu <= 0:

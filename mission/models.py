@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass
@@ -14,7 +14,7 @@ class Event:
     name: str
     body: str
     event_type: str = "generic"
-    epoch: Optional[Any] = None
+    epoch: Any | None = None
     notes: str = ""
 
     def __post_init__(self) -> None:
@@ -30,12 +30,12 @@ class Event:
 class TrajectoryResult:
     """A transfer result with explicit separation between v∞ and propulsive ΔV."""
 
-    departure_mjd2000: Optional[float] = None
-    arrival_mjd2000: Optional[float] = None
-    tof_years: Optional[float] = None
-    v_inf_depart: Optional[float] = None
-    v_inf_arrival: Optional[float] = None
-    delta_v: Optional[float] = None
+    departure_mjd2000: float | None = None
+    arrival_mjd2000: float | None = None
+    tof_years: float | None = None
+    v_inf_depart: float | None = None
+    v_inf_arrival: float | None = None
+    delta_v: float | None = None
     method: str = ""
     notes: str = ""
 
@@ -54,7 +54,7 @@ class Leg:
 
     origin: str
     destination: str
-    trajectory: Optional[TrajectoryResult] = None
+    trajectory: TrajectoryResult | None = None
     events: list[Event] = field(default_factory=list)
     notes: str = ""
 

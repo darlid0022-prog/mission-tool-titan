@@ -1,6 +1,5 @@
 """Minimal mission-domain objects for multi-leg mission analysis."""
 
-from .models import Event, Leg, Mission, TrajectoryResult
 from .builder import (
     build_event,
     build_leg,
@@ -8,6 +7,7 @@ from .builder import (
     build_mission_from_trajectory_alternatives,
     build_trajectory_result,
 )
+from .models import Event, Leg, Mission, TrajectoryResult
 
 __all__ = [
     "Event",

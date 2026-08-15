@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 from .models import Event, Leg, Mission, TrajectoryResult
 
@@ -18,7 +18,9 @@ def build_mission_from_trajectory_alternatives(
     propulsive delta-v remains unset (None).
     """
     if not isinstance(trajectory_alternatives, dict):
-        raise TypeError("trajectory_alternatives must be a dict from compute_trajectory_alternatives().")
+        raise TypeError(
+            "trajectory_alternatives must be a dict from compute_trajectory_alternatives()."
+        )
 
     selected = trajectory_alternatives.get(selection_key)
     if selected is None:
@@ -77,7 +79,7 @@ def build_event(
     name: str,
     body: str,
     event_type: str = "generic",
-    epoch: Optional[object] = None,
+    epoch: object | None = None,
     notes: str = "",
 ) -> Event:
     """Construct a mission event with basic validation."""
@@ -92,12 +94,12 @@ def build_event(
 
 def build_trajectory_result(
     *,
-    departure_mjd2000: Optional[float] = None,
-    arrival_mjd2000: Optional[float] = None,
-    tof_years: Optional[float] = None,
-    v_inf_depart: Optional[float] = None,
-    v_inf_arrival: Optional[float] = None,
-    delta_v: Optional[float] = None,
+    departure_mjd2000: float | None = None,
+    arrival_mjd2000: float | None = None,
+    tof_years: float | None = None,
+    v_inf_depart: float | None = None,
+    v_inf_arrival: float | None = None,
+    delta_v: float | None = None,
     method: str = "",
     notes: str = "",
 ) -> TrajectoryResult:
@@ -118,8 +120,8 @@ def build_leg(
     origin: str,
     destination: str,
     *,
-    trajectory: Optional[TrajectoryResult] = None,
-    events: Optional[Iterable[Event]] = None,
+    trajectory: TrajectoryResult | None = None,
+    events: Iterable[Event] | None = None,
     notes: str = "",
 ) -> Leg:
     """Construct a transfer leg with optional trajectory result and events."""
@@ -135,8 +137,8 @@ def build_leg(
 def build_mission(
     name: str = "Mission",
     *,
-    legs: Optional[Iterable[Leg]] = None,
-    events: Optional[Iterable[Event]] = None,
+    legs: Iterable[Leg] | None = None,
+    events: Iterable[Event] | None = None,
     notes: str = "",
 ) -> Mission:
     """Construct a mission with basic ordering validation."""

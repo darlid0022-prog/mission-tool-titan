@@ -1,8 +1,8 @@
 import unittest
 from datetime import date
 
-from trajectory import compute_trajectory_alternatives
 from mission.builder import build_mission_from_trajectory_alternatives
+from trajectory import compute_trajectory_alternatives
 
 
 class TestMissionBuilder(unittest.TestCase):

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Sequence
-
 from .leg_solver import compute_lambert_leg
 from .models import TrajectoryResult
 from .trajectory_engine import TrajectoryEngine

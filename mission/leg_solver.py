@@ -43,15 +43,25 @@ def compute_lambert_leg(
 
     if not origin_body.supports_lambert:
         raise NotImplementedError(
-            f"Lambert transfer modeling from {origin_body.name} is intentionally not implemented yet."
+            f"Lambert transfer modeling from {origin_body.name} "
+            "is intentionally not implemented yet."
         )
     if not destination_body.supports_lambert:
         raise NotImplementedError(
-            f"Lambert transfer modeling to {destination_body.name} is intentionally not implemented yet."
+            f"Lambert transfer modeling to {destination_body.name} "
+            "is intentionally not implemented yet."
         )
 
-    t_start = pk.epoch(launch_start.strftime("%Y-%m-%d 00:00:00")) if hasattr(launch_start, "strftime") else launch_start
-    t_end = pk.epoch(launch_end.strftime("%Y-%m-%d 00:00:00")) if hasattr(launch_end, "strftime") else launch_end
+    t_start = (
+        pk.epoch(launch_start.strftime("%Y-%m-%d 00:00:00"))
+        if hasattr(launch_start, "strftime")
+        else launch_start
+    )
+    t_end = (
+        pk.epoch(launch_end.strftime("%Y-%m-%d 00:00:00"))
+        if hasattr(launch_end, "strftime")
+        else launch_end
+    )
 
     launch_window_days = t_end.mjd2000 - t_start.mjd2000
     if launch_window_days < 0:
@@ -60,7 +70,9 @@ def compute_lambert_leg(
     if n_departures == 1:
         departure_offsets = [0.0]
     else:
-        departure_offsets = [launch_window_days * i / (n_departures - 1) for i in range(n_departures)]
+        departure_offsets = [
+            launch_window_days * i / (n_departures - 1) for i in range(n_departures)
+        ]
 
     tof_years_list = []
     tof_years = tof_min_years

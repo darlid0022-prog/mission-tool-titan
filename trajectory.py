@@ -8,10 +8,10 @@ from datetime import date, datetime
 
 import pykep as pk
 
+from mission import physics
+from mission.bodies import resolve_body
 from mission.models import TrajectoryResult
 from mission.pykep_trajectory_engine import PyKEPTrajectoryEngine
-from mission.bodies import resolve_body
-from mission import physics
 
 
 def norm(v):
@@ -27,22 +27,15 @@ def sub(a, b):
 def to_pk_epoch(value):
     """Convertit une date Python en epoch PyKEP."""
     if isinstance(value, datetime):
-        return pk.epoch(
-            value.strftime("%Y-%m-%d %H:%M:%S")
-        )
+        return pk.epoch(value.strftime("%Y-%m-%d %H:%M:%S"))
 
     if isinstance(value, date):
-        return pk.epoch(
-            value.strftime("%Y-%m-%d 00:00:00")
-        )
+        return pk.epoch(value.strftime("%Y-%m-%d 00:00:00"))
 
     if isinstance(value, pk.epoch):
         return value
 
-    raise TypeError(
-        f"Date non supportee: {type(value)}. "
-        "Un datetime/date Python est attendu."
-    )
+    raise TypeError(f"Date non supportee: {type(value)}. Un datetime/date Python est attendu.")
 
 
 def _legacy_solution_dict(result: TrajectoryResult) -> dict:
@@ -123,10 +116,7 @@ def _compute_lambert_earth_saturn_grid(
     )
 
     if not results:
-        raise RuntimeError(
-            "Aucune solution Lambert Terre -> Saturne "
-            "n'a ete trouvee."
-        )
+        raise RuntimeError("Aucune solution Lambert Terre -> Saturne n'a ete trouvee.")
 
     return _legacy_solution_list(results)
 
@@ -253,7 +243,6 @@ def compute_trajectory(
     leo_altitude_km: float,
     capture_altitude_km: float,
 ) -> dict:
-
     # Premiere version du moteur:
     # Terre -> Saturne uniquement.
     if destination.lower() != "saturn":
@@ -298,6 +287,8 @@ def compute_trajectory(
     # in kilometres and must be converted to metres.
     earth = resolve_body("Earth")
     saturn = resolve_body("Saturn")
+    assert earth.pykep_body is not None
+    assert saturn.pykep_body is not None
 
     # Convert altitudes from km to m
     r_leo = earth.pykep_body.get_radius() + float(leo_altitude_km) * 1000.0
@@ -328,13 +319,9 @@ def compute_trajectory(
 
     dv_total = sum(dv_budget.values())
 
-    best_launch_date = pk.epoch(
-        best_departure_mjd2000
-    )
+    best_launch_date = pk.epoch(best_departure_mjd2000)
 
-    arrival_date = pk.epoch(
-        best_arrival_mjd2000
-    )
+    arrival_date = pk.epoch(best_arrival_mjd2000)
 
     note = (
         "Premiere version Terre -> Saturne avec Lambert (multi_revs=0). "
@@ -365,10 +352,10 @@ def compute_trajectory_alternatives(
 ) -> dict:
     """
     Compute multiple trajectory alternatives based on different selection criteria.
-    
+
     Uses the same Lambert grid as compute_trajectory(), but exposes all selection strategies
     to allow mission designers to compare trade-offs.
-    
+
     Args:
         destination: target body (currently "Saturn" only)
         departure_type: "Direct" or "LEO"
@@ -378,7 +365,7 @@ def compute_trajectory_alternatives(
         has_landing: bool (for future landing logic)
         is_flyby_only: bool (for future flyby-only missions)
         dv_per_flyby: float (for future gravity assists)
-    
+
     Returns:
         dict containing:
         {
@@ -391,15 +378,16 @@ def compute_trajectory_alternatives(
             "pareto_count": int, number of Pareto-optimal solutions,
             "note": str, description of results,
         }
-    
+
     Note:
         - Only Saturn is currently implemented (other destinations return empty results)
         - No duplicate Lambert calculations; one grid computation feeds all selectors
         - Pareto frontier uses ["dv_depart", "v_infinity_saturn"] as default objectives
-    
+
     Raises:
         ValueError: if launch_end < launch_start
-        RuntimeError: if no valid Lambert solutions found (should not occur for Saturn in normal windows)
+        RuntimeError: if no valid Lambert solutions are found (not expected for
+            Saturn in normal launch windows)
     """
     # Non-Saturn guard
     if destination.lower() != "saturn":
@@ -428,10 +416,7 @@ def compute_trajectory_alternatives(
     best_by_dep = select_best_by_departure_v_infinity(all_results)
     best_by_arr = select_best_by_arrival_v_infinity(all_results)
     best_by_tof = select_best_by_shortest_mission_duration(all_results)
-    pareto = select_pareto_frontier(
-        all_results,
-        objectives=["dv_depart", "v_infinity_saturn"]
-    )
+    pareto = select_pareto_frontier(all_results, objectives=["dv_depart", "v_infinity_saturn"])
 
     note = (
         "Multiple Earth→Saturn Lambert trajectory alternatives. "
@@ -443,9 +428,15 @@ def compute_trajectory_alternatives(
     return {
         "all_solutions": _legacy_solution_list(all_results),
         "solution_count": len(all_results),
-        "best_by_departure_v_inf": _legacy_solution_dict(best_by_dep) if best_by_dep is not None else None,
-        "best_by_arrival_v_inf": _legacy_solution_dict(best_by_arr) if best_by_arr is not None else None,
-        "best_by_shortest_tof": _legacy_solution_dict(best_by_tof) if best_by_tof is not None else None,
+        "best_by_departure_v_inf": _legacy_solution_dict(best_by_dep)
+        if best_by_dep is not None
+        else None,
+        "best_by_arrival_v_inf": _legacy_solution_dict(best_by_arr)
+        if best_by_arr is not None
+        else None,
+        "best_by_shortest_tof": _legacy_solution_dict(best_by_tof)
+        if best_by_tof is not None
+        else None,
         "pareto_frontier": _legacy_solution_list(pareto),
         "pareto_count": len(pareto),
         "note": note,
