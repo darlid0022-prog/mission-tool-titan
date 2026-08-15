@@ -1,5 +1,8 @@
 __pycache__/
 *.py[cod]
+.DS_Store
+Miniforge*.sh
+*_backup.py
 .coverage
 coverage.xml
 htmlcov/
