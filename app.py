@@ -9,13 +9,14 @@ from mission.capabilities import (
     PLANNED_MISSION_FEATURES,
     SUPPORTED_DESTINATIONS,
 )
+from mission.moon_transfer import compute_saturn_titan_transfer
 from mission.sizing import compute_mass_budget
 
 st.set_page_config(page_title="Mission Design - Titan", layout="wide")
 st.title(":material/satellite_alt: Mission Design Calculator")
 st.caption(
-    "Version actuelle : transfert Terre → Saturne. "
-    "La jambe Saturne → Titan est la prochaine capacité planifiée."
+    "Version actuelle : transfert Terre → Saturne et étude préliminaire séparée "
+    "de la jambe Saturne → Titan."
 )
 
 # -----------------------------------------------------------------------
@@ -48,8 +49,8 @@ with col_inputs:
         st.form_submit_button("Calculer la trajectoire", icon=":material/calculate:")
 
     st.info(
-        "Titan est planifié, mais son transfert depuis Saturne n'est pas encore "
-        "implémenté. Aucun résultat Titan n'est présenté comme calculé."
+        "Titan n'est pas encore une destination de mission complète. Une étude "
+        "préliminaire Saturne → Titan est disponible séparément plus bas."
     )
 
     with st.expander("Capacités planifiées"):
@@ -131,3 +132,85 @@ with col_results:
     c2.metric("Masse sèche", f"{mass['dry_mass_kg']:.1f} kg")
     c3.metric("Masse d'ergols", f"{mass['propellant_mass_kg']:.1f} kg")
     c4.metric("Masse totale (wet)", f"{mass['wet_mass_kg']:.1f} kg")
+
+st.divider()
+st.header("Saturne → Titan — modèle préliminaire")
+st.warning(
+    "Budget partiel : la phase entre l'arrivée/capture à Saturne et l'orbite "
+    "d'attente autour de Saturne n'est pas modélisée. Les résultats ci-dessous "
+    "ne sont donc pas ajoutés au budget global ni au dimensionnement de masse."
+)
+
+with st.container(border=True):
+    st.subheader("Paramètres de l'étude")
+    titan_input_1, titan_input_2 = st.columns(2)
+    with titan_input_1:
+        saturn_staging_radius_km = st.number_input(
+            "Rayon de l'orbite d'attente autour de Saturne (km)",
+            min_value=480_001,
+            max_value=1_221_899,
+            value=600_000,
+            step=1_000,
+            help=(
+                "Rayon mesuré depuis le centre de Saturne. La limite basse est "
+                "placée au-delà de la garde préliminaire des anneaux."
+            ),
+        )
+    with titan_input_2:
+        titan_capture_altitude_km = st.number_input(
+            "Altitude de capture autour de Titan (km)",
+            min_value=1_000,
+            value=1_500,
+            step=100,
+            help=(
+                "Altitude au-dessus du rayon moyen de Titan. Le modèle impose "
+                "une garde non atmosphérique préliminaire de 1 000 km."
+            ),
+        )
+
+    titan_transfer = compute_saturn_titan_transfer(
+        saturn_staging_radius_m=float(saturn_staging_radius_km) * 1_000.0,
+        titan_capture_altitude_m=float(titan_capture_altitude_km) * 1_000.0,
+    )
+
+    st.caption(
+        f"Méthode : `{titan_transfer.method}` · Source : `{titan_transfer.source}` · "
+        "Calcul circulaire, coplanaire et impulsif."
+    )
+    with st.container(horizontal=True):
+        st.metric(
+            "ΔV de départ depuis l'orbite d'attente",
+            f"{titan_transfer.departure_delta_v_m_s:,.1f} m/s",
+            border=True,
+        )
+        st.metric(
+            "v∞ relatif à Titan (non propulsif)",
+            f"{titan_transfer.v_infinity_titan_m_s:,.1f} m/s",
+            help="Vitesse hyperbolique d'arrivée, distincte d'un ΔV propulsif.",
+            border=True,
+        )
+        st.metric(
+            "ΔV de capture à Titan",
+            f"{titan_transfer.capture_delta_v_m_s:,.1f} m/s",
+            border=True,
+        )
+        st.metric(
+            "ΔV total modélisé (partiel)",
+            f"{titan_transfer.total_delta_v_m_s:,.1f} m/s",
+            border=True,
+        )
+
+    st.metric(
+        "Temps de vol Saturne → Titan",
+        f"{titan_transfer.time_of_flight_days:.3f} jours",
+        help=f"{titan_transfer.time_of_flight_s:,.0f} secondes.",
+        border=True,
+    )
+
+    with st.expander("Hypothèses et exclusions du modèle"):
+        st.markdown("**Hypothèses**")
+        for assumption in titan_transfer.assumptions:
+            st.write(f"- {assumption}")
+        st.markdown("**Exclusions**")
+        for exclusion in titan_transfer.exclusions:
+            st.write(f"- {exclusion}")

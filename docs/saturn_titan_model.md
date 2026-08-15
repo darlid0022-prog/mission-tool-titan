@@ -1,6 +1,7 @@
 # Preliminary Saturn-to-Titan transfer model
 
-Status: specification only — no production implementation yet.
+Status: preliminary engine and separate UI implemented. The result remains
+excluded from the global mission and mass budgets.
 
 ## 1. Purpose
 

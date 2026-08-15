@@ -19,7 +19,7 @@ class TestAppCapabilities(unittest.TestCase):
         self.assertTrue(set(SUPPORTED_DESTINATIONS).isdisjoint(PLANNED_DESTINATIONS))
 
     def test_unimplemented_mission_features_are_declared_as_planned(self):
-        self.assertIn("Saturn to Titan transfer", PLANNED_MISSION_FEATURES)
+        self.assertIn("High-fidelity Saturn to Titan trajectory", PLANNED_MISSION_FEATURES)
         self.assertIn("Landing and atmospheric descent", PLANNED_MISSION_FEATURES)
 
 
