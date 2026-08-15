@@ -1,15 +1,15 @@
 """Streamlit interface for the Mission Design Calculator."""
 
-import numpy as np
 import pandas as pd
 import streamlit as st
 
+from app_services import PHYSICS_MODEL_VERSION, compute_cached_trajectory
 from mission.capabilities import (
     PLANNED_DESTINATIONS,
     PLANNED_MISSION_FEATURES,
     SUPPORTED_DESTINATIONS,
 )
-from trajectory import compute_trajectory
+from mission.sizing import compute_mass_budget
 
 st.set_page_config(page_title="Mission Design - Titan", layout="wide")
 st.title(":material/satellite_alt: Mission Design Calculator")
@@ -24,35 +24,38 @@ st.caption(
 col_inputs, col_results = st.columns([1, 2])
 
 with col_inputs:
-    st.header("1. Architecture de mission")
-    destination = st.selectbox(
-        "Destination calculable",
-        SUPPORTED_DESTINATIONS,
-        help="Seule Saturne est actuellement reliée au moteur de trajectoire.",
-    )
+    with st.form("orbital_inputs"):
+        st.header("1. Architecture de mission")
+        destination = st.selectbox(
+            "Destination calculable",
+            SUPPORTED_DESTINATIONS,
+            help="Seule Saturne est actuellement reliée au moteur de trajectoire.",
+        )
+        departure_type = st.radio("Type de départ", ["Direct", "LEO"])
+        leo_altitude_km = st.number_input(
+            "Altitude LEO initiale (km)",
+            min_value=100,
+            value=250,
+            help="Utilisée uniquement lorsque le type de départ est LEO.",
+        )
+        capture_altitude_km = st.number_input(
+            "Altitude de capture à Saturne (km)", min_value=0, value=2000
+        )
+
+        st.header("2. Fenêtre de lancement")
+        launch_window_start = st.date_input("Date de lancement - début")
+        launch_window_end = st.date_input("Date de lancement - fin")
+        st.form_submit_button("Calculer la trajectoire", icon=":material/calculate:")
+
     st.info(
         "Titan est planifié, mais son transfert depuis Saturne n'est pas encore "
         "implémenté. Aucun résultat Titan n'est présenté comme calculé."
-    )
-    departure_type = st.radio("Type de départ", ["Direct", "LEO"])
-    # Expose LEO altitude when relevant; provide a default value so the
-    # compute_trajectory() call always receives the parameter.
-    if departure_type == "LEO":
-        leo_altitude_km = st.number_input("Altitude LEO initiale (km)", min_value=100, value=250)
-    else:
-        leo_altitude_km = 250
-    capture_altitude_km = st.number_input(
-        "Altitude de capture à Saturne (km)", min_value=0, value=2000
     )
 
     with st.expander("Capacités planifiées"):
         st.write("Destinations : " + ", ".join(PLANNED_DESTINATIONS))
         for feature in PLANNED_MISSION_FEATURES:
             st.write(f"- {feature}")
-
-    st.header("2. Fenêtre de lancement")
-    launch_window_start = st.date_input("Date de lancement - début")
-    launch_window_end = st.date_input("Date de lancement - fin")
 
     st.header("3. Propulsion")
     isp_s = st.number_input("Isp moteur principal (s)", min_value=1, value=320)
@@ -81,65 +84,22 @@ with col_inputs:
         },
     )
 
-
-# -----------------------------------------------------------------------
-# 4. MOTEUR DE DIMENSIONNEMENT (transcription de la logique Excel)
-#    -> celui-ci est déjà fonctionnel, pas besoin d'attendre Hermès
-# -----------------------------------------------------------------------
-def compute_mass_budget(
-    dv_total: float,
-    isp_s: float,
-    instruments_df: pd.DataFrame,
-    harness_frac=0.10,
-    structure_frac=0.20,
-    margin_frac=0.20,
-) -> dict:
-    g0 = 9.80665
-    instrument_mass = instruments_df["Masse (kg)"].fillna(0).sum()
-
-    # Masse sèche = instruments + sous-systèmes estimés en % (comme l'onglet Dry Mass)
-    subsystems_mass = instrument_mass  # TODO affiner avec Data Handling/Comm/Thermal/etc.
-    dry_mass_before_margin = subsystems_mass * (1 + harness_frac + structure_frac)
-    dry_mass = dry_mass_before_margin * (1 + margin_frac)
-
-    # Équation de Tsiolkovski pour la masse d'ergols
-    if dv_total > 0 and isp_s > 0:
-        mass_ratio = np.exp(dv_total / (isp_s * g0))
-        wet_mass = dry_mass * mass_ratio
-        propellant_mass = wet_mass - dry_mass
-    else:
-        wet_mass = dry_mass
-        propellant_mass = 0.0
-
-    return {
-        "instrument_mass_kg": instrument_mass,
-        "dry_mass_kg": dry_mass,
-        "propellant_mass_kg": propellant_mass,
-        "wet_mass_kg": wet_mass,
-    }
-
-
-# -----------------------------------------------------------------------
-# 5. CALCUL EN DIRECT (relancé automatiquement par Streamlit)
-# -----------------------------------------------------------------------
 if launch_window_end < launch_window_start:
     st.error("La date de fin doit être postérieure ou égale à la date de début.")
     st.stop()
 
 with st.spinner("Calcul de la trajectoire Terre → Saturne…"):
-    traj = compute_trajectory(
+    traj = compute_cached_trajectory(
+        PHYSICS_MODEL_VERSION,
         destination,
         departure_type,
         launch_window_start,
         launch_window_end,
-        False,  # Moon transfer is not exposed until it is implemented.
-        False,  # Landing is not exposed until it is implemented.
-        False,  # Flyby-only mode is not exposed until it is implemented.
-        0.0,  # No artificial flyby credit is applied.
         leo_altitude_km,
         capture_altitude_km,
     )
 mass = compute_mass_budget(traj["dv_total"], isp_s, instruments_df)
+mass_ratio = mass["wet_mass_kg"] / mass["dry_mass_kg"] if mass["dry_mass_kg"] > 0 else 1.0
 
 with col_results:
     st.header("Résultats (mis à jour en direct)")
@@ -156,6 +116,16 @@ with col_results:
     st.metric("Somme des ΔV / valeurs budget", f"{traj['dv_total']:.0f} m/s")
 
     st.subheader("Budget de masse")
+    if departure_type == "Direct":
+        st.warning(
+            "Le mode Direct traite encore le v∞ de départ comme un ΔV équivalent "
+            "provisoire. Le budget de masse ne constitue pas un dimensionnement de lanceur."
+        )
+    if mass_ratio > 20:
+        st.warning(
+            f"Rapport de masse estimé : {mass_ratio:,.0f}. Une propulsion chimique à "
+            f"{isp_s:.0f} s est irréaliste pour ce budget de ΔV sans architecture multi-étages."
+        )
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Masse instruments", f"{mass['instrument_mass_kg']:.1f} kg")
     c2.metric("Masse sèche", f"{mass['dry_mass_kg']:.1f} kg")

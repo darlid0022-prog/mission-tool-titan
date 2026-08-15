@@ -34,11 +34,16 @@ python -m ruff check .
 
 echo ""
 echo ">>> Types"
-python -m mypy mission trajectory.py
+python -m mypy app_services.py mission trajectory.py
 
 echo ""
 echo ">>> Tests and coverage"
-python -m pytest --cov=mission --cov=trajectory --cov-report=term-missing --cov-report=xml
+python -m pytest \
+    --cov=app_services \
+    --cov=mission \
+    --cov=trajectory \
+    --cov-report=term-missing \
+    --cov-report=xml
 
 echo ""
 echo ">>> Dependency audit"
