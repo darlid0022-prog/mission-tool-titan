@@ -12,18 +12,24 @@ class TestCelestialBodyResolution(unittest.TestCase):
         self.assertEqual(body.name, "Earth")
         self.assertTrue(callable(body.eph))
         self.assertGreater(body.get_mu_central_body(), 0.0)
+        self.assertAlmostEqual(body.get_mu_self(), 3.986004418e14)
+        self.assertNotEqual(body.get_mu_self(), body.get_mu_central_body())
 
     def test_saturn_resolves_correctly(self):
         body = resolve_body("Saturn")
         self.assertEqual(body.name, "Saturn")
         self.assertTrue(callable(body.eph))
         self.assertGreater(body.get_mu_central_body(), 0.0)
+        self.assertAlmostEqual(body.get_mu_self(), 3.7931187e16)
+        self.assertNotEqual(body.get_mu_self(), body.get_mu_central_body())
 
     def test_titan_resolves_correctly(self):
         body = resolve_body("Titan")
         self.assertEqual(body.name, "Titan")
         self.assertTrue(callable(body.eph))
-        self.assertGreater(body.get_mu_central_body(), 0.0)
+        self.assertAlmostEqual(body.get_mu_self(), 8.978138e12)
+        with self.assertRaises(NotImplementedError):
+            body.get_mu_central_body()
 
     def test_unknown_body_names_raise_clear_error(self):
         with self.assertRaisesRegex(ValueError, "Unsupported body.*Earth, Saturn, Titan"):

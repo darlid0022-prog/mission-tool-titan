@@ -18,7 +18,7 @@ class CelestialBody:
 
     name: str
     pykep_body: Any | None = None
-    gravitational_parameter: float | None = None
+    mu_self: float | None = None
     supports_lambert: bool = True
 
     def eph(self, mjd2000):
@@ -30,11 +30,19 @@ class CelestialBody:
         return self.pykep_body.eph(mjd2000)
 
     def get_mu_central_body(self) -> float:
-        if self.gravitational_parameter is not None:
-            return self.gravitational_parameter
         if self.pykep_body is not None:
             return self.pykep_body.get_mu_central_body()
-        raise NotImplementedError(f"Gravitational parameter for {self.name} is not defined.")
+        raise NotImplementedError(
+            f"Central-body gravitational parameter for {self.name} is not defined."
+        )
+
+    def get_mu_self(self) -> float:
+        """Return the body's own gravitational parameter for local manoeuvres."""
+        if self.mu_self is not None:
+            return self.mu_self
+        if self.pykep_body is not None:
+            return self.pykep_body.get_mu_self()
+        raise NotImplementedError(f"Self gravitational parameter for {self.name} is not defined.")
 
 
 def _build_earth() -> CelestialBody:
@@ -42,7 +50,7 @@ def _build_earth() -> CelestialBody:
     return CelestialBody(
         name="Earth",
         pykep_body=planet,
-        gravitational_parameter=planet.get_mu_central_body(),
+        mu_self=planet.get_mu_self(),
         supports_lambert=True,
     )
 
@@ -52,7 +60,7 @@ def _build_saturn() -> CelestialBody:
     return CelestialBody(
         name="Saturn",
         pykep_body=planet,
-        gravitational_parameter=planet.get_mu_central_body(),
+        mu_self=planet.get_mu_self(),
         supports_lambert=True,
     )
 
@@ -64,7 +72,7 @@ def _build_titan() -> CelestialBody:
     return CelestialBody(
         name="Titan",
         pykep_body=None,
-        gravitational_parameter=8.978138e12,
+        mu_self=8.978138e12,
         supports_lambert=False,
     )
 

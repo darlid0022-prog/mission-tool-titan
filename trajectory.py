@@ -294,8 +294,8 @@ def compute_trajectory(
     r_leo = earth.pykep_body.get_radius() + float(leo_altitude_km) * 1000.0
     r_capture = saturn.pykep_body.get_radius() + float(capture_altitude_km) * 1000.0
 
-    mu_earth = earth.get_mu_central_body()
-    mu_saturn = saturn.get_mu_central_body()
+    mu_earth = earth.get_mu_self()
+    mu_saturn = saturn.get_mu_self()
 
     # For LEO departures compute actual injection ΔV; for Direct keep legacy v_inf value
     if str(departure_type).lower() == "leo":
@@ -327,7 +327,8 @@ def compute_trajectory(
         "Premiere version Terre -> Saturne avec Lambert (multi_revs=0). "
         "Les valeurs suivantes dans le budget sont des Delta-V propulsifs :\n"
         "- 'dV from LEO' : impulsive ΔV pour evasion depuis LEO (si selection LEO).\n"
-        "- 'dV Capture at Destination' : impulsive ΔV de capture a Saturne (provisoire).\n"
+        "- 'dV Capture at Destination' : impulsive ΔV de capture a Saturne, "
+        "calcule avec le parametre gravitationnel propre de Saturne (provisoire).\n"
         "Les autres lignes restent provisoires ou non implementees pour l'instant."
     )
 

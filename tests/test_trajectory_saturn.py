@@ -94,7 +94,8 @@ ABS_TOL_MJD2000 = 1e-6
 
 REGRESSION_DV_DEPART_M_S = 10432.306468285773
 REGRESSION_V_INF_SATURN_M_S = 6490.744714263188
-REGRESSION_DV_TOTAL_M_S = 16923.05118254896
+REGRESSION_DV_CAPTURE_SATURN_M_S = 10816.855098885902
+REGRESSION_DV_TOTAL_M_S = 21249.161567171675
 REGRESSION_BEST_LAUNCH_MJD2000 = 9681.181818181818
 REGRESSION_ARRIVAL_MJD2000 = 12537.181818181829
 
@@ -166,12 +167,17 @@ class TestEarthSaturnTrajectoryRegression(unittest.TestCase):
 
         saturn = resolve_body("Saturn")
         r_capture = saturn.pykep_body.get_radius() + DEFAULT_KWARGS["capture_altitude_km"] * 1000.0
-        mu_saturn = saturn.get_mu_central_body()
+        mu_saturn = saturn.get_mu_self()
         expected_capture = physics.delta_v_capture(lambert_v_inf, mu_saturn, r_capture)
 
         self.assertAlmostEqual(
             self.result["dv_budget"]["dV Capture at Destination"],
             expected_capture,
+            delta=ABS_TOL_M_S,
+        )
+        self.assertAlmostEqual(
+            self.result["dv_budget"]["dV Capture at Destination"],
+            REGRESSION_DV_CAPTURE_SATURN_M_S,
             delta=ABS_TOL_M_S,
         )
 
@@ -198,11 +204,12 @@ class TestEarthSaturnTrajectoryRegression(unittest.TestCase):
 
         saturn = resolve_body("Saturn")
         r_capture = saturn.pykep_body.get_radius() + DEFAULT_KWARGS["capture_altitude_km"] * 1000.0
-        mu_saturn = saturn.get_mu_central_body()
+        mu_saturn = saturn.get_mu_self()
         expected_capture = physics.delta_v_capture(v_inf_arrival, mu_saturn, r_capture)
 
         expected_total = v_inf_depart + expected_capture
         self.assertAlmostEqual(self.result["dv_total"], expected_total, delta=ABS_TOL_M_S)
+        self.assertAlmostEqual(self.result["dv_total"], REGRESSION_DV_TOTAL_M_S, delta=ABS_TOL_M_S)
 
     def test_best_launch_date_regression(self):
         self.assertIsInstance(self.result["best_launch_date"], pk.epoch)
@@ -608,7 +615,7 @@ class TestBackwardCompatibility(unittest.TestCase):
 
         saturn = resolve_body("Saturn")
         r_capture = saturn.pykep_body.get_radius() + DEFAULT_KWARGS["capture_altitude_km"] * 1000.0
-        mu_saturn = saturn.get_mu_central_body()
+        mu_saturn = saturn.get_mu_self()
         expected_capture = physics.delta_v_capture(new_v_inf_saturn, mu_saturn, r_capture)
         self.assertAlmostEqual(old_v_inf_saturn, expected_capture, delta=ABS_TOL_M_S)
 
@@ -649,7 +656,7 @@ class TestDeltaVIntegration(unittest.TestCase):
 
         earth = resolve_body("Earth")
         r_leo = earth.pykep_body.get_radius() + params["leo_altitude_km"] * 1000.0
-        mu_earth = earth.get_mu_central_body()
+        mu_earth = earth.get_mu_self()
 
         expected = physics.delta_v_injection(v_inf, mu_earth, r_leo)
         self.assertAlmostEqual(result["dv_budget"]["dV from LEO"], expected, delta=1e-6)
@@ -668,7 +675,7 @@ class TestDeltaVIntegration(unittest.TestCase):
 
         saturn = resolve_body("Saturn")
         r_capture = saturn.pykep_body.get_radius() + params["capture_altitude_km"] * 1000.0
-        mu_saturn = saturn.get_mu_central_body()
+        mu_saturn = saturn.get_mu_self()
 
         expected_capture = physics.delta_v_capture(v_inf_arrival, mu_saturn, r_capture)
         self.assertAlmostEqual(
