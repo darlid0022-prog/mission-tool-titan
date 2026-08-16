@@ -10,6 +10,7 @@ from mission.capabilities import (
     SUPPORTED_DESTINATIONS,
 )
 from mission.moon_transfer import compute_saturn_titan_transfer
+from mission.saturn_staging import compute_saturn_arrival_to_staging
 from mission.sizing import compute_mass_budget
 from mission.ui_text import UI_TEXT
 
@@ -127,13 +128,29 @@ with col_results:
     c4.metric(UI_TEXT["wet_mass"], f"{mass['wet_mass_kg']:.1f} kg")
 
 st.divider()
-st.header(UI_TEXT["titan_header"])
-st.warning(UI_TEXT["titan_warning"])
+st.header(UI_TEXT["staging_header"])
+st.warning(UI_TEXT["staging_warning"])
 
 with st.container(border=True):
     st.subheader(UI_TEXT["study_parameters"])
-    titan_input_1, titan_input_2 = st.columns(2)
-    with titan_input_1:
+    staging_input_1, staging_input_2, staging_input_3 = st.columns(3)
+    with staging_input_1:
+        saturn_arrival_v_infinity_m_s = st.number_input(
+            UI_TEXT["arrival_v_infinity"],
+            min_value=0.0,
+            value=6_490.744714263188,
+            step=100.0,
+            help=UI_TEXT["arrival_v_infinity_help"],
+        )
+    with staging_input_2:
+        saturn_periapsis_radius_km = st.number_input(
+            UI_TEXT["periapsis_radius"],
+            min_value=1,
+            value=62_330,
+            step=100,
+            help=UI_TEXT["periapsis_radius_help"],
+        )
+    with staging_input_3:
         saturn_staging_radius_km = st.number_input(
             UI_TEXT["staging_radius"],
             min_value=480_001,
@@ -142,14 +159,84 @@ with st.container(border=True):
             step=1_000,
             help=UI_TEXT["staging_radius_help"],
         )
-    with titan_input_2:
-        titan_capture_altitude_km = st.number_input(
-            UI_TEXT["titan_capture_altitude"],
-            min_value=1_000,
-            value=1_500,
-            step=100,
-            help=UI_TEXT["titan_capture_help"],
+
+    staging_result = compute_saturn_arrival_to_staging(
+        arrival_v_infinity_m_s=float(saturn_arrival_v_infinity_m_s),
+        periapsis_radius_m=float(saturn_periapsis_radius_km) * 1_000.0,
+        staging_radius_m=float(saturn_staging_radius_km) * 1_000.0,
+        periapsis_radius_provenance=(
+            "User-selected Saturn-centered radius; nominal value preserves the "
+            "PyKEP Saturn radius plus UI capture altitude."
+        ),
+    )
+
+    st.caption(
+        f"Method: `{staging_result.method}` · Source: `{staging_result.source}` · "
+        f"Replaces: `{staging_result.replaces_budget_term}`."
+    )
+    with st.container(horizontal=True):
+        st.metric(
+            UI_TEXT["capture_to_ellipse_dv"],
+            f"{staging_result.capture_to_ellipse_delta_v_m_s:,.1f} m/s",
+            border=True,
         )
+        st.metric(
+            UI_TEXT["staging_circularisation_dv"],
+            f"{staging_result.staging_circularisation_delta_v_m_s:,.1f} m/s",
+            border=True,
+        )
+        st.metric(
+            UI_TEXT["staging_phase_total_dv"],
+            f"{staging_result.total_delta_v_m_s:,.1f} m/s",
+            border=True,
+        )
+        st.metric(
+            UI_TEXT["staging_tof"],
+            f"{staging_result.time_of_flight_days:.3f} days",
+            border=True,
+        )
+
+    st.subheader(UI_TEXT["ring_constraints"])
+    st.error(
+        "Transfer safety margin: unestablished. The scalar model crosses known "
+        "ring radii and does not resolve three-dimensional ring-plane clearance."
+    )
+    with st.container(horizontal=True):
+        st.metric(
+            UI_TEXT["f_ring_margin"],
+            f"{staging_result.f_ring_radial_margin_m / 1_000:,.0f} km",
+            help="A negative value means the transfer periapsis lies inside this radius.",
+            border=True,
+        )
+        st.metric(
+            UI_TEXT["e_ring_margin"],
+            f"+{staging_result.staging_e_ring_radial_margin_m / 1_000:,.0f} km",
+            help="Radial margin of the final circular staging orbit only.",
+            border=True,
+        )
+
+    with st.expander(UI_TEXT["assumptions_exclusions"]):
+        st.markdown(UI_TEXT["assumptions"])
+        for assumption in staging_result.assumptions:
+            st.write(f"- {assumption}")
+        st.markdown(UI_TEXT["exclusions"])
+        for exclusion in staging_result.exclusions:
+            st.write(f"- {exclusion}")
+
+st.divider()
+st.header(UI_TEXT["titan_header"])
+st.warning(UI_TEXT["titan_warning"])
+
+with st.container(border=True):
+    st.subheader(UI_TEXT["study_parameters"])
+    st.caption(UI_TEXT["shared_staging_radius"])
+    titan_capture_altitude_km = st.number_input(
+        UI_TEXT["titan_capture_altitude"],
+        min_value=1_000,
+        value=1_500,
+        step=100,
+        help=UI_TEXT["titan_capture_help"],
+    )
 
     titan_transfer = compute_saturn_titan_transfer(
         saturn_staging_radius_m=float(saturn_staging_radius_km) * 1_000.0,

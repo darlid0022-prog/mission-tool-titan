@@ -33,6 +33,27 @@ class TestSaturnTitanUi(unittest.TestCase):
         self.assertEqual(metrics["Saturn → Titan time of flight"], "5.133 days")
         self.assertTrue(any("JPL SAT441" in caption.value for caption in app.caption))
 
+    def test_arrival_to_staging_section_displays_nominal_results_and_ring_status(self):
+        app = self._run_app()
+
+        self.assertFalse(app.exception)
+        self.assertTrue(
+            any(
+                heading.value == "Saturn arrival → staging orbit — preliminary model"
+                for heading in app.header
+            )
+        )
+        metrics = {metric.label: metric.value for metric in app.metric}
+        self.assertEqual(metrics["Capture-to-ellipse delta-v"], "2,280.8 m/s")
+        self.assertEqual(metrics["Staging circularization delta-v"], "4,501.6 m/s")
+        self.assertEqual(metrics["Arrival-to-staging total delta-v"], "6,782.4 m/s")
+        self.assertEqual(metrics["Periapsis-to-apoapsis time"], "1.125 days")
+        self.assertEqual(metrics["Periapsis minus F-ring radius"], "-77,850 km")
+        self.assertEqual(metrics["Staging orbit beyond E-ring edge"], "+118,000 km")
+        self.assertTrue(
+            any("Transfer safety margin: unestablished" in error.value for error in app.error)
+        )
+
     def test_missing_staging_phase_is_visible_and_mass_budget_stays_earth_saturn_only(self):
         mass_result = {
             "instrument_mass_kg": 0.0,
@@ -51,9 +72,11 @@ class TestSaturnTitanUi(unittest.TestCase):
 
         self.assertFalse(app.exception)
         self.assertTrue(
+            any("not connected to the global budget" in warning.value for warning in app.warning)
+        )
+        self.assertTrue(
             any(
-                "is not included here" in warning.value
-                and "not added to the global budget" in warning.value
+                "neither preliminary phase is added to the global budget" in warning.value
                 for warning in app.warning
             )
         )

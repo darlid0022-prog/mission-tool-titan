@@ -48,17 +48,42 @@ UI_TEXT: Final[dict[str, str]] = {
     "dry_mass": "Dry mass",
     "propellant_mass": "Propellant mass",
     "wet_mass": "Total wet mass",
+    "staging_header": "Saturn arrival → staging orbit — preliminary model",
+    "staging_warning": (
+        "Energy estimate only: ring-plane clearance is unresolved. This phase replaces "
+        "the legacy circular Saturn-capture term when selected, but it is not connected "
+        "to the global budget or mass sizing."
+    ),
+    "arrival_v_infinity": "Saturn arrival v∞ (m/s)",
+    "arrival_v_infinity_help": (
+        "Saturn-relative hyperbolic excess speed supplied by the Earth → Saturn leg."
+    ),
+    "periapsis_radius": "Capture periapsis radius (km)",
+    "periapsis_radius_help": (
+        "Saturn-centered radius. The nominal value preserves the current PyKEP "
+        "60,330 km radius plus a 2,000 km capture altitude."
+    ),
+    "capture_to_ellipse_dv": "Capture-to-ellipse delta-v",
+    "staging_circularisation_dv": "Staging circularization delta-v",
+    "staging_phase_total_dv": "Arrival-to-staging total delta-v",
+    "staging_tof": "Periapsis-to-apoapsis time",
+    "ring_constraints": "Ring-system constraints",
+    "f_ring_margin": "Periapsis minus F-ring radius",
+    "e_ring_margin": "Staging orbit beyond E-ring edge",
     "titan_header": "Saturn → Titan — preliminary model",
     "titan_warning": (
-        "Partial budget: the phase between Saturn arrival/capture and the Saturn "
-        "staging orbit is not included here. The values below are not added to the "
-        "global budget or mass sizing."
+        "Partial budget: the Saturn arrival-to-staging phase is modeled separately "
+        "above, but neither preliminary phase is added to the global budget or mass sizing."
     ),
     "study_parameters": "Study parameters",
     "staging_radius": "Saturn staging-orbit radius (km)",
     "staging_radius_help": (
         "Radius measured from Saturn's center. The lower bound is beyond the "
         "preliminary ring guard."
+    ),
+    "shared_staging_radius": (
+        "This study uses the same Saturn staging-orbit radius selected in the "
+        "arrival-to-staging section above."
     ),
     "titan_capture_altitude": "Titan capture altitude (km)",
     "titan_capture_help": (
