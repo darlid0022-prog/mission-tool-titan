@@ -13,6 +13,11 @@ UI_TEXT: Final[dict[str, str]] = {
         "The Lambert solver targets Saturn; the connected mission chain then continues to Titan."
     ),
     "departure_type": "Departure type",
+    "departure_type_help": (
+        "LEO converts the Lambert departure v∞ into the required injection burn at the "
+        "selected parking-orbit altitude. Direct displays the unconverted v∞ instead."
+    ),
+    "direct_departure_value": "Earth departure v∞ (direct mode)",
     "leo_altitude": "Initial LEO altitude (km)",
     "leo_help": "Used only when the departure type is LEO.",
     "launch_window_header": "2. Launch window",
@@ -58,6 +63,19 @@ UI_TEXT: Final[dict[str, str]] = {
     "dry_mass": "Dry mass",
     "propellant_mass": "Propellant mass",
     "wet_mass": "Total wet mass",
+    "trajectory_3d_header": "Complete mission trajectory — interactive 3D view",
+    "trajectory_3d_caption": (
+        "Drag to rotate, scroll to zoom, and double-click to reset. The heliocentric and "
+        "Saturn-centred panels use different reference frames and scales. Body sizes are not "
+        "shown to scale."
+    ),
+    "mission_elapsed_time": "Mission elapsed time",
+    "mission_elapsed_time_help": (
+        "Moves the spacecraft marker along pre-sampled trajectory points without rerunning "
+        "the orbital solver."
+    ),
+    "current_elapsed_time": "Current mission-elapsed time",
+    "current_mission_phase": "Current mission phase",
     "staging_header": "Saturn arrival → staging orbit — preliminary model",
     "staging_warning": (
         "Energy estimate only: ring-plane clearance is unresolved. This phase replaces "

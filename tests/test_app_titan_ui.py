@@ -4,7 +4,11 @@ from unittest.mock import patch
 
 from streamlit.testing.v1 import AppTest
 
+from app_services import DEFAULT_LAUNCH_WINDOW_END, DEFAULT_LAUNCH_WINDOW_START
+from mission import physics
+from mission.bodies import resolve_body
 from mission.models import Leg, TrajectoryResult
+from mission.ui_text import UI_TEXT
 
 APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
 
@@ -99,6 +103,25 @@ class TestSaturnTitanUi(unittest.TestCase):
             )
         )
 
+    def test_complete_trajectory_3d_view_is_rendered(self):
+        app = self._run_app()
+
+        self.assertFalse(app.exception)
+        self.assertTrue(
+            any(
+                heading.value == "Complete mission trajectory — interactive 3D view"
+                for heading in app.header
+            )
+        )
+        self.assertEqual(len(app.get("plotly_chart")), 1)
+        self.assertTrue(any(slider.label == "Mission elapsed time" for slider in app.slider))
+        metrics = {metric.label: metric.value for metric in app.metric}
+        self.assertEqual(metrics["Current mission-elapsed time"], "0.00 days")
+        self.assertEqual(metrics["Current mission phase"], "Earth → Saturn transfer")
+        date_inputs = {date_input.label: date_input.value for date_input in app.date_input}
+        self.assertEqual(date_inputs[UI_TEXT["launch_start"]], DEFAULT_LAUNCH_WINDOW_START)
+        self.assertEqual(date_inputs[UI_TEXT["launch_end"]], DEFAULT_LAUNCH_WINDOW_END)
+
     def test_complete_budget_is_connected_to_mass_sizing_without_legacy_capture(self):
         mass_result = {
             "instrument_mass_kg": 0.0,
@@ -126,6 +149,44 @@ class TestSaturnTitanUi(unittest.TestCase):
         expected_total = 1_000.0 + 6_782.353909 + 2_120.301028
         self.assertAlmostEqual(mass_mock.call_args.args[0], expected_total, delta=1e-3)
         self.assertNotEqual(mass_mock.call_args.args[0], 1_000.0 + 999_999.0)
+
+    def test_displayed_earth_departure_injection_equals_physics_output_exactly(self):
+        v_inf_m_s = self._earth_saturn_leg().trajectory.v_inf_depart
+        leo_altitude_m = 250_000.0
+        earth = resolve_body("Earth")
+        expected_injection_m_s = physics.delta_v_injection(
+            v_inf_m_s,
+            earth.get_mu_self(),
+            earth.pykep_body.get_radius() + leo_altitude_m,
+        )
+        earth_saturn_result = {
+            "note": "Test Earth-to-Saturn result",
+            "dv_budget": {
+                "dV from LEO": expected_injection_m_s,
+                "dV DSM/Fly-By": 0.0,
+                "dV Capture at Destination": 999_999.0,
+            },
+            "dv_total": expected_injection_m_s,
+            "earth_saturn_leg": self._earth_saturn_leg(),
+        }
+
+        with patch(
+            "app_services.compute_cached_trajectory", return_value=earth_saturn_result
+        ) as trajectory_mock:
+            app = AppTest.from_file(APP_PATH).run(timeout=30)
+
+        self.assertFalse(app.exception)
+        departure_type = next(radio for radio in app.radio if radio.label == "Departure type")
+        self.assertEqual(departure_type.value, "LEO")
+        self.assertEqual(trajectory_mock.call_args.args[2], "LEO")
+        budget_table = next(
+            dataframe.value for dataframe in app.dataframe if "Maneuver" in dataframe.value.columns
+        )
+        displayed_injection_m_s = budget_table.loc[
+            budget_table["Maneuver"] == "Earth departure injection",
+            "Value (m/s)",
+        ].iloc[0]
+        self.assertEqual(displayed_injection_m_s, expected_injection_m_s)
 
 
 if __name__ == "__main__":

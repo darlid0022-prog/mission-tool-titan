@@ -34,5 +34,5 @@ exclude = [
 ]
 
 [[tool.mypy.overrides]]
-module = ["pandas", "pandas.*", "pykep", "pykep.*"]
+module = ["pandas", "pandas.*", "plotly", "plotly.*", "pykep", "pykep.*"]
 ignore_missing_imports = true

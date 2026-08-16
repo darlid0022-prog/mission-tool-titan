@@ -18,7 +18,54 @@ from mission.capabilities import (
 from mission.dv_budget import compose_complete_dv_budget
 from mission.full_mission import compute_earth_saturn_titan_mission
 from mission.sizing import compute_mass_budget
+from mission.trajectory_plot import build_complete_mission_figure
+from mission.trajectory_visualization import (
+    CompleteMissionScene3D,
+    MissionAnimationTimeline3D,
+    build_complete_mission_scene,
+    build_mission_animation_timeline,
+    interpolate_spacecraft_position,
+)
 from mission.ui_text import UI_TEXT
+
+
+@st.fragment
+def render_trajectory_animation(
+    scene: CompleteMissionScene3D,
+    timeline: MissionAnimationTimeline3D,
+) -> None:
+    """Rerun only the marker and chart when mission elapsed time changes."""
+    elapsed_days = st.slider(
+        UI_TEXT["mission_elapsed_time"],
+        min_value=0.0,
+        max_value=float(timeline.total_duration_days),
+        value=0.0,
+        step=float(timeline.total_duration_days / 20_000.0),
+        format="%.2f days",
+        key="mission_elapsed_days",
+        help=UI_TEXT["mission_elapsed_time_help"],
+    )
+    spacecraft_position = interpolate_spacecraft_position(timeline, elapsed_days)
+    with st.container(horizontal=True):
+        st.metric(
+            UI_TEXT["current_elapsed_time"],
+            f"{spacecraft_position.elapsed_days:,.2f} days",
+            border=True,
+        )
+        st.metric(
+            UI_TEXT["current_mission_phase"],
+            spacecraft_position.phase_name,
+            border=True,
+        )
+    trajectory_figure = build_complete_mission_figure(scene, spacecraft_position)
+    st.plotly_chart(
+        trajectory_figure,
+        width="stretch",
+        height=720,
+        key="complete_mission_trajectory_3d",
+        config={"displaylogo": False, "scrollZoom": True},
+    )
+
 
 st.set_page_config(page_title="Mission Design - Titan", layout="wide")
 st.title(":material/satellite_alt: Mission Design Calculator")
@@ -37,7 +84,12 @@ with col_inputs:
             SUPPORTED_DESTINATIONS,
             help=UI_TEXT["destination_help"],
         )
-        departure_type = st.radio(UI_TEXT["departure_type"], ["Direct", "LEO"])
+        departure_type = st.radio(
+            UI_TEXT["departure_type"],
+            ["Direct", "LEO"],
+            index=1,
+            help=UI_TEXT["departure_type_help"],
+        )
         leo_altitude_km = st.number_input(
             UI_TEXT["leo_altitude"],
             min_value=100,
@@ -157,8 +209,14 @@ with col_results:
 
     st.subheader(UI_TEXT["provisional_budget"])
     st.caption(UI_TEXT["budget_caption"])
+    displayed_dv_rows = list(complete_dv_budget.as_dict().items())
+    if departure_type == "Direct":
+        displayed_dv_rows[0] = (
+            UI_TEXT["direct_departure_value"],
+            displayed_dv_rows[0][1],
+        )
     dv_table = pd.DataFrame(
-        complete_dv_budget.as_dict().items(),
+        displayed_dv_rows,
         columns=[UI_TEXT["maneuver"], UI_TEXT["value_m_s"]],
     )
     st.dataframe(dv_table, width="stretch")
@@ -179,6 +237,32 @@ with col_results:
     c2.metric(UI_TEXT["dry_mass"], f"{mass['dry_mass_kg']:.1f} kg")
     c3.metric(UI_TEXT["propellant_mass"], f"{mass['propellant_mass_kg']:.1f} kg")
     c4.metric(UI_TEXT["wet_mass"], f"{mass['wet_mass_kg']:.1f} kg")
+
+st.header(UI_TEXT["trajectory_3d_header"])
+st.caption(UI_TEXT["trajectory_3d_caption"])
+with st.container(border=True):
+    earth_saturn_trajectory = complete_mission.mission.legs[0].trajectory
+    assert earth_saturn_trajectory is not None
+    trajectory_scene_key = (
+        earth_saturn_trajectory.departure_mjd2000,
+        earth_saturn_trajectory.arrival_mjd2000,
+        staging_result.periapsis_radius_m,
+        staging_result.staging_radius_m,
+        titan_transfer.titan_orbit_radius_m,
+    )
+    if st.session_state.get("trajectory_scene_key") != trajectory_scene_key:
+        trajectory_scene = build_complete_mission_scene(complete_mission)
+        trajectory_timeline = build_mission_animation_timeline(
+            trajectory_scene,
+            complete_mission,
+        )
+        st.session_state["trajectory_scene_key"] = trajectory_scene_key
+        st.session_state["trajectory_scene"] = trajectory_scene
+        st.session_state["trajectory_timeline"] = trajectory_timeline
+    render_trajectory_animation(
+        st.session_state["trajectory_scene"],
+        st.session_state["trajectory_timeline"],
+    )
 
 st.header(UI_TEXT["staging_header"])
 st.warning(UI_TEXT["staging_warning"])
