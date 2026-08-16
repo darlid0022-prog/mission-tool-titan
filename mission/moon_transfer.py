@@ -12,12 +12,14 @@ from .constants import (
     TITAN_MEAN_RADIUS_M,
     TITAN_MU_M3_S2,
 )
+from .models import Event, Leg, TrajectoryResult
 
 DEFAULT_SATURN_STAGING_RADIUS_M = 6.0e8
 DEFAULT_TITAN_CAPTURE_ALTITUDE_M = 1.5e6
 MIN_SATURN_STAGING_RADIUS_M = 4.8e8
 MIN_TITAN_CAPTURE_ALTITUDE_M = 1.0e6
 SECONDS_PER_DAY = 86_400.0
+DAYS_PER_JULIAN_YEAR = 365.25
 
 
 @dataclass(frozen=True)
@@ -134,4 +136,54 @@ def compute_saturn_titan_transfer(
             "Ring interactions, plane changes, perturbations, and finite burns.",
             "Titan aerocapture and atmospheric effects.",
         ),
+    )
+
+
+def adapt_saturn_titan_transfer_to_leg(
+    result: SaturnTitanTransferResult,
+    *,
+    departure_epoch_mjd2000: float | None = None,
+) -> Leg:
+    """Adapt the preliminary transfer into the canonical mission-domain types."""
+    if not isinstance(result, SaturnTitanTransferResult):
+        raise TypeError("result must be a SaturnTitanTransferResult.")
+
+    departure_epoch: float | None = None
+    arrival_epoch: float | None = None
+    if departure_epoch_mjd2000 is not None:
+        departure_epoch = _require_finite_number("departure_epoch_mjd2000", departure_epoch_mjd2000)
+        arrival_epoch = departure_epoch + result.time_of_flight_s / SECONDS_PER_DAY
+
+    trajectory = TrajectoryResult(
+        departure_mjd2000=departure_epoch,
+        arrival_mjd2000=arrival_epoch,
+        tof_years=result.time_of_flight_s / (DAYS_PER_JULIAN_YEAR * SECONDS_PER_DAY),
+        v_inf_depart=None,
+        v_inf_arrival=result.v_infinity_titan_m_s,
+        delta_v=result.total_delta_v_m_s,
+        method=result.method,
+        notes=(f"{result.source}; Titan v-infinity remains distinct from propulsive delta-v."),
+    )
+    events = [
+        Event(
+            name="Saturn staging departure",
+            body="Saturn",
+            event_type="departure",
+            epoch=departure_epoch,
+            notes="Impulsive departure from the circular Saturn staging orbit.",
+        ),
+        Event(
+            name="Titan capture",
+            body="Titan",
+            event_type="capture",
+            epoch=arrival_epoch,
+            notes="Impulsive fully propulsive circular capture at Titan.",
+        ),
+    ]
+    return Leg(
+        origin=result.origin,
+        destination=result.destination,
+        trajectory=trajectory,
+        events=events,
+        notes="Preliminary circular, coplanar Saturn-to-Titan transfer.",
     )
