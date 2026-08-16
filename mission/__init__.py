@@ -9,6 +9,15 @@ from .builder import (
 )
 from .dv_budget import MissionDeltaVBudget, compose_complete_dv_budget
 from .full_mission import EarthSaturnTitanMissionResult, compute_earth_saturn_titan_mission
+from .mass_model import (
+    HESPEROS_MODEL_VERSION,
+    Manoeuvre,
+    MassArchitectureInfeasibleError,
+    ParametricBusCoefficients,
+    ParametricMassResult,
+    PayloadItem,
+    size_parametric_vehicle,
+)
 from .models import Event, Leg, Mission, TrajectoryResult
 from .moon_transfer import (
     SaturnTitanTransferResult,
@@ -30,12 +39,19 @@ __all__ = [
     "SaturnArrivalStagingResult",
     "EarthSaturnTitanMissionResult",
     "MissionDeltaVBudget",
+    "HESPEROS_MODEL_VERSION",
+    "Manoeuvre",
+    "MassArchitectureInfeasibleError",
+    "ParametricBusCoefficients",
+    "ParametricMassResult",
+    "PayloadItem",
     "adapt_saturn_arrival_staging_to_leg",
     "adapt_saturn_titan_transfer_to_leg",
     "compute_earth_saturn_titan_mission",
     "compose_complete_dv_budget",
     "compute_saturn_arrival_to_staging",
     "compute_saturn_titan_transfer",
+    "size_parametric_vehicle",
     "build_event",
     "build_leg",
     "build_mission",

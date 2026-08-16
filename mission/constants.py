@@ -1,5 +1,8 @@
 """Authoritative physical constants used by mission-domain calculations."""
 
+# Standard acceleration of gravity used by the Tsiolkovsky equation.
+G0_M_S2 = 9.80665
+
 # JPL SAT441 values converted from km-based units to SI.
 # https://ssd.jpl.nasa.gov/sats/phys_par/sep.html
 SATURN_MU_M3_S2 = 3.793120623e16
