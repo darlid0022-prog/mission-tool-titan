@@ -1,9 +1,9 @@
 """Mission capabilities currently exposed by the application."""
 
 SUPPORTED_DESTINATIONS = ("Saturn",)
+CONNECTED_CHAIN_DESTINATIONS = ("Titan",)
 
 PLANNED_DESTINATIONS = (
-    "Titan",
     "Mercury",
     "Venus",
     "Mars",

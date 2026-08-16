@@ -6,7 +6,8 @@ import streamlit as st
 
 from trajectory import compute_trajectory
 
-PHYSICS_MODEL_VERSION = "local-body-mu-v2"
+PHYSICS_MODEL_VERSION = "connected-titan-budget-v3"
+LEGACY_SATURN_CAPTURE_ALTITUDE_KM = 2_000.0
 
 
 @st.cache_data(max_entries=32, show_spinner=False)
@@ -17,7 +18,6 @@ def compute_cached_trajectory(
     launch_start: date,
     launch_end: date,
     leo_altitude_km: float,
-    capture_altitude_km: float,
 ) -> dict:
     """Compute a trajectory once for each bounded set of orbital inputs."""
     if physics_model_version != PHYSICS_MODEL_VERSION:
@@ -32,5 +32,5 @@ def compute_cached_trajectory(
         False,  # Flyby-only mode is not exposed until it is implemented.
         0.0,  # No artificial flyby credit is applied.
         leo_altitude_km,
-        capture_altitude_km,
+        LEGACY_SATURN_CAPTURE_ALTITUDE_KM,
     )

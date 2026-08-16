@@ -88,8 +88,8 @@ def compute_earth_saturn_titan_mission(
         legs=legs,
         events=[event for leg in legs for event in leg.events],
         notes=(
-            "Connected preliminary chain. Phase delta-v values remain separate and "
-            "are not yet connected to the global mass budget."
+            "Connected preliminary chain. Phase delta-v values remain explicit and can "
+            "be composed into the global propulsive and mass budgets."
         ),
     )
     return EarthSaturnTitanMissionResult(

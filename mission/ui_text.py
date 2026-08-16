@@ -4,25 +4,27 @@ from typing import Final
 
 UI_TEXT: Final[dict[str, str]] = {
     "app_caption": (
-        "Current scope: Earth → Saturn transfer and a separate preliminary "
-        "Saturn → Titan leg study."
+        "Connected preliminary Earth → Saturn → Titan mission chain with an explicit "
+        "propulsive delta-v and mass budget."
     ),
     "architecture_header": "1. Mission architecture",
-    "destination_label": "Computable destination",
-    "destination_help": "Only Saturn is currently connected to the trajectory engine.",
+    "destination_label": "Interplanetary solver target",
+    "destination_help": (
+        "The Lambert solver targets Saturn; the connected mission chain then continues to Titan."
+    ),
     "departure_type": "Departure type",
     "leo_altitude": "Initial LEO altitude (km)",
     "leo_help": "Used only when the departure type is LEO.",
-    "saturn_capture_altitude": "Saturn capture altitude (km)",
     "launch_window_header": "2. Launch window",
     "launch_start": "Launch date — start",
     "launch_end": "Launch date — end",
     "calculate": "Calculate trajectory",
     "titan_scope": (
-        "Titan is not yet available as an end-to-end mission destination. "
-        "A separate preliminary Saturn → Titan study is available below."
+        "Titan is connected through the preliminary Saturn staging and moon-transfer "
+        "models. Their assumptions and exclusions remain visible below."
     ),
     "planned_capabilities": "Planned capabilities",
+    "connected_destinations": "Connected mission destinations: ",
     "planned_destinations": "Destinations: ",
     "propulsion_header": "3. Propulsion",
     "isp": "Main engine specific impulse (s)",
@@ -31,15 +33,23 @@ UI_TEXT: Final[dict[str, str]] = {
     "invalid_dates": "The end date must be on or after the start date.",
     "earth_saturn_spinner": "Calculating the Earth → Saturn trajectory…",
     "results_header": "Results (updated after calculation)",
+    "complete_chain_note": (
+        "Connected preliminary Earth → Saturn → Titan budget. The legacy circular "
+        "Saturn-capture term is replaced by capture-to-ellipse and staging circularization."
+    ),
     "provisional_budget": "Preliminary delta-v budget",
     "budget_caption": (
-        "The displayed values include the computed propulsive delta-v for LEO escape "
-        "(when LEO is selected) and Saturn capture. Other entries remain preliminary."
+        "The displayed values include every currently modeled propulsive burn. DSM / "
+        "fly-by corrections remain zero because no such maneuver is modeled yet."
     ),
     "maneuver": "Maneuver",
     "value_m_s": "Value (m/s)",
     "dv_sum": "Sum of budgeted delta-v values",
     "mass_budget": "Mass budget",
+    "mass_model_warning": (
+        "Preliminary sizing: dry mass currently scales from the instrument table and does not "
+        "yet represent a complete spacecraft bus."
+    ),
     "direct_warning": (
         "Direct mode still treats departure v∞ as a preliminary equivalent delta-v. "
         "The mass budget is not a launch-vehicle sizing result."
@@ -51,8 +61,7 @@ UI_TEXT: Final[dict[str, str]] = {
     "staging_header": "Saturn arrival → staging orbit — preliminary model",
     "staging_warning": (
         "Energy estimate only: ring-plane clearance is unresolved. This phase replaces "
-        "the legacy circular Saturn-capture term when selected, but it is not connected "
-        "to the global budget or mass sizing."
+        "the legacy circular Saturn-capture term in the connected budget."
     ),
     "arrival_v_infinity": "Saturn arrival v∞ (m/s)",
     "arrival_v_infinity_help": (
@@ -72,8 +81,8 @@ UI_TEXT: Final[dict[str, str]] = {
     "e_ring_margin": "Staging orbit beyond E-ring edge",
     "titan_header": "Saturn → Titan — preliminary model",
     "titan_warning": (
-        "Partial budget: the Saturn arrival-to-staging phase is modeled separately "
-        "above, but neither preliminary phase is added to the global budget or mass sizing."
+        "This phase is included in the connected propulsive and mass budgets. The model "
+        "remains preliminary and retains the exclusions listed below."
     ),
     "study_parameters": "Study parameters",
     "staging_radius": "Saturn staging-orbit radius (km)",
@@ -96,7 +105,7 @@ UI_TEXT: Final[dict[str, str]] = {
         "Hyperbolic arrival speed relative to Titan, distinct from propulsive delta-v."
     ),
     "titan_capture_dv": "Titan capture delta-v",
-    "partial_total_dv": "Total modeled delta-v (partial)",
+    "partial_total_dv": "Saturn → Titan modeled delta-v",
     "titan_tof": "Saturn → Titan time of flight",
     "assumptions_exclusions": "Model assumptions and exclusions",
     "assumptions": "**Assumptions**",

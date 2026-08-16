@@ -13,15 +13,14 @@ class TestCachedTrajectoryService(unittest.TestCase):
         compute_cached_trajectory.clear()
 
     @staticmethod
-    def _args(*, capture_altitude_km=2000.0):
+    def _args(*, leo_altitude_km=250.0):
         return (
             PHYSICS_MODEL_VERSION,
             "Saturn",
             "Direct",
             date(2026, 8, 15),
             date(2026, 8, 15),
-            250.0,
-            capture_altitude_km,
+            leo_altitude_km,
         )
 
     @patch("app_services.compute_trajectory")
@@ -39,7 +38,7 @@ class TestCachedTrajectoryService(unittest.TestCase):
         compute_mock.return_value = {"dv_total": 123.0}
 
         compute_cached_trajectory(*self._args())
-        compute_cached_trajectory(*self._args(capture_altitude_km=3000.0))
+        compute_cached_trajectory(*self._args(leo_altitude_km=300.0))
 
         self.assertEqual(compute_mock.call_count, 2)
 

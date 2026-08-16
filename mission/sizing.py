@@ -1,6 +1,7 @@
 """Preliminary spacecraft mass-sizing calculations."""
 
-import numpy as np
+import math
+
 import pandas as pd
 
 
@@ -14,6 +15,10 @@ def compute_mass_budget(
 ) -> dict[str, float]:
     """Estimate dry, propellant, and wet mass from the current inputs."""
     g0 = 9.80665
+    if not math.isfinite(float(dv_total)) or dv_total < 0:
+        raise ValueError("dv_total must be finite and non-negative.")
+    if not math.isfinite(float(isp_s)) or isp_s <= 0:
+        raise ValueError("isp_s must be finite and positive.")
     instrument_mass = float(instruments_df["Masse (kg)"].fillna(0).sum())
 
     # Placeholder subsystem model retained from the original Streamlit page.
@@ -22,7 +27,15 @@ def compute_mass_budget(
     dry_mass = dry_mass_before_margin * (1 + margin_frac)
 
     if dv_total > 0 and isp_s > 0:
-        mass_ratio = np.exp(dv_total / (isp_s * g0))
+        exponent = dv_total / (isp_s * g0)
+        try:
+            mass_ratio = math.exp(exponent)
+        except OverflowError as error:
+            raise ValueError(
+                "The requested delta-v and Isp produce an infinite mass ratio."
+            ) from error
+        if not math.isfinite(mass_ratio):
+            raise ValueError("The requested delta-v and Isp produce an infinite mass ratio.")
         wet_mass = dry_mass * mass_ratio
         propellant_mass = wet_mass - dry_mass
     else:

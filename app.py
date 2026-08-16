@@ -5,12 +5,13 @@ import streamlit as st
 
 from app_services import PHYSICS_MODEL_VERSION, compute_cached_trajectory
 from mission.capabilities import (
+    CONNECTED_CHAIN_DESTINATIONS,
     PLANNED_DESTINATIONS,
     PLANNED_MISSION_FEATURES,
     SUPPORTED_DESTINATIONS,
 )
-from mission.moon_transfer import compute_saturn_titan_transfer
-from mission.saturn_staging import compute_saturn_arrival_to_staging
+from mission.dv_budget import compose_complete_dv_budget
+from mission.full_mission import compute_earth_saturn_titan_mission
 from mission.sizing import compute_mass_budget
 from mission.ui_text import UI_TEXT
 
@@ -38,8 +39,28 @@ with col_inputs:
             value=250,
             help=UI_TEXT["leo_help"],
         )
-        capture_altitude_km = st.number_input(
-            UI_TEXT["saturn_capture_altitude"], min_value=0, value=2000
+        saturn_periapsis_radius_km = st.number_input(
+            UI_TEXT["periapsis_radius"],
+            min_value=60_269,
+            max_value=66_899,
+            value=62_330,
+            step=100,
+            help=UI_TEXT["periapsis_radius_help"],
+        )
+        saturn_staging_radius_km = st.number_input(
+            UI_TEXT["staging_radius"],
+            min_value=480_001,
+            max_value=1_221_899,
+            value=600_000,
+            step=1_000,
+            help=UI_TEXT["staging_radius_help"],
+        )
+        titan_capture_altitude_km = st.number_input(
+            UI_TEXT["titan_capture_altitude"],
+            min_value=1_000,
+            value=1_500,
+            step=100,
+            help=UI_TEXT["titan_capture_help"],
         )
 
         st.header(UI_TEXT["launch_window_header"])
@@ -50,12 +71,13 @@ with col_inputs:
     st.info(UI_TEXT["titan_scope"])
 
     with st.expander(UI_TEXT["planned_capabilities"]):
+        st.write(UI_TEXT["connected_destinations"] + ", ".join(CONNECTED_CHAIN_DESTINATIONS))
         st.write(UI_TEXT["planned_destinations"] + ", ".join(PLANNED_DESTINATIONS))
         for feature in PLANNED_MISSION_FEATURES:
             st.write(f"- {feature}")
 
     st.header(UI_TEXT["propulsion_header"])
-    isp_s = st.number_input(UI_TEXT["isp"], min_value=1, value=320)
+    isp_s = st.number_input(UI_TEXT["isp"], min_value=100, value=320)
 
     st.header(UI_TEXT["instruments_header"])
     st.caption(UI_TEXT["instruments_caption"])
@@ -64,7 +86,7 @@ with col_inputs:
             {
                 "Instrument": "",
                 "Cible": "Orbiter",
-                "Masse (kg)": 0.0,
+                "Masse (kg)": 10.0,
                 "Puissance (W)": 0.0,
                 "Débit (bps)": 0.0,
             },
@@ -95,24 +117,44 @@ with st.spinner(UI_TEXT["earth_saturn_spinner"]):
         launch_window_start,
         launch_window_end,
         leo_altitude_km,
-        capture_altitude_km,
     )
-mass = compute_mass_budget(traj["dv_total"], isp_s, instruments_df)
+    complete_mission = compute_earth_saturn_titan_mission(
+        traj["earth_saturn_leg"],
+        saturn_periapsis_radius_m=float(saturn_periapsis_radius_km) * 1_000.0,
+        saturn_periapsis_radius_provenance=(
+            "User-selected Saturn-centered radius; nominal value preserves the "
+            "PyKEP Saturn radius plus UI capture altitude."
+        ),
+        saturn_staging_radius_m=float(saturn_staging_radius_km) * 1_000.0,
+        titan_capture_altitude_m=float(titan_capture_altitude_km) * 1_000.0,
+    )
+
+staging_result = complete_mission.saturn_arrival_staging
+titan_transfer = complete_mission.saturn_titan_transfer
+complete_dv_budget = compose_complete_dv_budget(
+    traj["dv_budget"],
+    staging_result,
+    titan_transfer,
+)
+dv_total = complete_dv_budget.total_m_s
+mass = compute_mass_budget(dv_total, isp_s, instruments_df)
 mass_ratio = mass["wet_mass_kg"] / mass["dry_mass_kg"] if mass["dry_mass_kg"] > 0 else 1.0
 
 with col_results:
     st.header(UI_TEXT["results_header"])
-    st.info(traj["note"])
+    st.info(UI_TEXT["complete_chain_note"])
 
     st.subheader(UI_TEXT["provisional_budget"])
     st.caption(UI_TEXT["budget_caption"])
     dv_table = pd.DataFrame(
-        traj["dv_budget"].items(), columns=[UI_TEXT["maneuver"], UI_TEXT["value_m_s"]]
+        complete_dv_budget.as_dict().items(),
+        columns=[UI_TEXT["maneuver"], UI_TEXT["value_m_s"]],
     )
     st.dataframe(dv_table, width="stretch")
-    st.metric(UI_TEXT["dv_sum"], f"{traj['dv_total']:.0f} m/s")
+    st.metric(UI_TEXT["dv_sum"], f"{dv_total:.0f} m/s")
 
     st.subheader(UI_TEXT["mass_budget"])
+    st.warning(UI_TEXT["mass_model_warning"], icon=":material/warning:")
     if departure_type == "Direct":
         st.warning(UI_TEXT["direct_warning"])
     if mass_ratio > 20:
@@ -127,49 +169,28 @@ with col_results:
     c3.metric(UI_TEXT["propellant_mass"], f"{mass['propellant_mass_kg']:.1f} kg")
     c4.metric(UI_TEXT["wet_mass"], f"{mass['wet_mass_kg']:.1f} kg")
 
-st.divider()
 st.header(UI_TEXT["staging_header"])
 st.warning(UI_TEXT["staging_warning"])
 
 with st.container(border=True):
     st.subheader(UI_TEXT["study_parameters"])
-    staging_input_1, staging_input_2, staging_input_3 = st.columns(3)
-    with staging_input_1:
-        saturn_arrival_v_infinity_m_s = st.number_input(
+    with st.container(horizontal=True):
+        st.metric(
             UI_TEXT["arrival_v_infinity"],
-            min_value=0.0,
-            value=6_490.744714263188,
-            step=100.0,
+            f"{staging_result.arrival_v_infinity_m_s:,.1f} m/s",
             help=UI_TEXT["arrival_v_infinity_help"],
+            border=True,
         )
-    with staging_input_2:
-        saturn_periapsis_radius_km = st.number_input(
+        st.metric(
             UI_TEXT["periapsis_radius"],
-            min_value=60_269,
-            max_value=66_899,
-            value=62_330,
-            step=100,
-            help=UI_TEXT["periapsis_radius_help"],
+            f"{staging_result.periapsis_radius_m / 1_000:,.0f} km",
+            border=True,
         )
-    with staging_input_3:
-        saturn_staging_radius_km = st.number_input(
+        st.metric(
             UI_TEXT["staging_radius"],
-            min_value=480_001,
-            max_value=1_221_899,
-            value=600_000,
-            step=1_000,
-            help=UI_TEXT["staging_radius_help"],
+            f"{staging_result.staging_radius_m / 1_000:,.0f} km",
+            border=True,
         )
-
-    staging_result = compute_saturn_arrival_to_staging(
-        arrival_v_infinity_m_s=float(saturn_arrival_v_infinity_m_s),
-        periapsis_radius_m=float(saturn_periapsis_radius_km) * 1_000.0,
-        staging_radius_m=float(saturn_staging_radius_km) * 1_000.0,
-        periapsis_radius_provenance=(
-            "User-selected Saturn-centered radius; nominal value preserves the "
-            "PyKEP Saturn radius plus UI capture altitude."
-        ),
-    )
 
     st.caption(
         f"Method: `{staging_result.method}` · Source: `{staging_result.source}` · "
@@ -228,24 +249,16 @@ with st.container(border=True):
         for exclusion in staging_result.exclusions:
             st.write(f"- {exclusion}")
 
-st.divider()
 st.header(UI_TEXT["titan_header"])
 st.warning(UI_TEXT["titan_warning"])
 
 with st.container(border=True):
     st.subheader(UI_TEXT["study_parameters"])
     st.caption(UI_TEXT["shared_staging_radius"])
-    titan_capture_altitude_km = st.number_input(
+    st.metric(
         UI_TEXT["titan_capture_altitude"],
-        min_value=1_000,
-        value=1_500,
-        step=100,
-        help=UI_TEXT["titan_capture_help"],
-    )
-
-    titan_transfer = compute_saturn_titan_transfer(
-        saturn_staging_radius_m=float(saturn_staging_radius_km) * 1_000.0,
-        titan_capture_altitude_m=float(titan_capture_altitude_km) * 1_000.0,
+        f"{titan_transfer.titan_capture_altitude_m / 1_000:,.0f} km",
+        border=True,
     )
 
     st.caption(

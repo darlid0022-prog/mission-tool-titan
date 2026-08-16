@@ -10,7 +10,7 @@ import pykep as pk
 
 from mission import physics
 from mission.bodies import resolve_body
-from mission.models import TrajectoryResult
+from mission.models import Event, Leg, TrajectoryResult
 from mission.pykep_trajectory_engine import PyKEPTrajectoryEngine
 
 
@@ -331,11 +331,42 @@ def compute_trajectory(
         "Other entries remain preliminary or unimplemented."
     )
 
+    earth_saturn_trajectory = TrajectoryResult(
+        departure_mjd2000=best_departure_mjd2000,
+        arrival_mjd2000=best_arrival_mjd2000,
+        tof_years=_result_value(best, "tof_years"),
+        v_inf_depart=best_departure_v_inf,
+        v_inf_arrival=best_arrival_v_inf,
+        delta_v=dv_from_leo,
+        method="lambert",
+        notes="Earth-to-Saturn Lambert leg; delta_v contains Earth departure only.",
+    )
+    earth_departure_event = Event(
+        name="Earth departure",
+        body="Earth",
+        event_type="departure",
+        epoch=best_departure_mjd2000,
+    )
+    saturn_arrival_event = Event(
+        name="Saturn arrival",
+        body="Saturn",
+        event_type="arrival",
+        epoch=best_arrival_mjd2000,
+    )
+    earth_saturn_leg = Leg(
+        origin="Earth",
+        destination="Saturn",
+        trajectory=earth_saturn_trajectory,
+        events=[earth_departure_event, saturn_arrival_event],
+        notes="Canonical Earth-to-Saturn leg for the connected mission chain.",
+    )
+
     return {
         "dv_budget": dv_budget,
         "dv_total": dv_total,
         "best_launch_date": best_launch_date,
         "arrival_date": arrival_date,
+        "earth_saturn_leg": earth_saturn_leg,
         "note": note,
     }
 

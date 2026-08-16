@@ -66,6 +66,7 @@ EXPECTED_TOP_LEVEL_KEYS = frozenset(
         "dv_total",
         "best_launch_date",
         "arrival_date",
+        "earth_saturn_leg",
         "note",
     }
 )
@@ -120,6 +121,22 @@ class TestEarthSaturnTrajectoryRegression(unittest.TestCase):
         self.assertAlmostEqual(
             self.result["dv_total"],
             budget_sum,
+            delta=ABS_TOL_M_S,
+        )
+
+    def test_canonical_leg_preserves_lambert_values(self):
+        leg = self.result["earth_saturn_leg"]
+        trajectory = leg.trajectory
+        self.assertEqual((leg.origin, leg.destination), ("Earth", "Saturn"))
+        self.assertIsNotNone(trajectory)
+        self.assertAlmostEqual(
+            trajectory.v_inf_depart,
+            REGRESSION_DV_DEPART_M_S,
+            delta=ABS_TOL_M_S,
+        )
+        self.assertAlmostEqual(
+            trajectory.v_inf_arrival,
+            REGRESSION_V_INF_SATURN_M_S,
             delta=ABS_TOL_M_S,
         )
 

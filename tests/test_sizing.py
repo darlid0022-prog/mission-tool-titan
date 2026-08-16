@@ -1,3 +1,4 @@
+import math
 import unittest
 
 import pandas as pd
@@ -24,6 +25,14 @@ class TestMassBudget(unittest.TestCase):
 
         self.assertEqual(heavy_result["dry_mass_kg"], 2 * light_result["dry_mass_kg"])
         self.assertEqual(heavy_result["wet_mass_kg"], 2 * light_result["wet_mass_kg"])
+
+    def test_rejects_non_finite_or_overflowing_mass_ratios(self):
+        instruments = pd.DataFrame({"Masse (kg)": [10.0]})
+
+        for dv_total, isp_s in ((math.nan, 320.0), (1_000.0, math.inf), (16_000.0, 1.0)):
+            with self.subTest(dv_total=dv_total, isp_s=isp_s):
+                with self.assertRaisesRegex(ValueError, "finite|infinite mass ratio"):
+                    compute_mass_budget(dv_total, isp_s, instruments)
 
 
 if __name__ == "__main__":
