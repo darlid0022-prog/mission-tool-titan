@@ -18,6 +18,7 @@ from mission.moon_transfer import (
     SaturnTitanTransferResult,
     compute_saturn_titan_transfer,
 )
+from mission.physics import delta_v_capture
 
 ABS_TOL_M_S = 1e-3
 ABS_TOL_S = 1e-3
@@ -66,6 +67,16 @@ class TestSaturnTitanTransfer(unittest.TestCase):
             result.departure_delta_v_m_s + result.capture_delta_v_m_s,
             delta=1e-12,
         )
+
+    def test_titan_capture_uses_generic_vis_viva_capture_primitive(self):
+        result = compute_saturn_titan_transfer()
+
+        expected = delta_v_capture(
+            result.v_infinity_titan_m_s,
+            TITAN_MU_M3_S2,
+            result.titan_capture_radius_m,
+        )
+        self.assertEqual(result.capture_delta_v_m_s, expected)
 
     def test_higher_capture_orbit_reduces_capture_delta_v_for_nominal_case(self):
         low = compute_saturn_titan_transfer(titan_capture_altitude_m=1.0e6)

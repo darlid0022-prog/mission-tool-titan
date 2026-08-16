@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from . import physics
 from .constants import (
     JPL_SATURN_SYSTEM_SOURCE,
     SATURN_MU_M3_S2,
@@ -103,9 +104,11 @@ def compute_saturn_titan_transfer(
     time_of_flight = math.pi * math.sqrt(transfer_semimajor_axis**3 / SATURN_MU_M3_S2)
 
     titan_capture_radius = TITAN_MEAN_RADIUS_M + capture_altitude
-    capture_delta_v = math.sqrt(
-        v_infinity_titan**2 + 2.0 * TITAN_MU_M3_S2 / titan_capture_radius
-    ) - math.sqrt(TITAN_MU_M3_S2 / titan_capture_radius)
+    capture_delta_v = physics.delta_v_capture(
+        v_infinity_titan,
+        TITAN_MU_M3_S2,
+        titan_capture_radius,
+    )
     total_delta_v = departure_delta_v + capture_delta_v
 
     return SaturnTitanTransferResult(
