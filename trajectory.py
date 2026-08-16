@@ -116,7 +116,7 @@ def _compute_lambert_earth_saturn_grid(
     )
 
     if not results:
-        raise RuntimeError("Aucune solution Lambert Terre -> Saturne n'a ete trouvee.")
+        raise RuntimeError("No Earth-to-Saturn Lambert solution was found.")
 
     return _legacy_solution_list(results)
 
@@ -263,9 +263,8 @@ def compute_trajectory(
             "best_launch_date": None,
             "arrival_date": None,
             "note": (
-                f"Destination '{destination}' non encore implemente. "
-                "Selectionnez Saturn pour tester le moteur "
-                "Terre -> Saturne."
+                f"Destination '{destination}' is not implemented yet. "
+                "Select Saturn to use the Earth-to-Saturn engine."
             ),
         }
 
@@ -324,12 +323,12 @@ def compute_trajectory(
     arrival_date = pk.epoch(best_arrival_mjd2000)
 
     note = (
-        "Premiere version Terre -> Saturne avec Lambert (multi_revs=0). "
-        "Les valeurs suivantes dans le budget sont des Delta-V propulsifs :\n"
-        "- 'dV from LEO' : impulsive ΔV pour evasion depuis LEO (si selection LEO).\n"
-        "- 'dV Capture at Destination' : impulsive ΔV de capture a Saturne, "
-        "calcule avec le parametre gravitationnel propre de Saturne (provisoire).\n"
-        "Les autres lignes restent provisoires ou non implementees pour l'instant."
+        "Preliminary Earth-to-Saturn Lambert model (multi_revs=0). "
+        "The following budget values are propulsive delta-v terms:\n"
+        "- 'dV from LEO': impulsive LEO escape delta-v when LEO is selected.\n"
+        "- 'dV Capture at Destination': impulsive Saturn capture delta-v, "
+        "computed with Saturn's own gravitational parameter (preliminary).\n"
+        "Other entries remain preliminary or unimplemented."
     )
 
     return {
@@ -401,8 +400,8 @@ def compute_trajectory_alternatives(
             "pareto_frontier": [],
             "pareto_count": 0,
             "note": (
-                f"Destination '{destination}' non encore implemente. "
-                "Selectionnez Saturn pour voir les alternatives."
+                f"Destination '{destination}' is not implemented yet. "
+                "Select Saturn to view alternatives."
             ),
         }
 

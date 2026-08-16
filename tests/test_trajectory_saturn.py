@@ -229,7 +229,7 @@ class TestEarthSaturnTrajectoryRegression(unittest.TestCase):
 
     def test_note_indicates_saturn_lambert_engine(self):
         note = self.result["note"]
-        self.assertIn("Terre -> Saturne", note)
+        self.assertIn("Earth-to-Saturn", note)
         self.assertIn("Lambert", note)
 
     def test_compute_trajectory_is_deterministic(self):
@@ -256,7 +256,7 @@ class TestEarthSaturnTrajectoryEdgeCases(unittest.TestCase):
         self.assertIsNone(result["best_launch_date"])
         self.assertIsNone(result["arrival_date"])
         self.assertEqual(set(result["dv_budget"].keys()), EXPECTED_MANEUVER_KEYS)
-        self.assertIn("non encore implemente", result["note"])
+        self.assertIn("is not implemented yet", result["note"])
 
     def test_destination_matching_is_case_insensitive(self):
         upper = _call_saturn_baseline(destination="Saturn")

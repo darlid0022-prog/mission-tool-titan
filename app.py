@@ -11,13 +11,11 @@ from mission.capabilities import (
 )
 from mission.moon_transfer import compute_saturn_titan_transfer
 from mission.sizing import compute_mass_budget
+from mission.ui_text import UI_TEXT
 
 st.set_page_config(page_title="Mission Design - Titan", layout="wide")
 st.title(":material/satellite_alt: Mission Design Calculator")
-st.caption(
-    "Version actuelle : transfert Terre → Saturne et étude préliminaire séparée "
-    "de la jambe Saturne → Titan."
-)
+st.caption(UI_TEXT["app_caption"])
 
 # -----------------------------------------------------------------------
 # 2. ENTRÉES - colonne de gauche : architecture de mission
@@ -26,43 +24,40 @@ col_inputs, col_results = st.columns([1, 2])
 
 with col_inputs:
     with st.form("orbital_inputs"):
-        st.header("1. Architecture de mission")
+        st.header(UI_TEXT["architecture_header"])
         destination = st.selectbox(
-            "Destination calculable",
+            UI_TEXT["destination_label"],
             SUPPORTED_DESTINATIONS,
-            help="Seule Saturne est actuellement reliée au moteur de trajectoire.",
+            help=UI_TEXT["destination_help"],
         )
-        departure_type = st.radio("Type de départ", ["Direct", "LEO"])
+        departure_type = st.radio(UI_TEXT["departure_type"], ["Direct", "LEO"])
         leo_altitude_km = st.number_input(
-            "Altitude LEO initiale (km)",
+            UI_TEXT["leo_altitude"],
             min_value=100,
             value=250,
-            help="Utilisée uniquement lorsque le type de départ est LEO.",
+            help=UI_TEXT["leo_help"],
         )
         capture_altitude_km = st.number_input(
-            "Altitude de capture à Saturne (km)", min_value=0, value=2000
+            UI_TEXT["saturn_capture_altitude"], min_value=0, value=2000
         )
 
-        st.header("2. Fenêtre de lancement")
-        launch_window_start = st.date_input("Date de lancement - début")
-        launch_window_end = st.date_input("Date de lancement - fin")
-        st.form_submit_button("Calculer la trajectoire", icon=":material/calculate:")
+        st.header(UI_TEXT["launch_window_header"])
+        launch_window_start = st.date_input(UI_TEXT["launch_start"])
+        launch_window_end = st.date_input(UI_TEXT["launch_end"])
+        st.form_submit_button(UI_TEXT["calculate"], icon=":material/calculate:")
 
-    st.info(
-        "Titan n'est pas encore une destination de mission complète. Une étude "
-        "préliminaire Saturne → Titan est disponible séparément plus bas."
-    )
+    st.info(UI_TEXT["titan_scope"])
 
-    with st.expander("Capacités planifiées"):
-        st.write("Destinations : " + ", ".join(PLANNED_DESTINATIONS))
+    with st.expander(UI_TEXT["planned_capabilities"]):
+        st.write(UI_TEXT["planned_destinations"] + ", ".join(PLANNED_DESTINATIONS))
         for feature in PLANNED_MISSION_FEATURES:
             st.write(f"- {feature}")
 
-    st.header("3. Propulsion")
-    isp_s = st.number_input("Isp moteur principal (s)", min_value=1, value=320)
+    st.header(UI_TEXT["propulsion_header"])
+    isp_s = st.number_input(UI_TEXT["isp"], min_value=1, value=320)
 
-    st.header("4. Instruments")
-    st.caption("Ajoute/édite les lignes directement dans le tableau ci-dessous.")
+    st.header(UI_TEXT["instruments_header"])
+    st.caption(UI_TEXT["instruments_caption"])
     default_instruments = pd.DataFrame(
         [
             {
@@ -79,17 +74,19 @@ with col_inputs:
         num_rows="dynamic",
         width="stretch",
         column_config={
-            "Masse (kg)": st.column_config.NumberColumn(min_value=0.0),
-            "Puissance (W)": st.column_config.NumberColumn(min_value=0.0),
-            "Débit (bps)": st.column_config.NumberColumn(min_value=0.0),
+            "Instrument": st.column_config.TextColumn("Instrument"),
+            "Cible": st.column_config.TextColumn("Target"),
+            "Masse (kg)": st.column_config.NumberColumn("Mass (kg)", min_value=0.0),
+            "Puissance (W)": st.column_config.NumberColumn("Power (W)", min_value=0.0),
+            "Débit (bps)": st.column_config.NumberColumn("Data rate (bps)", min_value=0.0),
         },
     )
 
 if launch_window_end < launch_window_start:
-    st.error("La date de fin doit être postérieure ou égale à la date de début.")
+    st.error(UI_TEXT["invalid_dates"])
     st.stop()
 
-with st.spinner("Calcul de la trajectoire Terre → Saturne…"):
+with st.spinner(UI_TEXT["earth_saturn_spinner"]):
     traj = compute_cached_trajectory(
         PHYSICS_MODEL_VERSION,
         destination,
@@ -103,69 +100,55 @@ mass = compute_mass_budget(traj["dv_total"], isp_s, instruments_df)
 mass_ratio = mass["wet_mass_kg"] / mass["dry_mass_kg"] if mass["dry_mass_kg"] > 0 else 1.0
 
 with col_results:
-    st.header("Résultats (mis à jour en direct)")
+    st.header(UI_TEXT["results_header"])
     st.info(traj["note"])
 
-    st.subheader("Budget (provisoire)")
-    st.caption(
-        "Les valeurs affichées incluent désormais les ΔV propulsifs calcules pour "
-        "l'evasion depuis LEO (si selection LEO) et la capture a Saturne. Les autres "
-        "lignes restent provisoires."
+    st.subheader(UI_TEXT["provisional_budget"])
+    st.caption(UI_TEXT["budget_caption"])
+    dv_table = pd.DataFrame(
+        traj["dv_budget"].items(), columns=[UI_TEXT["maneuver"], UI_TEXT["value_m_s"]]
     )
-    dv_table = pd.DataFrame(traj["dv_budget"].items(), columns=["Manoeuvre", "Valeur (m/s)"])
     st.dataframe(dv_table, width="stretch")
-    st.metric("Somme des ΔV / valeurs budget", f"{traj['dv_total']:.0f} m/s")
+    st.metric(UI_TEXT["dv_sum"], f"{traj['dv_total']:.0f} m/s")
 
-    st.subheader("Budget de masse")
+    st.subheader(UI_TEXT["mass_budget"])
     if departure_type == "Direct":
-        st.warning(
-            "Le mode Direct traite encore le v∞ de départ comme un ΔV équivalent "
-            "provisoire. Le budget de masse ne constitue pas un dimensionnement de lanceur."
-        )
+        st.warning(UI_TEXT["direct_warning"])
     if mass_ratio > 20:
         st.warning(
-            f"Rapport de masse estimé : {mass_ratio:,.0f}. Une propulsion chimique à "
-            f"{isp_s:.0f} s est irréaliste pour ce budget de ΔV sans architecture multi-étages."
+            f"Estimated mass ratio: {mass_ratio:,.0f}. Chemical propulsion at "
+            f"{isp_s:.0f} s is unrealistic for this delta-v budget without a "
+            "multi-stage architecture."
         )
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Masse instruments", f"{mass['instrument_mass_kg']:.1f} kg")
-    c2.metric("Masse sèche", f"{mass['dry_mass_kg']:.1f} kg")
-    c3.metric("Masse d'ergols", f"{mass['propellant_mass_kg']:.1f} kg")
-    c4.metric("Masse totale (wet)", f"{mass['wet_mass_kg']:.1f} kg")
+    c1.metric(UI_TEXT["instrument_mass"], f"{mass['instrument_mass_kg']:.1f} kg")
+    c2.metric(UI_TEXT["dry_mass"], f"{mass['dry_mass_kg']:.1f} kg")
+    c3.metric(UI_TEXT["propellant_mass"], f"{mass['propellant_mass_kg']:.1f} kg")
+    c4.metric(UI_TEXT["wet_mass"], f"{mass['wet_mass_kg']:.1f} kg")
 
 st.divider()
-st.header("Saturne → Titan — modèle préliminaire")
-st.warning(
-    "Budget partiel : la phase entre l'arrivée/capture à Saturne et l'orbite "
-    "d'attente autour de Saturne n'est pas modélisée. Les résultats ci-dessous "
-    "ne sont donc pas ajoutés au budget global ni au dimensionnement de masse."
-)
+st.header(UI_TEXT["titan_header"])
+st.warning(UI_TEXT["titan_warning"])
 
 with st.container(border=True):
-    st.subheader("Paramètres de l'étude")
+    st.subheader(UI_TEXT["study_parameters"])
     titan_input_1, titan_input_2 = st.columns(2)
     with titan_input_1:
         saturn_staging_radius_km = st.number_input(
-            "Rayon de l'orbite d'attente autour de Saturne (km)",
+            UI_TEXT["staging_radius"],
             min_value=480_001,
             max_value=1_221_899,
             value=600_000,
             step=1_000,
-            help=(
-                "Rayon mesuré depuis le centre de Saturne. La limite basse est "
-                "placée au-delà de la garde préliminaire des anneaux."
-            ),
+            help=UI_TEXT["staging_radius_help"],
         )
     with titan_input_2:
         titan_capture_altitude_km = st.number_input(
-            "Altitude de capture autour de Titan (km)",
+            UI_TEXT["titan_capture_altitude"],
             min_value=1_000,
             value=1_500,
             step=100,
-            help=(
-                "Altitude au-dessus du rayon moyen de Titan. Le modèle impose "
-                "une garde non atmosphérique préliminaire de 1 000 km."
-            ),
+            help=UI_TEXT["titan_capture_help"],
         )
 
     titan_transfer = compute_saturn_titan_transfer(
@@ -174,43 +157,43 @@ with st.container(border=True):
     )
 
     st.caption(
-        f"Méthode : `{titan_transfer.method}` · Source : `{titan_transfer.source}` · "
-        "Calcul circulaire, coplanaire et impulsif."
+        f"Method: `{titan_transfer.method}` · Source: `{titan_transfer.source}` · "
+        "Circular, coplanar, impulsive calculation."
     )
     with st.container(horizontal=True):
         st.metric(
-            "ΔV de départ depuis l'orbite d'attente",
+            UI_TEXT["departure_dv"],
             f"{titan_transfer.departure_delta_v_m_s:,.1f} m/s",
             border=True,
         )
         st.metric(
-            "v∞ relatif à Titan (non propulsif)",
+            UI_TEXT["titan_v_infinity"],
             f"{titan_transfer.v_infinity_titan_m_s:,.1f} m/s",
-            help="Vitesse hyperbolique d'arrivée, distincte d'un ΔV propulsif.",
+            help=UI_TEXT["titan_v_infinity_help"],
             border=True,
         )
         st.metric(
-            "ΔV de capture à Titan",
+            UI_TEXT["titan_capture_dv"],
             f"{titan_transfer.capture_delta_v_m_s:,.1f} m/s",
             border=True,
         )
         st.metric(
-            "ΔV total modélisé (partiel)",
+            UI_TEXT["partial_total_dv"],
             f"{titan_transfer.total_delta_v_m_s:,.1f} m/s",
             border=True,
         )
 
     st.metric(
-        "Temps de vol Saturne → Titan",
-        f"{titan_transfer.time_of_flight_days:.3f} jours",
-        help=f"{titan_transfer.time_of_flight_s:,.0f} secondes.",
+        UI_TEXT["titan_tof"],
+        f"{titan_transfer.time_of_flight_days:.3f} days",
+        help=f"{titan_transfer.time_of_flight_s:,.0f} seconds.",
         border=True,
     )
 
-    with st.expander("Hypothèses et exclusions du modèle"):
-        st.markdown("**Hypothèses**")
+    with st.expander(UI_TEXT["assumptions_exclusions"]):
+        st.markdown(UI_TEXT["assumptions"])
         for assumption in titan_transfer.assumptions:
             st.write(f"- {assumption}")
-        st.markdown("**Exclusions**")
+        st.markdown(UI_TEXT["exclusions"])
         for exclusion in titan_transfer.exclusions:
             st.write(f"- {exclusion}")

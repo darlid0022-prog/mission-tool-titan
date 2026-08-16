@@ -23,14 +23,14 @@ class TestSaturnTitanUi(unittest.TestCase):
 
         self.assertFalse(app.exception)
         self.assertTrue(
-            any(heading.value == "Saturne → Titan — modèle préliminaire" for heading in app.header)
+            any(heading.value == "Saturn → Titan — preliminary model" for heading in app.header)
         )
         metrics = {metric.label: metric.value for metric in app.metric}
-        self.assertEqual(metrics["ΔV de départ depuis l'orbite d'attente"], "1,257.6 m/s")
-        self.assertEqual(metrics["v∞ relatif à Titan (non propulsif)"], "1,049.8 m/s")
-        self.assertEqual(metrics["ΔV de capture à Titan"], "862.7 m/s")
-        self.assertEqual(metrics["ΔV total modélisé (partiel)"], "2,120.3 m/s")
-        self.assertEqual(metrics["Temps de vol Saturne → Titan"], "5.133 jours")
+        self.assertEqual(metrics["Departure delta-v from staging orbit"], "1,257.6 m/s")
+        self.assertEqual(metrics["Titan-relative v∞ (non-propulsive)"], "1,049.8 m/s")
+        self.assertEqual(metrics["Titan capture delta-v"], "862.7 m/s")
+        self.assertEqual(metrics["Total modeled delta-v (partial)"], "2,120.3 m/s")
+        self.assertEqual(metrics["Saturn → Titan time of flight"], "5.133 days")
         self.assertTrue(any("JPL SAT441" in caption.value for caption in app.caption))
 
     def test_missing_staging_phase_is_visible_and_mass_budget_stays_earth_saturn_only(self):
@@ -52,8 +52,8 @@ class TestSaturnTitanUi(unittest.TestCase):
         self.assertFalse(app.exception)
         self.assertTrue(
             any(
-                "n'est pas modélisée" in warning.value
-                and "pas ajoutés au budget global" in warning.value
+                "is not included here" in warning.value
+                and "not added to the global budget" in warning.value
                 for warning in app.warning
             )
         )
