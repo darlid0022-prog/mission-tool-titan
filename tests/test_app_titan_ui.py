@@ -59,6 +59,28 @@ class TestSaturnTitanUi(unittest.TestCase):
         self.assertEqual(metrics["Saturn → Titan time of flight"], "5.133 days")
         self.assertTrue(any("JPL SAT441" in caption.value for caption in app.caption))
 
+    def test_isolated_titan_edl_section_displays_direct_entry_without_budget_change(self):
+        app = self._run_app()
+
+        self.assertFalse(app.exception)
+        self.assertTrue(
+            any(
+                heading.value == "Titan EDL — preliminary ballistic-entry model"
+                for heading in app.header
+            )
+        )
+        metrics = {metric.label: metric.value for metric in app.metric}
+        self.assertEqual(metrics["Atmospheric-interface entry velocity"], "2,402.6 m/s")
+        self.assertEqual(metrics["Estimated deployment altitude"], "151.2 km")
+        self.assertEqual(metrics["Avoided circular-capture burn"], "862.7 m/s")
+        self.assertEqual(metrics["Sum of budgeted delta-v values"], "9903 m/s")
+        self.assertTrue(
+            any(
+                "not included in the connected delta-v or mass budget" in warning.value
+                for warning in app.warning
+            )
+        )
+
     def test_connected_total_and_default_mass_outputs_are_non_zero(self):
         app = self._run_app()
 

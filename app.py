@@ -18,6 +18,7 @@ from mission.capabilities import (
 from mission.dv_budget import compose_complete_dv_budget
 from mission.full_mission import compute_earth_saturn_titan_mission
 from mission.sizing import compute_mass_budget
+from mission.titan_edl import compute_titan_edl
 from mission.trajectory_plot import build_complete_mission_figure
 from mission.trajectory_visualization import (
     CompleteMissionScene3D,
@@ -194,6 +195,10 @@ with st.spinner(UI_TEXT["earth_saturn_spinner"]):
 
 staging_result = complete_mission.saturn_arrival_staging
 titan_transfer = complete_mission.saturn_titan_transfer
+titan_edl = compute_titan_edl(
+    titan_transfer.v_infinity_titan_m_s,
+    titan_transfer.capture_delta_v_m_s,
+)
 complete_dv_budget = compose_complete_dv_budget(
     traj["dv_budget"],
     staging_result,
@@ -397,3 +402,73 @@ with st.container(border=True):
         st.markdown(UI_TEXT["exclusions"])
         for exclusion in titan_transfer.exclusions:
             st.write(f"- {exclusion}")
+
+st.header(UI_TEXT["titan_edl_header"])
+st.warning(UI_TEXT["titan_edl_warning"])
+
+with st.container(border=True):
+    st.subheader(UI_TEXT["study_parameters"])
+    with st.container(horizontal=True):
+        st.metric(
+            UI_TEXT["edl_incoming_v_infinity"],
+            f"{titan_edl.incoming_v_infinity_m_s:,.1f} m/s",
+            border=True,
+        )
+        st.metric(
+            UI_TEXT["edl_interface_altitude"],
+            f"{titan_edl.entry_interface_altitude_m / 1_000:,.0f} km",
+            border=True,
+        )
+        st.metric(
+            UI_TEXT["edl_ballistic_coefficient"],
+            f"{titan_edl.ballistic_coefficient_kg_m2:.0f} kg/m²",
+            border=True,
+        )
+        st.metric(
+            UI_TEXT["edl_entry_angle"],
+            f"−{titan_edl.entry_flight_path_angle_deg:.0f}°",
+            border=True,
+        )
+
+    st.caption(f"Method: `{titan_edl.method}` · Direct entry; no prior Titan orbit.")
+    with st.container(horizontal=True):
+        st.metric(
+            UI_TEXT["edl_interface_velocity"],
+            f"{titan_edl.entry_velocity_m_s:,.1f} m/s",
+            border=True,
+        )
+        st.metric(
+            UI_TEXT["edl_deployment_speed"],
+            f"{titan_edl.parachute_deployment_speed_m_s:,.0f} m/s",
+            border=True,
+        )
+        st.metric(
+            UI_TEXT["edl_deployment_altitude"],
+            f"{titan_edl.estimated_parachute_deployment_altitude_m / 1_000:,.1f} km",
+            border=True,
+        )
+        st.metric(
+            UI_TEXT["edl_atmospheric_reduction"],
+            f"{titan_edl.atmospheric_velocity_reduction_m_s:,.1f} m/s",
+            help=UI_TEXT["edl_atmospheric_reduction_help"],
+            border=True,
+        )
+
+    st.metric(
+        UI_TEXT["edl_capture_savings"],
+        f"{titan_edl.propulsive_equivalent_savings_m_s:,.1f} m/s",
+        help=UI_TEXT["edl_capture_savings_help"],
+        border=True,
+    )
+
+    with st.expander(UI_TEXT["assumptions_exclusions"]):
+        st.markdown(UI_TEXT["assumptions"])
+        for assumption in titan_edl.assumptions:
+            st.write(f"- {assumption}")
+        st.markdown(UI_TEXT["exclusions"])
+        for exclusion in titan_edl.exclusions:
+            st.write(f"- {exclusion}")
+
+    with st.expander(UI_TEXT["edl_sources"]):
+        for source in titan_edl.sources:
+            st.write(f"- {source}")

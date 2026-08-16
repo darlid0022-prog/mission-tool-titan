@@ -125,6 +125,28 @@ UI_TEXT: Final[dict[str, str]] = {
     "titan_capture_dv": "Titan capture delta-v",
     "partial_total_dv": "Saturn → Titan modeled delta-v",
     "titan_tof": "Saturn → Titan time of flight",
+    "titan_edl_header": "Titan EDL — preliminary ballistic-entry model",
+    "titan_edl_warning": (
+        "Exploratory alternative only: this direct-entry study is not included in the "
+        "connected delta-v or mass budget and does not replace the validated circular-capture case."
+    ),
+    "edl_incoming_v_infinity": "Incoming Titan-relative v∞",
+    "edl_interface_altitude": "Atmospheric-interface altitude",
+    "edl_ballistic_coefficient": "Ballistic coefficient",
+    "edl_entry_angle": "Entry flight-path angle",
+    "edl_interface_velocity": "Atmospheric-interface entry velocity",
+    "edl_deployment_speed": "Target parachute-deployment speed",
+    "edl_deployment_altitude": "Estimated deployment altitude",
+    "edl_atmospheric_reduction": "Atmospheric velocity reduction",
+    "edl_atmospheric_reduction_help": (
+        "Drag-induced speed reduction, not a propulsive delta-v and not a budget term."
+    ),
+    "edl_capture_savings": "Avoided circular-capture burn",
+    "edl_capture_savings_help": (
+        "Propulsive-equivalent saving relative only to the currently budgeted Titan "
+        "circular-capture burn. Terminal descent and landing propulsion are not modeled."
+    ),
+    "edl_sources": "Scientific sources",
     "assumptions_exclusions": "Model assumptions and exclusions",
     "assumptions": "**Assumptions**",
     "exclusions": "**Exclusions**",

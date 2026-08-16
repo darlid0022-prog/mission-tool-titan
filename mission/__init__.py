@@ -29,6 +29,7 @@ from .saturn_staging import (
     adapt_saturn_arrival_staging_to_leg,
     compute_saturn_arrival_to_staging,
 )
+from .titan_edl import TitanEdlResult, compute_titan_edl
 
 __all__ = [
     "Event",
@@ -37,6 +38,7 @@ __all__ = [
     "TrajectoryResult",
     "SaturnTitanTransferResult",
     "SaturnArrivalStagingResult",
+    "TitanEdlResult",
     "EarthSaturnTitanMissionResult",
     "MissionDeltaVBudget",
     "HESPEROS_MODEL_VERSION",
@@ -51,6 +53,7 @@ __all__ = [
     "compose_complete_dv_budget",
     "compute_saturn_arrival_to_staging",
     "compute_saturn_titan_transfer",
+    "compute_titan_edl",
     "size_parametric_vehicle",
     "build_event",
     "build_leg",
