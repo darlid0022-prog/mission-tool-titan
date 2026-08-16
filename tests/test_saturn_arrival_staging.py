@@ -5,6 +5,7 @@ from mission.constants import SATURN_MU_M3_S2
 from mission.models import Leg, TrajectoryResult
 from mission.saturn_staging import (
     ALTERNATE_E_RING_OUTER_RADIUS_M,
+    D_RING_INNER_EDGE_RADIUS_M,
     DEFAULT_SATURN_STAGING_RADIUS_M,
     F_RING_REFERENCE_RADIUS_M,
     MIN_SATURN_STAGING_RADIUS_M,
@@ -58,8 +59,10 @@ class TestSaturnArrivalStagingRegression(unittest.TestCase):
         self.assertEqual(result.ring_clearance_status, "unresolved")
         self.assertEqual(result.transfer_safety_margin_status, "unestablished")
         self.assertEqual(result.f_ring_radial_margin_m, -77_850_000.0)
+        self.assertEqual(result.periapsis_below_d_ring_inner_edge_m, 4_570_000.0)
         self.assertEqual(result.staging_e_ring_radial_margin_m, 118_000_000.0)
         self.assertEqual(F_RING_REFERENCE_RADIUS_M, 140_180_000.0)
+        self.assertEqual(D_RING_INNER_EDGE_RADIUS_M, 66_900_000.0)
         self.assertEqual(ALTERNATE_E_RING_OUTER_RADIUS_M, 482_000_000.0)
 
     def test_phase_total_contains_exactly_the_two_modelled_burns(self):

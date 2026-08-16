@@ -68,7 +68,7 @@ UI_TEXT: Final[dict[str, str]] = {
     "staging_phase_total_dv": "Arrival-to-staging total delta-v",
     "staging_tof": "Periapsis-to-apoapsis time",
     "ring_constraints": "Ring-system constraints",
-    "f_ring_margin": "Periapsis minus F-ring radius",
+    "d_ring_clearance": "Periapsis below D-ring inner edge",
     "e_ring_margin": "Staging orbit beyond E-ring edge",
     "titan_header": "Saturn → Titan — preliminary model",
     "titan_warning": (

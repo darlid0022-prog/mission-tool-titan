@@ -11,6 +11,7 @@ from .models import Event, Leg, TrajectoryResult
 DEFAULT_SATURN_STAGING_RADIUS_M = 6.0e8
 MIN_SATURN_STAGING_RADIUS_M = 4.8e8
 F_RING_REFERENCE_RADIUS_M = 1.4018e8
+D_RING_INNER_EDGE_RADIUS_M = 6.69e7
 ALTERNATE_E_RING_OUTER_RADIUS_M = 4.82e8
 SECONDS_PER_DAY = 86_400.0
 DAYS_PER_JULIAN_YEAR = 365.25
@@ -41,6 +42,7 @@ class SaturnArrivalStagingResult:
     total_delta_v_m_s: float
     time_of_flight_s: float
     f_ring_radial_margin_m: float
+    periapsis_below_d_ring_inner_edge_m: float
     staging_e_ring_radial_margin_m: float
     ring_clearance_status: str
     transfer_safety_margin_status: str
@@ -142,6 +144,7 @@ def compute_saturn_arrival_to_staging(
         total_delta_v_m_s=total_delta_v,
         time_of_flight_s=time_of_flight,
         f_ring_radial_margin_m=periapsis - F_RING_REFERENCE_RADIUS_M,
+        periapsis_below_d_ring_inner_edge_m=D_RING_INNER_EDGE_RADIUS_M - periapsis,
         staging_e_ring_radial_margin_m=staging - ALTERNATE_E_RING_OUTER_RADIUS_M,
         ring_clearance_status=RING_CLEARANCE_STATUS,
         transfer_safety_margin_status=TRANSFER_SAFETY_MARGIN_STATUS,

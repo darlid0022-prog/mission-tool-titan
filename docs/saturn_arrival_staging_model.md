@@ -107,9 +107,28 @@ equatorial interpretation would therefore cross the radial domains of the D, C,
 B, A, F, G, and E rings. Merely placing the final staging orbit outside
 `480,000 km` does **not** make the transfer ring-safe.
 
+At periapsis itself, however, the spacecraft is below every named ring, not
+inside the ring material. The D ring's inner edge is `66,900 km`, so the nominal
+`62,330 km` periapsis lies `4,570 km` planetward of that edge. Relative to JPL's
+`60,268 km` equatorial radius, it is `2,062 km` above that reference surface.
+This is the narrow planet–D-ring corridor; it must not be described as a passage
+through the main A/B/C rings at periapsis.
+
+NASA's Cassini Grand Finale provides a relevant flight precedent for this
+corridor. Cassini completed 22 passes between Saturn and its innermost ring, at
+about `1,600–4,000 km` above the cloud tops. JPL reported the region as largely
+dust-free from RPWS observations after the first dive. Cassini nevertheless used
+a deliberately designed three-dimensional node geometry and initially oriented
+its high-gain antenna as a particle shield:
+
+- <https://science.nasa.gov/mission/cassini/grand-finale/overview/>
+- <https://www.jpl.nasa.gov/news/cassini-finds-the-big-empty-close-to-saturn/>
+- <https://science.nasa.gov/mission/cassini/grand-finale/grand-finale-orbit-guide/>
+
 The numerical margins are explicit:
 
 - reference F-ring radius: `140,180 km` from Saturn's centre;
+- D-ring inner-edge clearance at periapsis: `66,900 - 62,330 = +4,570 km`;
 - transfer periapsis minus F-ring radius: `62,330 - 140,180 = -77,850 km`;
 - nominal staging radius minus the `480,000 km` outer E-ring guard: `+120,000 km`;
 - nominal staging radius minus NASA's alternate `482,000 km` E-ring extent:
@@ -121,12 +140,14 @@ therefore `118,000 km`. The `62,330 km` value is the periapsis of the captured
 **transfer ellipse**, not the periapsis of the final staging orbit.
 
 Thus the final circular staging orbit has at least `118,000 km` of radial margin
-beyond the cited E-ring edge, but the transfer path has **no positive radial
-safety margin** relative to the rings. Its periapsis is `77,850 km` inside the
-F-ring reference radius and the outbound arc passes through that radius. The
-specified safety margin for the transfer itself is therefore `not established`,
-not zero-risk and not “outside the rings.” The value `140,180 km` is taken from
-NASA's Cassini mission reference guide:
+beyond the cited E-ring edge, and its periapsis has `4,570 km` of radial clearance
+below the D-ring inner edge. The Grand Finale shows that this periapsis corridor
+can be flown with purpose-designed geometry and risk controls. It does not prove
+that the entire scalar ellipse avoids ring material: the outbound arc spans ring
+radii, and actual intersection depends on inclination and node placement. The
+specified three-dimensional transfer safety margin therefore remains `not
+established`. The value `140,180 km` is retained as geometric context from NASA's
+Cassini mission reference guide, not as the primary clearance metric:
 <https://science.nasa.gov/wp-content/uploads/2023/09/cassini.pdf>
 
 This scalar two-body model contains no orbit-plane orientation, node geometry,
@@ -372,8 +393,9 @@ energy, angular-momentum, or budget-exclusivity invariant.
 - The output keeps both burns separate and their sum exact within floating-point
   precision.
 - The result explicitly reports unresolved ring clearance.
-- The result reports the `-77,850 km` F-ring radial comparison and an
-  `unestablished` transfer safety margin; it must not claim ring safety.
+- The result reports the `+4,570 km` clearance below the D-ring inner edge, cites
+  the Cassini Grand Finale corridor precedent, and retains an `unestablished`
+  three-dimensional transfer safety margin; it must not claim full ring safety.
 - The canonical adapter produces one Saturn-to-Saturn `Leg` containing one
   `TrajectoryResult` and the two required events without numerical recomputation.
 - Energy and angular-momentum invariants in section 10 pass within documented

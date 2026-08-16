@@ -48,10 +48,15 @@ class TestSaturnTitanUi(unittest.TestCase):
         self.assertEqual(metrics["Staging circularization delta-v"], "4,501.6 m/s")
         self.assertEqual(metrics["Arrival-to-staging total delta-v"], "6,782.4 m/s")
         self.assertEqual(metrics["Periapsis-to-apoapsis time"], "1.125 days")
-        self.assertEqual(metrics["Periapsis minus F-ring radius"], "-77,850 km")
+        self.assertEqual(metrics["Periapsis below D-ring inner edge"], "4,570 km")
         self.assertEqual(metrics["Staging orbit beyond E-ring edge"], "+118,000 km")
         self.assertTrue(
-            any("Transfer safety margin: unestablished" in error.value for error in app.error)
+            any(
+                "Planet–ring corridor at periapsis" in warning.value
+                and "Cassini's 2017 Grand Finale" in warning.value
+                and "three-dimensional ring-plane geometry" in warning.value
+                for warning in app.warning
+            )
         )
 
     def test_missing_staging_phase_is_visible_and_mass_budget_stays_earth_saturn_only(self):

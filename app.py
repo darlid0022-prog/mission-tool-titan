@@ -145,7 +145,8 @@ with st.container(border=True):
     with staging_input_2:
         saturn_periapsis_radius_km = st.number_input(
             UI_TEXT["periapsis_radius"],
-            min_value=1,
+            min_value=60_269,
+            max_value=66_899,
             value=62_330,
             step=100,
             help=UI_TEXT["periapsis_radius_help"],
@@ -197,15 +198,19 @@ with st.container(border=True):
         )
 
     st.subheader(UI_TEXT["ring_constraints"])
-    st.error(
-        "Transfer safety margin: unestablished. The scalar model crosses known "
-        "ring radii and does not resolve three-dimensional ring-plane clearance."
+    st.warning(
+        "Planet–ring corridor at periapsis: the selected periapsis is "
+        f"{staging_result.periapsis_below_d_ring_inner_edge_m / 1_000:,.0f} km below "
+        "the D ring's inner edge. Cassini's 2017 Grand Finale flew through this corridor, "
+        "which RPWS observations found to be largely dust-free. This is a relevant flight "
+        "precedent, but the scalar model still cannot verify the transfer ellipse's full "
+        "three-dimensional ring-plane geometry."
     )
     with st.container(horizontal=True):
         st.metric(
-            UI_TEXT["f_ring_margin"],
-            f"{staging_result.f_ring_radial_margin_m / 1_000:,.0f} km",
-            help="A negative value means the transfer periapsis lies inside this radius.",
+            UI_TEXT["d_ring_clearance"],
+            f"{staging_result.periapsis_below_d_ring_inner_edge_m / 1_000:,.0f} km",
+            help="Positive clearance within the planet–D-ring corridor at periapsis.",
             border=True,
         )
         st.metric(
