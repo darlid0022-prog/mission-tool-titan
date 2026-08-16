@@ -3,7 +3,12 @@
 import pandas as pd
 import streamlit as st
 
-from app_services import PHYSICS_MODEL_VERSION, compute_cached_trajectory
+from app_services import (
+    DEFAULT_LAUNCH_WINDOW_END,
+    DEFAULT_LAUNCH_WINDOW_START,
+    PHYSICS_MODEL_VERSION,
+    compute_cached_trajectory,
+)
 from mission.capabilities import (
     CONNECTED_CHAIN_DESTINATIONS,
     PLANNED_DESTINATIONS,
@@ -64,8 +69,14 @@ with col_inputs:
         )
 
         st.header(UI_TEXT["launch_window_header"])
-        launch_window_start = st.date_input(UI_TEXT["launch_start"])
-        launch_window_end = st.date_input(UI_TEXT["launch_end"])
+        launch_window_start = st.date_input(
+            UI_TEXT["launch_start"],
+            value=DEFAULT_LAUNCH_WINDOW_START,
+        )
+        launch_window_end = st.date_input(
+            UI_TEXT["launch_end"],
+            value=DEFAULT_LAUNCH_WINDOW_END,
+        )
         st.form_submit_button(UI_TEXT["calculate"], icon=":material/calculate:")
 
     st.info(UI_TEXT["titan_scope"])

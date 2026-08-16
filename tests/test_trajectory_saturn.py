@@ -98,7 +98,8 @@ REGRESSION_V_INF_SATURN_M_S = 6490.744714263188
 REGRESSION_DV_CAPTURE_SATURN_M_S = 10816.855098885902
 REGRESSION_DV_TOTAL_M_S = 21249.161567171675
 REGRESSION_BEST_LAUNCH_MJD2000 = 9681.181818181818
-REGRESSION_ARRIVAL_MJD2000 = 12537.181818181829
+REGRESSION_ARRIVAL_MJD2000 = 12537.18181818183
+REGRESSION_TOF_YEARS = 7.819301848049317
 
 
 @unittest.skipUnless(PYKEP_AVAILABLE, "pykep is required for trajectory tests")
@@ -260,6 +261,37 @@ class TestEarthSaturnTrajectoryRegression(unittest.TestCase):
             second["dv_budget"]["dV from LEO"],
             self.result["dv_budget"]["dV from LEO"],
             delta=ABS_TOL_M_S,
+        )
+
+    def test_full_search_locks_identical_selected_state_exactly(self):
+        """Two complete searches must select byte-for-byte identical scalar state."""
+        first = _call_saturn_baseline()["earth_saturn_leg"].trajectory
+        second = _call_saturn_baseline()["earth_saturn_leg"].trajectory
+
+        first_state = (
+            first.departure_mjd2000,
+            first.arrival_mjd2000,
+            first.tof_years,
+            first.v_inf_depart,
+            first.v_inf_arrival,
+        )
+        second_state = (
+            second.departure_mjd2000,
+            second.arrival_mjd2000,
+            second.tof_years,
+            second.v_inf_depart,
+            second.v_inf_arrival,
+        )
+        self.assertEqual(first_state, second_state)
+        self.assertEqual(
+            first_state,
+            (
+                REGRESSION_BEST_LAUNCH_MJD2000,
+                REGRESSION_ARRIVAL_MJD2000,
+                REGRESSION_TOF_YEARS,
+                REGRESSION_DV_DEPART_M_S,
+                REGRESSION_V_INF_SATURN_M_S,
+            ),
         )
 
 
@@ -431,6 +463,23 @@ class TestTrajectorySelection(unittest.TestCase):
         """Selecting from empty list should raise ValueError."""
         with self.assertRaises(ValueError):
             select_best_by_departure_v_infinity([])
+
+    def test_equal_primary_values_have_order_independent_tie_break(self):
+        later = {
+            "dv_depart": 10_000.0,
+            "v_infinity_saturn": 6_000.0,
+            "departure_mjd2000": 9_700.0,
+            "arrival_mjd2000": 12_500.0,
+            "tof_years": 7.7,
+        }
+        earlier = {
+            **later,
+            "departure_mjd2000": 9_600.0,
+            "arrival_mjd2000": 12_450.0,
+        }
+
+        self.assertIs(select_best_by_departure_v_infinity([later, earlier]), earlier)
+        self.assertIs(select_best_by_departure_v_infinity([earlier, later]), earlier)
 
 
 @unittest.skipUnless(PYKEP_AVAILABLE, "pykep is required for trajectory tests")

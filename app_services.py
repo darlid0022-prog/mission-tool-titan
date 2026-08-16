@@ -6,11 +6,13 @@ import streamlit as st
 
 from trajectory import compute_trajectory
 
-PHYSICS_MODEL_VERSION = "connected-titan-budget-v3"
+PHYSICS_MODEL_VERSION = "deterministic-earth-saturn-v4"
 LEGACY_SATURN_CAPTURE_ALTITUDE_KM = 2_000.0
+DEFAULT_LAUNCH_WINDOW_START = date(2026, 6, 1)
+DEFAULT_LAUNCH_WINDOW_END = date(2027, 6, 1)
 
 
-@st.cache_data(max_entries=32, show_spinner=False)
+@st.cache_data(max_entries=32, persist="disk", show_spinner=False)
 def compute_cached_trajectory(
     physics_model_version: str,
     destination: str,
@@ -19,7 +21,7 @@ def compute_cached_trajectory(
     launch_end: date,
     leo_altitude_km: float,
 ) -> dict:
-    """Compute a trajectory once for each bounded set of orbital inputs."""
+    """Compute and persist one trajectory for each bounded set of orbital inputs."""
     if physics_model_version != PHYSICS_MODEL_VERSION:
         raise ValueError("Unsupported physics model version.")
     return compute_trajectory(

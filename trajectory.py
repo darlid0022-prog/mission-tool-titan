@@ -131,17 +131,10 @@ def select_best_by_criterion(solutions, key_name):
     if not solutions:
         raise ValueError("solutions list cannot be empty")
 
-    if key_name in {"dv_depart", "v_infinity_saturn"}:
-        legacy_key = key_name
-    else:
-        legacy_key = key_name
-
     if isinstance(solutions[0], dict):
-        if legacy_key not in solutions[0]:
+        if key_name not in solutions[0]:
             raise ValueError(f"key_name '{key_name}' not found in solution dict")
-        return min(solutions, key=lambda s: s[legacy_key])
-
-    if not hasattr(solutions[0], key_name):
+    elif not hasattr(solutions[0], key_name):
         if key_name == "dv_depart":
             if not hasattr(solutions[0], "v_inf_depart"):
                 raise ValueError(f"key_name '{key_name}' not found in solution")
@@ -151,7 +144,23 @@ def select_best_by_criterion(solutions, key_name):
         else:
             raise ValueError(f"key_name '{key_name}' not found in solution")
 
-    return min(solutions, key=lambda s: _result_value(s, key_name))
+    # Make equal-primary-value selection independent of grid/list ordering.
+    # The orbital criterion remains unchanged; the remaining fields only provide
+    # a stable lexicographic tie-break for otherwise equivalent candidates.
+    tie_break_fields = (
+        "departure_mjd2000",
+        "tof_years",
+        "arrival_mjd2000",
+        "dv_depart",
+        "v_infinity_saturn",
+    )
+
+    def deterministic_key(solution):
+        values = [_result_value(solution, key_name)]
+        values.extend(_result_value(solution, field) for field in tie_break_fields)
+        return tuple(math.inf if value is None else float(value) for value in values)
+
+    return min(solutions, key=deterministic_key)
 
 
 def select_best_by_departure_v_infinity(solutions):
