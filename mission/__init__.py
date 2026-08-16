@@ -9,6 +9,11 @@ from .builder import (
 )
 from .models import Event, Leg, Mission, TrajectoryResult
 from .moon_transfer import SaturnTitanTransferResult, compute_saturn_titan_transfer
+from .saturn_staging import (
+    SaturnArrivalStagingResult,
+    adapt_saturn_arrival_staging_to_leg,
+    compute_saturn_arrival_to_staging,
+)
 
 __all__ = [
     "Event",
@@ -16,6 +21,9 @@ __all__ = [
     "Mission",
     "TrajectoryResult",
     "SaturnTitanTransferResult",
+    "SaturnArrivalStagingResult",
+    "adapt_saturn_arrival_staging_to_leg",
+    "compute_saturn_arrival_to_staging",
     "compute_saturn_titan_transfer",
     "build_event",
     "build_leg",

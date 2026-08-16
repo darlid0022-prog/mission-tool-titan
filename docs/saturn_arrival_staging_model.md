@@ -1,6 +1,7 @@
 # Preliminary Saturn arrival-to-staging model
 
-Status: scientific specification only — no production implementation yet.
+Status: pure typed engine and mission-domain adapter implemented. No Streamlit or
+global-budget integration yet.
 
 ## 1. Purpose and boundary
 
