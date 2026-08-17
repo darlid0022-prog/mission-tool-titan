@@ -22,6 +22,11 @@ from mission.capabilities import (
 from mission.dv_budget import compose_complete_dv_budget
 from mission.feasibility_check import evaluate_single_stage_chemical_feasibility
 from mission.full_mission import compute_earth_saturn_titan_mission
+from mission.gravity_assist import (
+    compute_earth_flyby_demonstration,
+    compute_jupiter_flyby_demonstration,
+    compute_venus_flyby_demonstration,
+)
 from mission.mass_model import PayloadItem
 from mission.pareto_plot import build_pareto_front_figure, select_pareto_highlights
 from mission.sizing import compute_mass_budget
@@ -141,14 +146,37 @@ def render_trajectory_animation(
     )
 
 
-st.set_page_config(page_title="Mission Design - Titan", layout="wide")
+st.set_page_config(
+    page_title="Mission Design — Titan",
+    page_icon=":material/satellite_alt:",
+    layout="wide",
+)
 st.title(":material/satellite_alt: Mission Design Calculator")
 st.caption(UI_TEXT["app_caption"])
+scorecard_slot = st.empty()
 
-# -----------------------------------------------------------------------
-# 2. ENTRÉES - colonne de gauche : architecture de mission
-# -----------------------------------------------------------------------
-col_inputs, col_results = st.columns([1, 2])
+(
+    mission_setup_tab,
+    connected_budget_tab,
+    trajectory_tab,
+    saturn_titan_studies_tab,
+    feasibility_tab,
+    optimization_tab,
+    gravity_assists_tab,
+) = st.tabs(
+    [
+        ":material/tune: Mission setup",
+        ":material/account_tree: Connected budget",
+        ":material/3d_rotation: 3D trajectory",
+        ":material/public: Saturn & Titan studies",
+        ":material/warning: Feasibility",
+        ":material/query_stats: Optimization",
+        ":material/rocket_launch: Gravity assists",
+    ]
+)
+
+col_inputs = mission_setup_tab
+col_results = connected_budget_tab
 
 with col_inputs:
     with st.form("orbital_inputs"):
@@ -282,6 +310,7 @@ complete_dv_budget = compose_complete_dv_budget(
 dv_total = complete_dv_budget.total_m_s
 mass = compute_mass_budget(dv_total, isp_s, instruments_df)
 mass_ratio = mass["wet_mass_kg"] / mass["dry_mass_kg"] if mass["dry_mass_kg"] > 0 else 1.0
+
 payload_items = tuple(
     PayloadItem(
         name=(str(row["Instrument"]).strip() or f"Payload item {index + 1}"),
@@ -296,7 +325,51 @@ single_stage_feasibility = evaluate_single_stage_chemical_feasibility(
     float(isp_s),
     payload_items,
 )
+earth_saturn_trajectory = complete_mission.mission.legs[0].trajectory
+assert earth_saturn_trajectory is not None
+assert earth_saturn_trajectory.departure_mjd2000 is not None
+assert earth_saturn_trajectory.arrival_mjd2000 is not None
+mission_duration_days = (
+    float(earth_saturn_trajectory.arrival_mjd2000)
+    - float(earth_saturn_trajectory.departure_mjd2000)
+    + staging_result.time_of_flight_days
+    + titan_transfer.time_of_flight_days
+)
+flyby_demonstrations = (
+    compute_venus_flyby_demonstration(),
+    compute_earth_flyby_demonstration(),
+    compute_jupiter_flyby_demonstration(),
+)
+combined_flyby_gain_m_s = sum(
+    result.heliocentric_speed_change_m_s for result in flyby_demonstrations
+)
+single_stage_deficit_m_s = max(
+    dv_total - single_stage_feasibility.maximum_feasible_delta_v_m_s,
+    0.0,
+)
+flyby_deficit_coverage = (
+    combined_flyby_gain_m_s / single_stage_deficit_m_s if single_stage_deficit_m_s > 0.0 else None
+)
 
+with scorecard_slot.container(border=True):
+    st.subheader(":material/dashboard: Mission scorecard")
+    st.metric("Connected delta-v", f"{dv_total:,.0f} m/s", border=True)
+    st.metric("Wet mass (simplified)", f"{mass['wet_mass_kg']:,.0f} kg", border=True)
+    st.metric("Duration to Titan", f"{mission_duration_days:,.1f} days", border=True)
+    st.metric(
+        "Single-stage exceedance",
+        f"{single_stage_feasibility.threshold_exceedance_factor:.2f}×",
+        border=True,
+    )
+    st.metric(
+        "Flyby gain coverage",
+        f"{flyby_deficit_coverage:.1%}" if flyby_deficit_coverage is not None else "N/A",
+        border=True,
+    )
+    st.caption(
+        "Live connected-budget values. Flyby coverage compares the sum of the isolated "
+        "Venus, Earth, and Jupiter demonstrations with the current single-stage delta-v deficit."
+    )
 
 with col_results:
     st.header(UI_TEXT["results_header"])
@@ -337,9 +410,9 @@ with col_results:
     c3.metric(UI_TEXT["propellant_mass"], f"{mass['propellant_mass_kg']:.1f} kg")
     c4.metric(UI_TEXT["wet_mass"], f"{mass['wet_mass_kg']:.1f} kg")
 
-st.header(UI_TEXT["pareto_header"])
-st.caption(UI_TEXT["pareto_caption"])
-with st.container(border=True):
+optimization_tab.header(UI_TEXT["pareto_header"])
+optimization_tab.caption(UI_TEXT["pareto_caption"])
+with optimization_tab.container(border=True):
     with st.spinner(UI_TEXT["pareto_spinner"]):
         pareto_result = compute_cached_pareto_front(PARETO_MODEL_VERSION)
     pareto_highlights = select_pareto_highlights(pareto_result)
@@ -367,9 +440,9 @@ with st.container(border=True):
         )
     )
 
-st.header(UI_TEXT["single_stage_feasibility_header"])
-st.caption(UI_TEXT["single_stage_feasibility_caption"])
-with st.container(border=True):
+feasibility_tab.header(UI_TEXT["single_stage_feasibility_header"])
+feasibility_tab.caption(UI_TEXT["single_stage_feasibility_caption"])
+with feasibility_tab.container(border=True):
     f1, f2, f3 = st.columns(3)
     f1.metric(
         UI_TEXT["single_stage_required_delta_v"],
@@ -393,11 +466,9 @@ with st.container(border=True):
         )
     )
 
-st.header(UI_TEXT["trajectory_3d_header"])
-st.caption(UI_TEXT["trajectory_3d_caption"])
-with st.container(border=True):
-    earth_saturn_trajectory = complete_mission.mission.legs[0].trajectory
-    assert earth_saturn_trajectory is not None
+trajectory_tab.header(UI_TEXT["trajectory_3d_header"])
+trajectory_tab.caption(UI_TEXT["trajectory_3d_caption"])
+with trajectory_tab.container(border=True):
     trajectory_scene_key = (
         earth_saturn_trajectory.departure_mjd2000,
         earth_saturn_trajectory.arrival_mjd2000,
@@ -419,10 +490,10 @@ with st.container(border=True):
         st.session_state["trajectory_timeline"],
     )
 
-st.header(UI_TEXT["staging_header"])
-st.warning(UI_TEXT["staging_warning"])
+saturn_titan_studies_tab.header(UI_TEXT["staging_header"])
+saturn_titan_studies_tab.warning(UI_TEXT["staging_warning"])
 
-with st.container(border=True):
+with saturn_titan_studies_tab.container(border=True):
     st.subheader(UI_TEXT["study_parameters"])
     with st.container(horizontal=True):
         st.metric(
@@ -499,10 +570,10 @@ with st.container(border=True):
         for exclusion in staging_result.exclusions:
             st.write(f"- {exclusion}")
 
-st.header(UI_TEXT["titan_header"])
-st.warning(UI_TEXT["titan_warning"])
+saturn_titan_studies_tab.header(UI_TEXT["titan_header"])
+saturn_titan_studies_tab.warning(UI_TEXT["titan_warning"])
 
-with st.container(border=True):
+with saturn_titan_studies_tab.container(border=True):
     st.subheader(UI_TEXT["study_parameters"])
     st.caption(UI_TEXT["shared_staging_radius"])
     st.metric(
@@ -553,10 +624,10 @@ with st.container(border=True):
         for exclusion in titan_transfer.exclusions:
             st.write(f"- {exclusion}")
 
-st.header(UI_TEXT["titan_edl_header"])
-st.warning(UI_TEXT["titan_edl_warning"])
+saturn_titan_studies_tab.header(UI_TEXT["titan_edl_header"])
+saturn_titan_studies_tab.warning(UI_TEXT["titan_edl_warning"])
 
-with st.container(border=True):
+with saturn_titan_studies_tab.container(border=True):
     st.subheader(UI_TEXT["study_parameters"])
     with st.container(horizontal=True):
         st.metric(
@@ -622,3 +693,34 @@ with st.container(border=True):
     with st.expander(UI_TEXT["edl_sources"]):
         for source in titan_edl.sources:
             st.write(f"- {source}")
+
+gravity_assists_tab.header(":material/rocket_launch: Gravity-assist flyby demonstrators")
+gravity_assists_tab.caption(
+    "Isolated, energy-conserving patched-conic demonstrations. They are not wired into "
+    "the connected Earth → Saturn → Titan trajectory or its budget."
+)
+for flyby_result in flyby_demonstrations:
+    with gravity_assists_tab.container(border=True):
+        st.subheader(f"{flyby_result.body} flyby")
+        with st.container(horizontal=True):
+            st.metric(
+                "Incoming v∞", f"{flyby_result.v_infinity_magnitude_m_s:,.1f} m/s", border=True
+            )
+            st.metric(
+                "Outgoing v∞",
+                f"{math.sqrt(sum(value**2 for value in flyby_result.v_infinity_out_m_s)):,.1f} m/s",
+                border=True,
+            )
+            st.metric(
+                "Turn angle", f"{math.degrees(flyby_result.turn_angle_rad):.3f}°", border=True
+            )
+            st.metric(
+                "Heliocentric speed gain",
+                f"{flyby_result.heliocentric_speed_change_m_s:,.1f} m/s",
+                border=True,
+            )
+        st.caption(
+            f"Periapsis altitude: {flyby_result.periapsis_altitude_m / 1_000:,.0f} km · "
+            f"radius: {flyby_result.periapsis_radius_m / 1_000:,.0f} km · "
+            "body-frame v∞ magnitude is conserved."
+        )

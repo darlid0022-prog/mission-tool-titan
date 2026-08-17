@@ -115,6 +115,29 @@ class TestSaturnTitanUi(unittest.TestCase):
             )
         )
 
+    def test_scorecard_and_tabs_present_live_connected_results(self):
+        app = self._run_app()
+
+        self.assertFalse(app.exception)
+        self.assertEqual(
+            [tab.label for tab in app.tabs],
+            [
+                ":material/tune: Mission setup",
+                ":material/account_tree: Connected budget",
+                ":material/3d_rotation: 3D trajectory",
+                ":material/public: Saturn & Titan studies",
+                ":material/warning: Feasibility",
+                ":material/query_stats: Optimization",
+                ":material/rocket_launch: Gravity assists",
+            ],
+        )
+        metrics = {metric.label: metric.value for metric in app.metric}
+        self.assertEqual(metrics["Connected delta-v"], "9,903 m/s")
+        self.assertEqual(metrics["Wet mass (simplified)"], "5,253 kg")
+        self.assertEqual(metrics["Duration to Titan"], "2,862.3 days")
+        self.assertEqual(metrics["Single-stage exceedance"], "2.58×")
+        self.assertEqual(metrics["Flyby gain coverage"], "161.7%")
+
     def test_arrival_to_staging_section_displays_nominal_results_and_ring_status(self):
         app = self._run_app()
 
