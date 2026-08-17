@@ -63,6 +63,20 @@ UI_TEXT: Final[dict[str, str]] = {
     "dry_mass": "Dry mass",
     "propellant_mass": "Propellant mass",
     "wet_mass": "Total wet mass",
+    "pareto_header": "Connected mission trade space — Pareto front",
+    "pareto_caption": (
+        "The fixed 1,176-point study varies Earth departure date and Earth → Saturn time "
+        "of flight. All 38 non-dominated points are shown; marker color reports wet mass, "
+        "which is not an independent objective while Isp and payload remain fixed."
+    ),
+    "pareto_spinner": "Loading the deterministic Pareto front…",
+    "pareto_comparison": (
+        "The reproducible 2,856-day Earth → Saturn baseline is kept as the connected "
+        "mission reference. Relative to the sampled minimum-delta-v point, it requires "
+        "{delta_v_difference:.3f} m/s more (+{delta_v_percent:.2f}%), "
+        "{duration_difference:.0f} more days (+{duration_percent:.2f}%), and "
+        "{mass_difference:.3f} kg more wet mass (+{mass_percent:.2f}%)."
+    ),
     "trajectory_3d_header": "Complete mission trajectory — interactive 3D view",
     "trajectory_3d_caption": (
         "Drag to rotate, scroll to zoom, and double-click to reset. The heliocentric and "

@@ -4,9 +4,11 @@ from datetime import date
 
 import streamlit as st
 
+from mission.pareto import ParetoSearchResult, compute_connected_pareto_front
 from trajectory import compute_trajectory
 
 PHYSICS_MODEL_VERSION = "deterministic-earth-saturn-v4"
+PARETO_MODEL_VERSION = "connected-pareto-v1"
 LEGACY_SATURN_CAPTURE_ALTITUDE_KM = 2_000.0
 DEFAULT_LAUNCH_WINDOW_START = date(2026, 6, 1)
 DEFAULT_LAUNCH_WINDOW_END = date(2027, 6, 1)
@@ -36,3 +38,11 @@ def compute_cached_trajectory(
         leo_altitude_km,
         LEGACY_SATURN_CAPTURE_ALTITUDE_KM,
     )
+
+
+@st.cache_data(max_entries=2, persist="disk", show_spinner=False)
+def compute_cached_pareto_front(pareto_model_version: str) -> ParetoSearchResult:
+    """Persist the fixed deterministic Pareto study across application reruns."""
+    if pareto_model_version != PARETO_MODEL_VERSION:
+        raise ValueError("Unsupported Pareto model version.")
+    return compute_connected_pareto_front()

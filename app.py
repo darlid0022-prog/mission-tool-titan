@@ -8,7 +8,9 @@ import streamlit as st
 from app_services import (
     DEFAULT_LAUNCH_WINDOW_END,
     DEFAULT_LAUNCH_WINDOW_START,
+    PARETO_MODEL_VERSION,
     PHYSICS_MODEL_VERSION,
+    compute_cached_pareto_front,
     compute_cached_trajectory,
 )
 from mission.capabilities import (
@@ -19,6 +21,7 @@ from mission.capabilities import (
 )
 from mission.dv_budget import compose_complete_dv_budget
 from mission.full_mission import compute_earth_saturn_titan_mission
+from mission.pareto_plot import build_pareto_front_figure, select_pareto_highlights
 from mission.sizing import compute_mass_budget
 from mission.titan_edl import compute_titan_edl
 from mission.trajectory_plot import build_complete_mission_figure
@@ -310,6 +313,36 @@ with col_results:
     c2.metric(UI_TEXT["dry_mass"], f"{mass['dry_mass_kg']:.1f} kg")
     c3.metric(UI_TEXT["propellant_mass"], f"{mass['propellant_mass_kg']:.1f} kg")
     c4.metric(UI_TEXT["wet_mass"], f"{mass['wet_mass_kg']:.1f} kg")
+
+st.header(UI_TEXT["pareto_header"])
+st.caption(UI_TEXT["pareto_caption"])
+with st.container(border=True):
+    with st.spinner(UI_TEXT["pareto_spinner"]):
+        pareto_result = compute_cached_pareto_front(PARETO_MODEL_VERSION)
+    pareto_highlights = select_pareto_highlights(pareto_result)
+    pareto_figure = build_pareto_front_figure(pareto_result)
+    st.plotly_chart(
+        pareto_figure,
+        width="stretch",
+        height=540,
+        key="connected_mission_pareto_front",
+        config={"displaylogo": False, "scrollZoom": True},
+    )
+    baseline = pareto_highlights.baseline
+    optimum = pareto_highlights.delta_v_optimum
+    delta_v_percent = 100.0 * (baseline.total_delta_v_m_s / optimum.total_delta_v_m_s - 1.0)
+    duration_percent = 100.0 * (baseline.total_duration_days / optimum.total_duration_days - 1.0)
+    mass_percent = 100.0 * (baseline.wet_mass_kg / optimum.wet_mass_kg - 1.0)
+    st.caption(
+        UI_TEXT["pareto_comparison"].format(
+            delta_v_difference=baseline.total_delta_v_m_s - optimum.total_delta_v_m_s,
+            delta_v_percent=delta_v_percent,
+            duration_difference=baseline.total_duration_days - optimum.total_duration_days,
+            duration_percent=duration_percent,
+            mass_difference=baseline.wet_mass_kg - optimum.wet_mass_kg,
+            mass_percent=mass_percent,
+        )
+    )
 
 st.header(UI_TEXT["trajectory_3d_header"])
 st.caption(UI_TEXT["trajectory_3d_caption"])

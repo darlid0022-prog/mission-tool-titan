@@ -8,6 +8,8 @@ from app_services import DEFAULT_LAUNCH_WINDOW_END, DEFAULT_LAUNCH_WINDOW_START
 from mission import physics
 from mission.bodies import resolve_body
 from mission.models import Leg, TrajectoryResult
+from mission.pareto import compute_connected_pareto_front
+from mission.pareto_plot import build_pareto_front_figure
 from mission.ui_text import UI_TEXT
 
 APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
@@ -145,7 +147,7 @@ class TestSaturnTitanUi(unittest.TestCase):
                 for heading in app.header
             )
         )
-        self.assertEqual(len(app.get("plotly_chart")), 1)
+        self.assertEqual(len(app.get("plotly_chart")), 2)
         self.assertTrue(
             any(
                 control.label == "Mission phase" and control.value == "Earth → Saturn cruise"
@@ -161,6 +163,56 @@ class TestSaturnTitanUi(unittest.TestCase):
         date_inputs = {date_input.label: date_input.value for date_input in app.date_input}
         self.assertEqual(date_inputs[UI_TEXT["launch_start"]], DEFAULT_LAUNCH_WINDOW_START)
         self.assertEqual(date_inputs[UI_TEXT["launch_end"]], DEFAULT_LAUNCH_WINDOW_END)
+
+    def test_pareto_chart_renders_38_front_points_and_highlights_references(self):
+        pareto_result = compute_connected_pareto_front()
+        captured = {}
+
+        def capture_figure(result):
+            figure = build_pareto_front_figure(result)
+            captured["figure"] = figure
+            return figure
+
+        with (
+            patch(
+                "app_services.compute_cached_trajectory",
+                return_value=self._earth_saturn_result(),
+            ),
+            patch(
+                "app_services.compute_cached_pareto_front",
+                return_value=pareto_result,
+            ),
+            patch(
+                "mission.pareto_plot.build_pareto_front_figure",
+                side_effect=capture_figure,
+            ),
+        ):
+            app = AppTest.from_file(APP_PATH).run(timeout=30)
+
+        self.assertFalse(app.exception)
+        self.assertTrue(
+            any(
+                heading.value == "Connected mission trade space — Pareto front"
+                for heading in app.header
+            )
+        )
+        figure = captured["figure"]
+        traces = {trace.meta["role"]: trace for trace in figure.data}
+        self.assertEqual(
+            len(traces["pareto_front"].x) + len(traces["Minimum connected delta-v"].x),
+            38,
+        )
+        self.assertEqual(len(traces["Current mission baseline"].x), 1)
+        self.assertAlmostEqual(
+            traces["Current mission baseline"].customdata[0][1],
+            2_856.0,
+            delta=1e-9,
+        )
+        self.assertAlmostEqual(
+            traces["Minimum connected delta-v"].customdata[0][1],
+            2_826.0,
+            delta=1e-9,
+        )
 
     def test_animation_slider_uses_selected_phase_duration(self):
         phase_duration_attributes = {

@@ -2,7 +2,12 @@ import unittest
 from datetime import date
 from unittest.mock import patch
 
-from app_services import PHYSICS_MODEL_VERSION, compute_cached_trajectory
+from app_services import (
+    PARETO_MODEL_VERSION,
+    PHYSICS_MODEL_VERSION,
+    compute_cached_pareto_front,
+    compute_cached_trajectory,
+)
 
 
 class TestCachedTrajectoryService(unittest.TestCase):
@@ -45,3 +50,25 @@ class TestCachedTrajectoryService(unittest.TestCase):
     def test_rejects_an_unknown_physics_model_version(self):
         with self.assertRaisesRegex(ValueError, "Unsupported physics model version"):
             compute_cached_trajectory("obsolete-model", *self._args()[1:])
+
+
+class TestCachedParetoService(unittest.TestCase):
+    def setUp(self):
+        compute_cached_pareto_front.clear()
+
+    def tearDown(self):
+        compute_cached_pareto_front.clear()
+
+    @patch("app_services.compute_connected_pareto_front")
+    def test_identical_model_version_computes_front_once(self, compute_mock):
+        compute_mock.return_value = {"pareto_count": 38}
+
+        first = compute_cached_pareto_front(PARETO_MODEL_VERSION)
+        second = compute_cached_pareto_front(PARETO_MODEL_VERSION)
+
+        self.assertEqual(first, second)
+        self.assertEqual(compute_mock.call_count, 1)
+
+    def test_rejects_an_unknown_pareto_model_version(self):
+        with self.assertRaisesRegex(ValueError, "Unsupported Pareto model version"):
+            compute_cached_pareto_front("obsolete-pareto-model")
