@@ -35,6 +35,11 @@ pages = [
         title="Saturn & Titan studies",
         icon=":material/public:",
     ),
+    st.Page(
+        "pages/feasibility.py",
+        title="Feasibility",
+        icon=":material/warning:",
+    ),
 ]
 
 navigation = st.navigation(pages)
