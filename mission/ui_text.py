@@ -10,8 +10,8 @@ UI_TEXT: Final[dict[str, str]] = {
     "architecture_header": "1. Mission architecture",
     "destination_label": "Interplanetary solver target",
     "destination_help": (
-        "The Lambert solver's target planet. Only Saturn currently has a connected mission "
-        "engine; other planets are not implemented yet."
+        "The Lambert solver's target planet. Every Lambert-capable planet computes a real "
+        "direct arrival; only Saturn currently has a connected moon-transfer chain (Titan)."
     ),
     "moon_label": "Moon destination (optional)",
     "moon_help": (
@@ -20,8 +20,8 @@ UI_TEXT: Final[dict[str, str]] = {
     ),
     "no_moon_option": "Direct arrival only (no moon)",
     "destination_not_implemented": (
-        "This destination is not implemented yet. Select Saturn to use the connected "
-        "Earth-to-Saturn engine."
+        "This destination is not implemented yet. Select a Lambert-capable planet to use "
+        "the direct-arrival engine."
     ),
     "direct_arrival_only_note": (
         "Direct planetary arrival only: the connected budget, 3D trajectory view, and "

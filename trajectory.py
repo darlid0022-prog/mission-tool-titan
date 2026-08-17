@@ -10,6 +10,7 @@ import pykep as pk
 
 from mission import physics
 from mission.bodies import resolve_body
+from mission.capabilities import PLANET_DESTINATIONS
 from mission.models import Event, Leg, TrajectoryResult
 from mission.pykep_trajectory_engine import PyKEPTrajectoryEngine
 
@@ -88,7 +89,9 @@ def _result_value(solution, key_name: str):
     raise ValueError(f"key_name '{key_name}' not found on solution")
 
 
-def _compute_lambert_earth_saturn_grid(
+def _compute_lambert_grid(
+    origin,
+    destination,
     launch_start,
     launch_end,
     n_departures=12,
@@ -97,16 +100,17 @@ def _compute_lambert_earth_saturn_grid(
     tof_step_days=15.0,
 ) -> list[dict]:
     """
-    Compute all feasible Earth→Saturn Lambert trajectories over a grid.
+    Compute all feasible origin→destination Lambert trajectories over a grid.
 
     Internally the solver uses the canonical TrajectoryResult representation; at
     this compatibility boundary we convert back to the legacy dict shape expected
-    by the current callers/tests.
+    by the current callers/tests. Body-agnostic: origin/destination are resolved
+    generically by mission.bodies.resolve_body via PyKEPTrajectoryEngine.
     """
     engine = PyKEPTrajectoryEngine()
     results = engine.compute_trajectory(
-        "Earth",
-        "Saturn",
+        origin,
+        destination,
         launch_start,
         launch_end,
         n_departures=n_departures,
@@ -116,9 +120,36 @@ def _compute_lambert_earth_saturn_grid(
     )
 
     if not results:
-        raise RuntimeError("No Earth-to-Saturn Lambert solution was found.")
+        raise RuntimeError(f"No {origin}-to-{destination} Lambert solution was found.")
 
     return _legacy_solution_list(results)
+
+
+def _compute_lambert_earth_saturn_grid(
+    launch_start,
+    launch_end,
+    n_departures=12,
+    tof_min_years=4.0,
+    tof_max_years=8.0,
+    tof_step_days=15.0,
+) -> list[dict]:
+    """Earth→Saturn specialisation of _compute_lambert_grid.
+
+    Kept with its original name/signature for backward compatibility: several
+    existing regression tests (test_trajectory_saturn.py, test_solver_equivalence.py,
+    test_celestial_body_resolution.py, test_leg_solver.py) import and call this
+    function directly by name.
+    """
+    return _compute_lambert_grid(
+        "Earth",
+        "Saturn",
+        launch_start,
+        launch_end,
+        n_departures=n_departures,
+        tof_min_years=tof_min_years,
+        tof_max_years=tof_max_years,
+        tof_step_days=tof_step_days,
+    )
 
 
 def select_best_by_criterion(solutions, key_name):
@@ -252,9 +283,12 @@ def compute_trajectory(
     leo_altitude_km: float,
     capture_altitude_km: float,
 ) -> dict:
-    # Premiere version du moteur:
-    # Terre -> Saturne uniquement.
-    if destination.lower() != "saturn":
+    # Direct planetary arrival: any Lambert-capable planet in
+    # mission.capabilities.PLANET_DESTINATIONS. Moon-only names (e.g. Titan) are
+    # not offered here - they are reached through the connected staging-and-
+    # transfer chain in mission/full_mission.py, not this direct Lambert engine.
+    supported_destinations = {name.lower() for name in PLANET_DESTINATIONS}
+    if destination.lower() not in supported_destinations:
         dv_budget = {
             "dV from LEO": 0.0,
             "dV DSM/Fly-By": 0.0,
@@ -273,12 +307,14 @@ def compute_trajectory(
             "arrival_date": None,
             "note": (
                 f"Destination '{destination}' is not implemented yet. "
-                "Select Saturn to use the Earth-to-Saturn engine."
+                f"Supported destinations: {', '.join(PLANET_DESTINATIONS)}."
             ),
         }
 
     # Compute all Lambert solutions over grid
-    solutions = _compute_lambert_earth_saturn_grid(
+    solutions = _compute_lambert_grid(
+        "Earth",
+        destination,
         launch_start,
         launch_end,
     )
@@ -290,20 +326,22 @@ def compute_trajectory(
     best_departure_mjd2000 = _result_value(best, "departure_mjd2000")
     best_arrival_mjd2000 = _result_value(best, "arrival_mjd2000")
 
-    # Compute propulsive ΔV where applicable (LEO injection and Saturn capture).
+    # Compute propulsive ΔV where applicable (LEO injection and destination capture).
     # Use body-provided radii and mu values; altitudes are provided by the UI
     # in kilometres and must be converted to metres.
     earth = resolve_body("Earth")
-    saturn = resolve_body("Saturn")
+    destination_body = resolve_body(destination)
     assert earth.pykep_body is not None
-    assert saturn.pykep_body is not None
+    # Guaranteed: destination is in PLANET_DESTINATIONS, i.e. supports_lambert,
+    # which mission/bodies.py only sets for jpl_lp-backed (pykep_body-having) planets.
+    assert destination_body.pykep_body is not None
 
     # Convert altitudes from km to m
     r_leo = earth.pykep_body.get_radius() + float(leo_altitude_km) * 1000.0
-    r_capture = saturn.pykep_body.get_radius() + float(capture_altitude_km) * 1000.0
+    r_capture = destination_body.pykep_body.get_radius() + float(capture_altitude_km) * 1000.0
 
     mu_earth = earth.get_mu_self()
-    mu_saturn = saturn.get_mu_self()
+    mu_destination = destination_body.get_mu_self()
 
     # For LEO departures compute actual injection ΔV; for Direct keep legacy v_inf value
     if str(departure_type).lower() == "leo":
@@ -311,8 +349,8 @@ def compute_trajectory(
     else:
         dv_from_leo = best_departure_v_inf
 
-    # Always compute capture ΔV at destination (Saturn)
-    dv_capture_dest = physics.delta_v_capture(best_arrival_v_inf, mu_saturn, r_capture)
+    # Always compute capture ΔV at the destination planet
+    dv_capture_dest = physics.delta_v_capture(best_arrival_v_inf, mu_destination, r_capture)
 
     dv_budget = {
         "dV from LEO": dv_from_leo,
@@ -332,15 +370,15 @@ def compute_trajectory(
     arrival_date = pk.epoch(best_arrival_mjd2000)
 
     note = (
-        "Preliminary Earth-to-Saturn Lambert model (multi_revs=0). "
+        f"Preliminary Earth-to-{destination_body.name} Lambert model (multi_revs=0). "
         "The following budget values are propulsive delta-v terms:\n"
         "- 'dV from LEO': impulsive LEO escape delta-v when LEO is selected.\n"
-        "- 'dV Capture at Destination': impulsive Saturn capture delta-v, "
-        "computed with Saturn's own gravitational parameter (preliminary).\n"
+        f"- 'dV Capture at Destination': impulsive {destination_body.name} capture delta-v, "
+        f"computed with {destination_body.name}'s own gravitational parameter (preliminary).\n"
         "Other entries remain preliminary or unimplemented."
     )
 
-    earth_saturn_trajectory = TrajectoryResult(
+    earth_leg_trajectory = TrajectoryResult(
         departure_mjd2000=best_departure_mjd2000,
         arrival_mjd2000=best_arrival_mjd2000,
         tof_years=_result_value(best, "tof_years"),
@@ -348,7 +386,7 @@ def compute_trajectory(
         v_inf_arrival=best_arrival_v_inf,
         delta_v=dv_from_leo,
         method="lambert",
-        notes="Earth-to-Saturn Lambert leg; delta_v contains Earth departure only.",
+        notes=f"Earth-to-{destination_body.name} Lambert leg; delta_v contains Earth departure only.",
     )
     earth_departure_event = Event(
         name="Earth departure",
@@ -356,18 +394,18 @@ def compute_trajectory(
         event_type="departure",
         epoch=best_departure_mjd2000,
     )
-    saturn_arrival_event = Event(
-        name="Saturn arrival",
-        body="Saturn",
+    destination_arrival_event = Event(
+        name=f"{destination_body.name} arrival",
+        body=destination_body.name,
         event_type="arrival",
         epoch=best_arrival_mjd2000,
     )
-    earth_saturn_leg = Leg(
+    earth_leg = Leg(
         origin="Earth",
-        destination="Saturn",
-        trajectory=earth_saturn_trajectory,
-        events=[earth_departure_event, saturn_arrival_event],
-        notes="Canonical Earth-to-Saturn leg for the connected mission chain.",
+        destination=destination_body.name,
+        trajectory=earth_leg_trajectory,
+        events=[earth_departure_event, destination_arrival_event],
+        notes=f"Canonical Earth-to-{destination_body.name} leg for the connected mission chain.",
     )
 
     return {
@@ -375,7 +413,12 @@ def compute_trajectory(
         "dv_total": dv_total,
         "best_launch_date": best_launch_date,
         "arrival_date": arrival_date,
-        "earth_saturn_leg": earth_saturn_leg,
+        # Key name kept as "earth_saturn_leg" for every destination (not just
+        # Saturn) for backward compatibility: it is pinned as an exact top-level
+        # key set by tests/test_trajectory_saturn.py's EXPECTED_TOP_LEVEL_KEYS,
+        # and app.py/other tests already read this literal key. It now holds the
+        # generic Earth-to-destination leg, regardless of which planet.
+        "earth_saturn_leg": earth_leg,
         "note": note,
     }
 
@@ -429,8 +472,9 @@ def compute_trajectory_alternatives(
         RuntimeError: if no valid Lambert solutions are found (not expected for
             Saturn in normal launch windows)
     """
-    # Non-Saturn guard
-    if destination.lower() != "saturn":
+    # Unsupported-destination guard, same PLANET_DESTINATIONS set as compute_trajectory().
+    supported_destinations = {name.lower() for name in PLANET_DESTINATIONS}
+    if destination.lower() not in supported_destinations:
         return {
             "all_solutions": [],
             "solution_count": 0,
@@ -441,13 +485,15 @@ def compute_trajectory_alternatives(
             "pareto_count": 0,
             "note": (
                 f"Destination '{destination}' is not implemented yet. "
-                "Select Saturn to view alternatives."
+                f"Supported destinations: {', '.join(PLANET_DESTINATIONS)}."
             ),
         }
 
     # Compute all Lambert solutions once. Internally we convert to the canonical
     # TrajectoryResult representation so the selection logic works on consistent objects.
-    all_legacy_solutions = _compute_lambert_earth_saturn_grid(
+    all_legacy_solutions = _compute_lambert_grid(
+        "Earth",
+        destination,
         launch_start,
         launch_end,
     )
