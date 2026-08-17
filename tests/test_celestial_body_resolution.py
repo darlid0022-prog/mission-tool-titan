@@ -82,6 +82,8 @@ class TestNewlySupportedMoons(unittest.TestCase):
         ("Europa", 3.20271210e12),
         ("Ganymede", 9.88783275e12),
         ("Callisto", 7.17928340e12),
+        ("Ceres", 6.26e10),
+        ("Pluto", 8.70e11),
     )
 
     def test_each_moon_resolves_with_known_mu_and_no_lambert(self):

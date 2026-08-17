@@ -12,6 +12,10 @@ from .constants import (
     GANYMEDE_MU_M3_S2,
     IO_MU_M3_S2,
     PHOBOS_MU_M3_S2,
+    CERES_MU_M3_S2,
+    CERES_MEAN_RADIUS_M,
+    PLUTO_MU_M3_S2,
+    PLUTO_MEAN_RADIUS_M,
 )
 
 # The original body-resolution facade exposed this rounded Titan GM. Keep it
@@ -160,6 +164,29 @@ def _build_callisto() -> CelestialBody:
     return _build_artificial_moon("Callisto", CALLISTO_MU_M3_S2)
 
 
+def _build_ceres() -> CelestialBody:
+    # Ceres is an independent small body (heliocentric) without a PyKEP
+    # jpl_lp ephemeris in this project. We register it as an artificial-like
+    # body (no Lambert support) with a published GM and mean radius.
+    return CelestialBody(
+        name="Ceres",
+        pykep_body=None,
+        mu_self=CERES_MU_M3_S2,
+        supports_lambert=False,
+    )
+
+
+def _build_pluto() -> CelestialBody:
+    # Pluto is similarly registered without a PyKEP ephemeris here; use the
+    # published GM and mean radius constants for local manoeuvre calculations.
+    return CelestialBody(
+        name="Pluto",
+        pykep_body=None,
+        mu_self=PLUTO_MU_M3_S2,
+        supports_lambert=False,
+    )
+
+
 SUPPORTED_BODIES = {
     "earth": _build_earth(),
     "mercury": _build_mercury(),
@@ -176,6 +203,8 @@ SUPPORTED_BODIES = {
     "europa": _build_europa(),
     "ganymede": _build_ganymede(),
     "callisto": _build_callisto(),
+    "ceres": _build_ceres(),
+    "pluto": _build_pluto(),
 }
 
 

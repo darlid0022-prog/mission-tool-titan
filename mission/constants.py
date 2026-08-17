@@ -42,3 +42,22 @@ GANYMEDE_MEAN_RADIUS_M = 2.6312e6
 
 CALLISTO_MU_M3_S2 = 7.17928340e12
 CALLISTO_MEAN_RADIUS_M = 2.4103e6
+
+# ---------------------------------------------------------------------------
+# Ceres and Pluto
+#
+# Preferred GM (mu) values are taken from the JPL Small-Body Database when
+# available (published GM values are preferred to G * mass approximations).
+# Ceres: JPL Small-Body DB reports GM ≈ 6.26e10 m^3/s^2 (used below).
+# Note: the project Excel source (mission_design_tool.xlsx) listed Ceres
+# perihelion and aphelion values reversed; the correct ordering is
+# perihelion ≈ 3.81e11 m, aphelion ≈ 4.46e11 m (documented in reference
+# comments but not stored as constants here).
+# Pluto: JPL value used where available (GM ≈ 8.70e11 m^3/s^2).
+# ---------------------------------------------------------------------------
+
+CERES_MU_M3_S2 = 6.26e10
+CERES_MEAN_RADIUS_M = 469700.0
+
+PLUTO_MU_M3_S2 = 8.70e11
+PLUTO_MEAN_RADIUS_M = 1188300.0
