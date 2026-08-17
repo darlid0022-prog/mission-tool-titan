@@ -14,7 +14,12 @@ from .builder import (
     build_trajectory_result,
 )
 from .dv_budget import MissionDeltaVBudget, compose_complete_dv_budget
-from .full_mission import EarthSaturnTitanMissionResult, compute_earth_saturn_titan_mission
+from .full_mission import (
+    EarthDestinationMissionResult,
+    EarthSaturnTitanMissionResult,
+    compute_earth_destination_mission,
+    compute_earth_saturn_titan_mission,
+)
 from .mass_model import (
     HESPEROS_MODEL_VERSION,
     Manoeuvre,
@@ -54,6 +59,7 @@ __all__ = [
     "SaturnArrivalStagingResult",
     "TitanEdlResult",
     "EarthSaturnTitanMissionResult",
+    "EarthDestinationMissionResult",
     "MissionDeltaVBudget",
     "HESPEROS_MODEL_VERSION",
     "Manoeuvre",
@@ -66,6 +72,7 @@ __all__ = [
     "adapt_saturn_arrival_staging_to_leg",
     "adapt_saturn_titan_transfer_to_leg",
     "compute_earth_saturn_titan_mission",
+    "compute_earth_destination_mission",
     "compose_complete_dv_budget",
     "compute_arrival_to_staging",
     "compute_parent_to_moon_transfer",
