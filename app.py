@@ -40,6 +40,11 @@ pages = [
         title="Feasibility",
         icon=":material/warning:",
     ),
+    st.Page(
+        "pages/optimization.py",
+        title="Optimization",
+        icon=":material/query_stats:",
+    ),
 ]
 
 navigation = st.navigation(pages)

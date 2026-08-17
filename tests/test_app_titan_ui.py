@@ -7,6 +7,8 @@ from streamlit.testing.v1 import AppTest
 from mission import physics
 from mission.bodies import resolve_body
 from mission.models import Leg, TrajectoryResult
+from mission.pareto import compute_connected_pareto_front
+from mission.pareto_plot import build_pareto_front_figure
 
 APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
 
@@ -342,6 +344,60 @@ class TestFeasibilityPage(unittest.TestCase):
                 "This is a model finding, not an application error" in info.value
                 for info in app.info
             )
+        )
+
+
+class TestOptimizationPage(unittest.TestCase):
+    def test_pareto_chart_renders_38_front_points_and_highlights_references(self):
+        pareto_result = compute_connected_pareto_front()
+        captured = {}
+
+        def capture_figure(result):
+            figure = build_pareto_front_figure(result)
+            captured["figure"] = figure
+            return figure
+
+        with (
+            patch(
+                "app_services.compute_cached_trajectory",
+                return_value=earth_saturn_result(),
+            ),
+            patch(
+                "app_services.compute_cached_pareto_front",
+                return_value=pareto_result,
+            ),
+            patch(
+                "mission.pareto_plot.build_pareto_front_figure",
+                side_effect=capture_figure,
+            ),
+        ):
+            app = AppTest.from_file(APP_PATH)
+            app.run(timeout=30)
+            app.switch_page("pages/optimization.py").run(timeout=30)
+
+        self.assertFalse(app.exception)
+        self.assertTrue(
+            any(
+                heading.value == "Connected mission trade space — Pareto front"
+                for heading in app.header
+            )
+        )
+        figure = captured["figure"]
+        traces = {trace.meta["role"]: trace for trace in figure.data}
+        self.assertEqual(
+            len(traces["pareto_front"].x) + len(traces["Minimum connected delta-v"].x),
+            38,
+        )
+        self.assertEqual(len(traces["Current mission baseline"].x), 1)
+        self.assertAlmostEqual(
+            traces["Current mission baseline"].customdata[0][1],
+            2_856.0,
+            delta=1e-9,
+        )
+        self.assertAlmostEqual(
+            traces["Minimum connected delta-v"].customdata[0][1],
+            2_826.0,
+            delta=1e-9,
         )
 
 
