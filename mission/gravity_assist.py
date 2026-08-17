@@ -23,6 +23,20 @@ DEMO_EARTH_DEPARTURE = "1997-10-15 08:43:00"
 DEMO_VENUS_ARRIVAL = "1998-04-26 13:44:00"
 DEMO_VENUS_FLYBY_ALTITUDE_M = 600_000.0
 
+EARTH_ALTITUDE_SOURCE = (
+    "NASA JPL, Cassini successfully completes flyby of Earth: closest-approach altitude "
+    "about 1,171 km: https://www.jpl.nasa.gov/news/cassini-successfully-completes-flyby-of-earth/"
+)
+JUPITER_ALTITUDE_SOURCE = (
+    "NASA JPL DESCANSO Cassini Navigation Performance Assessment: Jupiter periapsis "
+    "altitude 9,722,965 km: https://descanso.jpl.nasa.gov/DPSummary/DESCANSO17_Cassini_RevA.pdf"
+)
+DEMO_SECOND_VENUS_FLYBY = "1999-06-24 20:30:00"
+DEMO_EARTH_FLYBY = "1999-08-18 03:28:00"
+DEMO_JUPITER_FLYBY = "2000-12-30 10:05:00"
+DEMO_EARTH_FLYBY_ALTITUDE_M = 1_171_000.0
+DEMO_JUPITER_FLYBY_ALTITUDE_M = 9_722_965_000.0
+
 
 @dataclass(frozen=True)
 class GravityAssistResult:
@@ -195,6 +209,84 @@ def compute_venus_flyby_demonstration() -> GravityAssistResult:
             periapsis_altitude_m=DEMO_VENUS_FLYBY_ALTITUDE_M,
             v_infinity_in_m_s=incoming,
             body_heliocentric_velocity_m_s=venus_velocity,
+            turn_axis=turn_axis,
+            turn_direction=direction,
+        )
+        for direction in (-1, 1)
+    )
+    return max(
+        candidates,
+        key=lambda result: (result.heliocentric_speed_change_m_s, result.turn_direction),
+    )
+
+
+def compute_earth_flyby_demonstration() -> GravityAssistResult:
+    """Build one fixed second-Venus-to-Earth Lambert arrival and planar turn."""
+    venus = pk.planet(pk.udpla.jpl_lp("venus"))
+    earth = pk.planet(pk.udpla.jpl_lp("earth"))
+    departure = pk.epoch(DEMO_SECOND_VENUS_FLYBY)
+    arrival = pk.epoch(DEMO_EARTH_FLYBY)
+    venus_position, _ = venus.eph(departure.mjd2000)
+    earth_position, earth_velocity_raw = earth.eph(arrival.mjd2000)
+    tof_seconds = (arrival.mjd2000 - departure.mjd2000) * 86_400.0
+    lambert = pk.lambert_problem(
+        venus_position,
+        earth_position,
+        tof_seconds,
+        earth.get_mu_central_body(),
+        multi_revs=0,
+    )
+    transfer_arrival = _vector(lambert.v1[0], "Lambert arrival velocity")
+    earth_velocity = _vector(earth_velocity_raw, "Earth heliocentric velocity")
+    incoming = _sub(transfer_arrival, earth_velocity)
+    turn_axis = _unit(_cross(incoming, earth_velocity), "demonstration turn plane")
+    candidates = tuple(
+        compute_unpowered_gravity_assist(
+            body="Earth",
+            body_radius_m=earth.get_radius(),
+            gravitational_parameter_m3_s2=earth.get_mu_self(),
+            periapsis_altitude_m=DEMO_EARTH_FLYBY_ALTITUDE_M,
+            v_infinity_in_m_s=incoming,
+            body_heliocentric_velocity_m_s=earth_velocity,
+            turn_axis=turn_axis,
+            turn_direction=direction,
+        )
+        for direction in (-1, 1)
+    )
+    return max(
+        candidates,
+        key=lambda result: (result.heliocentric_speed_change_m_s, result.turn_direction),
+    )
+
+
+def compute_jupiter_flyby_demonstration() -> GravityAssistResult:
+    """Build one fixed Earth-to-Jupiter Lambert arrival and distant planar turn."""
+    earth = pk.planet(pk.udpla.jpl_lp("earth"))
+    jupiter = pk.planet(pk.udpla.jpl_lp("jupiter"))
+    departure = pk.epoch(DEMO_EARTH_FLYBY)
+    arrival = pk.epoch(DEMO_JUPITER_FLYBY)
+    earth_position, _ = earth.eph(departure.mjd2000)
+    jupiter_position, jupiter_velocity_raw = jupiter.eph(arrival.mjd2000)
+    tof_seconds = (arrival.mjd2000 - departure.mjd2000) * 86_400.0
+    lambert = pk.lambert_problem(
+        earth_position,
+        jupiter_position,
+        tof_seconds,
+        earth.get_mu_central_body(),
+        multi_revs=0,
+    )
+    transfer_arrival = _vector(lambert.v1[0], "Lambert arrival velocity")
+    jupiter_velocity = _vector(jupiter_velocity_raw, "Jupiter heliocentric velocity")
+    incoming = _sub(transfer_arrival, jupiter_velocity)
+    turn_axis = _unit(_cross(incoming, jupiter_velocity), "demonstration turn plane")
+    candidates = tuple(
+        compute_unpowered_gravity_assist(
+            body="Jupiter",
+            body_radius_m=jupiter.get_radius(),
+            gravitational_parameter_m3_s2=jupiter.get_mu_self(),
+            periapsis_altitude_m=DEMO_JUPITER_FLYBY_ALTITUDE_M,
+            v_infinity_in_m_s=incoming,
+            body_heliocentric_velocity_m_s=jupiter_velocity,
             turn_axis=turn_axis,
             turn_direction=direction,
         )
