@@ -5,7 +5,6 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from . import physics
 from .constants import (
     JPL_SATURN_SYSTEM_SOURCE,
     SATURN_MU_M3_S2,
@@ -14,13 +13,16 @@ from .constants import (
     TITAN_MU_M3_S2,
 )
 from .models import Event, Leg, TrajectoryResult
+from .parent_moon_transfer import (
+    DAYS_PER_JULIAN_YEAR,
+    SECONDS_PER_DAY,
+    compute_parent_to_moon_transfer,
+)
 
 DEFAULT_SATURN_STAGING_RADIUS_M = 6.0e8
 DEFAULT_TITAN_CAPTURE_ALTITUDE_M = 1.5e6
 MIN_SATURN_STAGING_RADIUS_M = 4.8e8
 MIN_TITAN_CAPTURE_ALTITUDE_M = 1.0e6
-SECONDS_PER_DAY = 86_400.0
-DAYS_PER_JULIAN_YEAR = 365.25
 
 
 @dataclass(frozen=True)
@@ -86,49 +88,36 @@ def compute_saturn_titan_transfer(
             f"non-atmospheric guard ({MIN_TITAN_CAPTURE_ALTITUDE_M:.0f} m)."
         )
 
-    r_2 = TITAN_MEAN_ORBIT_RADIUS_M
-    transfer_semimajor_axis = (r_1 + r_2) / 2.0
-
-    staging_circular_speed = math.sqrt(SATURN_MU_M3_S2 / r_1)
-    transfer_departure_speed = math.sqrt(
-        SATURN_MU_M3_S2 * (2.0 / r_1 - 1.0 / transfer_semimajor_axis)
+    generic_result = compute_parent_to_moon_transfer(
+        parent_body="Saturn",
+        moon_body="Titan",
+        parent_mu_m3_s2=SATURN_MU_M3_S2,
+        parent_staging_radius_m=r_1,
+        moon_orbit_radius_m=TITAN_MEAN_ORBIT_RADIUS_M,
+        moon_mu_m3_s2=TITAN_MU_M3_S2,
+        moon_radius_m=TITAN_MEAN_RADIUS_M,
+        moon_capture_altitude_m=capture_altitude,
+        source=JPL_SATURN_SYSTEM_SOURCE,
     )
-    departure_delta_v = transfer_departure_speed - staging_circular_speed
-
-    transfer_arrival_speed = math.sqrt(
-        SATURN_MU_M3_S2 * (2.0 / r_2 - 1.0 / transfer_semimajor_axis)
-    )
-    titan_orbital_speed = math.sqrt(SATURN_MU_M3_S2 / r_2)
-    v_infinity_titan = abs(titan_orbital_speed - transfer_arrival_speed)
-
-    time_of_flight = math.pi * math.sqrt(transfer_semimajor_axis**3 / SATURN_MU_M3_S2)
-
-    titan_capture_radius = TITAN_MEAN_RADIUS_M + capture_altitude
-    capture_delta_v = physics.delta_v_capture(
-        v_infinity_titan,
-        TITAN_MU_M3_S2,
-        titan_capture_radius,
-    )
-    total_delta_v = departure_delta_v + capture_delta_v
 
     return SaturnTitanTransferResult(
-        origin="Saturn",
-        destination="Titan",
-        method="hohmann_circular_coplanar",
-        source=JPL_SATURN_SYSTEM_SOURCE,
-        saturn_staging_radius_m=r_1,
-        titan_orbit_radius_m=r_2,
-        titan_capture_altitude_m=capture_altitude,
-        titan_capture_radius_m=titan_capture_radius,
-        saturn_staging_circular_speed_m_s=staging_circular_speed,
-        transfer_departure_speed_m_s=transfer_departure_speed,
-        departure_delta_v_m_s=departure_delta_v,
-        transfer_arrival_speed_m_s=transfer_arrival_speed,
-        titan_orbital_speed_m_s=titan_orbital_speed,
-        v_infinity_titan_m_s=v_infinity_titan,
-        time_of_flight_s=time_of_flight,
-        capture_delta_v_m_s=capture_delta_v,
-        total_delta_v_m_s=total_delta_v,
+        origin=generic_result.origin,
+        destination=generic_result.destination,
+        method=generic_result.method,
+        source=generic_result.source,
+        saturn_staging_radius_m=generic_result.parent_staging_radius_m,
+        titan_orbit_radius_m=generic_result.moon_orbit_radius_m,
+        titan_capture_altitude_m=generic_result.moon_capture_altitude_m,
+        titan_capture_radius_m=generic_result.moon_capture_radius_m,
+        saturn_staging_circular_speed_m_s=(generic_result.parent_staging_circular_speed_m_s),
+        transfer_departure_speed_m_s=generic_result.transfer_departure_speed_m_s,
+        departure_delta_v_m_s=generic_result.departure_delta_v_m_s,
+        transfer_arrival_speed_m_s=generic_result.transfer_arrival_speed_m_s,
+        titan_orbital_speed_m_s=generic_result.moon_orbital_speed_m_s,
+        v_infinity_titan_m_s=generic_result.v_infinity_moon_m_s,
+        time_of_flight_s=generic_result.time_of_flight_s,
+        capture_delta_v_m_s=generic_result.capture_delta_v_m_s,
+        total_delta_v_m_s=generic_result.total_delta_v_m_s,
         assumptions=(
             "Saturn-centred circular and coplanar staging and Titan orbits.",
             "Two-impulse Hohmann transfer with instantaneous burns.",

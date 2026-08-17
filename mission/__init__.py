@@ -30,6 +30,11 @@ from .moon_transfer import (
     adapt_saturn_titan_transfer_to_leg,
     compute_saturn_titan_transfer,
 )
+from .parent_moon_transfer import (
+    ParentMoonTransferResult,
+    adapt_parent_moon_transfer_to_leg,
+    compute_parent_to_moon_transfer,
+)
 from .saturn_staging import (
     SaturnArrivalStagingResult,
     adapt_saturn_arrival_staging_to_leg,
@@ -44,6 +49,7 @@ __all__ = [
     "TrajectoryResult",
     "ArrivalStagingResult",
     "StagingRadiusGuard",
+    "ParentMoonTransferResult",
     "SaturnTitanTransferResult",
     "SaturnArrivalStagingResult",
     "TitanEdlResult",
@@ -55,12 +61,14 @@ __all__ = [
     "ParametricBusCoefficients",
     "ParametricMassResult",
     "PayloadItem",
+    "adapt_parent_moon_transfer_to_leg",
     "adapt_arrival_staging_to_leg",
     "adapt_saturn_arrival_staging_to_leg",
     "adapt_saturn_titan_transfer_to_leg",
     "compute_earth_saturn_titan_mission",
     "compose_complete_dv_budget",
     "compute_arrival_to_staging",
+    "compute_parent_to_moon_transfer",
     "compute_saturn_arrival_to_staging",
     "compute_saturn_titan_transfer",
     "compute_titan_edl",
