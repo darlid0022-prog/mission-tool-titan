@@ -38,6 +38,17 @@ UI_TEXT: Final[dict[str, str]] = {
         "The default aggregate science payload is 143.5 kg and 323 W. Add or edit rows "
         "directly; a zero data rate means that no aggregate value is currently available."
     ),
+    "instrument_catalog_label": "Add named instruments from the catalogue",
+    "instrument_catalog_help": (
+        "Named Orbiter/Lander instrument slots, inspired by real interplanetary missions. "
+        "Selecting one adds a zero-mass, zero-power placeholder row below - fill in the real, "
+        "sourced mass/power/data-rate values yourself, exactly as in the original spreadsheet."
+    ),
+    "instrument_catalog_caption": (
+        "Catalogue entries carry no assumed mass or power: this tool does not ship "
+        "unsourced instrument specifications. Edit each added row with a documented "
+        "reference (e.g. a flown analogous instrument) before using it for sizing."
+    ),
     "invalid_dates": "The end date must be on or after the start date.",
     "earth_saturn_spinner": "Calculating the Earth → Saturn trajectory…",
     "results_header": "Results (updated after calculation)",

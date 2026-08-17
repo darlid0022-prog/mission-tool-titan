@@ -29,6 +29,7 @@ from mission.gravity_assist import (
 )
 from mission.mass_model import PayloadItem
 from mission.pareto_plot import build_pareto_front_figure, select_pareto_highlights
+from mission.payload_catalog import catalog_by_label, catalog_row
 from mission.sizing import compute_mass_budget
 from mission.titan_edl import compute_titan_edl
 from mission.trajectory_plot import build_complete_mission_figure
@@ -246,17 +247,27 @@ with col_inputs:
 
     st.header(UI_TEXT["instruments_header"])
     st.caption(UI_TEXT["instruments_caption"])
-    default_instruments = pd.DataFrame(
-        [
-            {
-                "Instrument": "Science payload (aggregate)",
-                "Cible": "Orbiter",
-                "Masse (kg)": 143.5,
-                "Puissance (W)": 323.0,
-                "Débit (bps)": 0.0,
-            },
-        ]
+
+    catalog_options = catalog_by_label()
+    selected_catalog_labels = st.multiselect(
+        UI_TEXT["instrument_catalog_label"],
+        options=list(catalog_options.keys()),
+        default=[],
+        help=UI_TEXT["instrument_catalog_help"],
     )
+    st.caption(UI_TEXT["instrument_catalog_caption"])
+
+    instrument_rows = [
+        {
+            "Instrument": "Science payload (aggregate)",
+            "Cible": "Orbiter",
+            "Masse (kg)": 143.5,
+            "Puissance (W)": 323.0,
+            "Débit (bps)": 0.0,
+        },
+    ]
+    instrument_rows.extend(catalog_row(catalog_options[label]) for label in selected_catalog_labels)
+    default_instruments = pd.DataFrame(instrument_rows)
     instruments_df = st.data_editor(
         default_instruments,
         num_rows="dynamic",
