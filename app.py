@@ -45,6 +45,11 @@ pages = [
         title="Optimization",
         icon=":material/query_stats:",
     ),
+    st.Page(
+        "pages/gravity_assists.py",
+        title="Gravity assists",
+        icon=":material/rocket_launch:",
+    ),
 ]
 
 navigation = st.navigation(pages)

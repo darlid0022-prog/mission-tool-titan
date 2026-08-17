@@ -401,5 +401,32 @@ class TestOptimizationPage(unittest.TestCase):
         )
 
 
+class TestGravityAssistsPage(unittest.TestCase):
+    def test_flyby_demonstrators_render_for_all_three_bodies(self):
+        app = run_app(page_path="pages/gravity_assists.py")
+
+        self.assertFalse(app.exception)
+        subheaders = {sub.value for sub in app.subheader}
+        self.assertEqual(
+            subheaders,
+            {"Venus flyby", "Earth flyby", "Jupiter flyby"},
+        )
+        self.assertTrue(any("Incoming v∞" == metric.label for metric in app.metric))
+
+
+class TestNavigationAcrossAllPages(unittest.TestCase):
+    def test_every_page_renders_without_exception(self):
+        for page_path in (
+            "pages/trajectory_3d.py",
+            "pages/saturn_system_studies.py",
+            "pages/feasibility.py",
+            "pages/optimization.py",
+            "pages/gravity_assists.py",
+        ):
+            with self.subTest(page=page_path):
+                app = run_app(page_path=page_path)
+                self.assertFalse(app.exception)
+
+
 if __name__ == "__main__":
     unittest.main()
