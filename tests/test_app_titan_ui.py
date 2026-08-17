@@ -304,6 +304,11 @@ class TestSaturnTitanUi(unittest.TestCase):
         self.assertFalse(app.exception)
         self.assertEqual(trajectory_mock.call_count, 1)
         self.assertEqual(mass_mock.call_count, 1)
+        instruments = mass_mock.call_args.args[2]
+        self.assertEqual(len(instruments), 1)
+        self.assertEqual(instruments.iloc[0]["Instrument"], "Science payload (aggregate)")
+        self.assertEqual(instruments.iloc[0]["Masse (kg)"], 143.5)
+        self.assertEqual(instruments.iloc[0]["Puissance (W)"], 323.0)
         expected_total = 1_000.0 + 6_782.353909 + 2_120.301028
         self.assertAlmostEqual(mass_mock.call_args.args[0], expected_total, delta=1e-3)
         self.assertNotEqual(mass_mock.call_args.args[0], 1_000.0 + 999_999.0)

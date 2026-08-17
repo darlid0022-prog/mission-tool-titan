@@ -1,10 +1,14 @@
 import unittest
 
+import pandas as pd
+
 from mission.pareto import (
+    DEFAULT_INSTRUMENT_MASS_KG,
     ParetoPoint,
     compute_connected_pareto_front,
     extract_pareto_front,
 )
+from mission.sizing import compute_mass_budget
 
 LOCKED_DEPARTURE_MJD2000 = 9_681.181818181818
 LOCKED_TOF_YEARS = 7.819301848049317
@@ -46,6 +50,21 @@ class TestConnectedParetoSearch(unittest.TestCase):
         self.assertEqual(self.first.evaluated_count, 1_176)
         self.assertEqual(self.first.pareto_count, 38)
         self.assertEqual(self.first, self.second)
+
+    def test_default_mass_objective_uses_real_aggregate_payload(self):
+        self.assertEqual(DEFAULT_INSTRUMENT_MASS_KG, 143.5)
+        baseline = next(
+            point
+            for point in self.first.evaluated_points
+            if point.departure_mjd2000 == LOCKED_DEPARTURE_MJD2000
+            and point.earth_saturn_tof_years == LOCKED_TOF_YEARS
+        )
+        expected = compute_mass_budget(
+            baseline.total_delta_v_m_s,
+            320.0,
+            pd.DataFrame({"Masse (kg)": [143.5]}),
+        )
+        self.assertEqual(baseline.wet_mass_kg, expected["wet_mass_kg"])
 
     def test_locked_departure_v_infinity_optimum_is_evaluated_and_near_front(self):
         matches = tuple(

@@ -219,10 +219,10 @@ with col_inputs:
     default_instruments = pd.DataFrame(
         [
             {
-                "Instrument": "",
+                "Instrument": "Science payload (aggregate)",
                 "Cible": "Orbiter",
-                "Masse (kg)": 10.0,
-                "Puissance (W)": 0.0,
+                "Masse (kg)": 143.5,
+                "Puissance (W)": 323.0,
                 "Débit (bps)": 0.0,
             },
         ]
