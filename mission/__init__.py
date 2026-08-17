@@ -1,5 +1,11 @@
 """Minimal mission-domain objects for multi-leg mission analysis."""
 
+from .arrival_staging import (
+    ArrivalStagingResult,
+    StagingRadiusGuard,
+    adapt_arrival_staging_to_leg,
+    compute_arrival_to_staging,
+)
 from .builder import (
     build_event,
     build_leg,
@@ -36,6 +42,8 @@ __all__ = [
     "Leg",
     "Mission",
     "TrajectoryResult",
+    "ArrivalStagingResult",
+    "StagingRadiusGuard",
     "SaturnTitanTransferResult",
     "SaturnArrivalStagingResult",
     "TitanEdlResult",
@@ -47,10 +55,12 @@ __all__ = [
     "ParametricBusCoefficients",
     "ParametricMassResult",
     "PayloadItem",
+    "adapt_arrival_staging_to_leg",
     "adapt_saturn_arrival_staging_to_leg",
     "adapt_saturn_titan_transfer_to_leg",
     "compute_earth_saturn_titan_mission",
     "compose_complete_dv_budget",
+    "compute_arrival_to_staging",
     "compute_saturn_arrival_to_staging",
     "compute_saturn_titan_transfer",
     "compute_titan_edl",

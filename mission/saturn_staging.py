@@ -5,6 +5,15 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from .arrival_staging import (
+    DAYS_PER_JULIAN_YEAR,
+    SECONDS_PER_DAY,
+    StagingRadiusGuard,
+    compute_arrival_to_staging,
+)
+from .arrival_staging import (
+    METHOD as ARRIVAL_STAGING_METHOD,
+)
 from .constants import JPL_SATURN_SYSTEM_SOURCE, SATURN_MU_M3_S2
 from .models import Event, Leg, TrajectoryResult
 
@@ -13,9 +22,7 @@ MIN_SATURN_STAGING_RADIUS_M = 4.8e8
 F_RING_REFERENCE_RADIUS_M = 1.4018e8
 D_RING_INNER_EDGE_RADIUS_M = 6.69e7
 ALTERNATE_E_RING_OUTER_RADIUS_M = 4.82e8
-SECONDS_PER_DAY = 86_400.0
-DAYS_PER_JULIAN_YEAR = 365.25
-METHOD = "hyperbolic_capture_to_elliptic_staging"
+METHOD = ARRIVAL_STAGING_METHOD
 RING_CLEARANCE_STATUS = "unresolved"
 TRANSFER_SAFETY_MARGIN_STATUS = "unestablished"
 REPLACED_BUDGET_TERM = "dV Capture at Destination"
@@ -65,12 +72,6 @@ def _require_finite_number(name: str, value: float) -> float:
     return converted
 
 
-def _validate_non_negative_finite_outputs(values: dict[str, float]) -> None:
-    for name, value in values.items():
-        if not math.isfinite(value) or value < 0.0:
-            raise ArithmeticError(f"Computed {name} must be finite and non-negative.")
-
-
 def compute_saturn_arrival_to_staging(
     arrival_v_infinity_m_s: float,
     periapsis_radius_m: float,
@@ -83,72 +84,47 @@ def compute_saturn_arrival_to_staging(
     Inputs and outputs use SI units. This energy-only model does not establish
     clearance through Saturn's ring plane and is not connected to a mission budget.
     """
-    v_infinity = _require_finite_number("arrival_v_infinity_m_s", arrival_v_infinity_m_s)
-    periapsis = _require_finite_number("periapsis_radius_m", periapsis_radius_m)
-    staging = _require_finite_number("staging_radius_m", staging_radius_m)
-
-    if v_infinity < 0.0:
-        raise ValueError("arrival_v_infinity_m_s must be non-negative.")
-    if periapsis <= 0.0:
-        raise ValueError("periapsis_radius_m must be positive.")
-    if staging <= MIN_SATURN_STAGING_RADIUS_M:
-        raise ValueError(
-            "staging_radius_m must be greater than the preliminary outer E-ring "
-            f"guard ({MIN_SATURN_STAGING_RADIUS_M:.0f} m)."
-        )
-    if staging <= periapsis:
-        raise ValueError("staging_radius_m must be greater than periapsis_radius_m.")
-    if not isinstance(periapsis_radius_provenance, str) or not periapsis_radius_provenance.strip():
-        raise ValueError("periapsis_radius_provenance must be a non-empty string.")
-
-    semimajor_axis = (periapsis + staging) / 2.0
-    hyperbolic_periapsis_speed = math.sqrt(v_infinity**2 + 2.0 * SATURN_MU_M3_S2 / periapsis)
-    transfer_periapsis_speed = math.sqrt(SATURN_MU_M3_S2 * (2.0 / periapsis - 1.0 / semimajor_axis))
-    capture_to_ellipse_delta_v = hyperbolic_periapsis_speed - transfer_periapsis_speed
-
-    transfer_apoapsis_speed = math.sqrt(SATURN_MU_M3_S2 * (2.0 / staging - 1.0 / semimajor_axis))
-    staging_circular_speed = math.sqrt(SATURN_MU_M3_S2 / staging)
-    staging_circularisation_delta_v = staging_circular_speed - transfer_apoapsis_speed
-    total_delta_v = capture_to_ellipse_delta_v + staging_circularisation_delta_v
-    time_of_flight = math.pi * math.sqrt(semimajor_axis**3 / SATURN_MU_M3_S2)
-
-    _validate_non_negative_finite_outputs(
-        {
-            "transfer_semimajor_axis_m": semimajor_axis,
-            "hyperbolic_periapsis_speed_m_s": hyperbolic_periapsis_speed,
-            "transfer_periapsis_speed_m_s": transfer_periapsis_speed,
-            "capture_to_ellipse_delta_v_m_s": capture_to_ellipse_delta_v,
-            "transfer_apoapsis_speed_m_s": transfer_apoapsis_speed,
-            "staging_circular_speed_m_s": staging_circular_speed,
-            "staging_circularisation_delta_v_m_s": staging_circularisation_delta_v,
-            "total_delta_v_m_s": total_delta_v,
-            "time_of_flight_s": time_of_flight,
-        }
+    generic_result = compute_arrival_to_staging(
+        parent_body="Saturn",
+        parent_mu_m3_s2=SATURN_MU_M3_S2,
+        arrival_v_infinity_m_s=arrival_v_infinity_m_s,
+        periapsis_radius_m=periapsis_radius_m,
+        staging_radius_m=staging_radius_m,
+        source=JPL_SATURN_SYSTEM_SOURCE,
+        periapsis_radius_provenance=periapsis_radius_provenance,
+        staging_radius_guard=StagingRadiusGuard(
+            minimum_radius_m=MIN_SATURN_STAGING_RADIUS_M,
+            description="the preliminary outer E-ring guard",
+        ),
     )
 
     return SaturnArrivalStagingResult(
-        origin_state="Saturn hyperbolic arrival",
-        destination_state="Saturn staging circular orbit",
-        method=METHOD,
-        source=JPL_SATURN_SYSTEM_SOURCE,
-        arrival_v_infinity_m_s=v_infinity,
-        periapsis_radius_m=periapsis,
-        staging_radius_m=staging,
-        transfer_semimajor_axis_m=semimajor_axis,
-        hyperbolic_periapsis_speed_m_s=hyperbolic_periapsis_speed,
-        transfer_periapsis_speed_m_s=transfer_periapsis_speed,
-        capture_to_ellipse_delta_v_m_s=capture_to_ellipse_delta_v,
-        transfer_apoapsis_speed_m_s=transfer_apoapsis_speed,
-        staging_circular_speed_m_s=staging_circular_speed,
-        staging_circularisation_delta_v_m_s=staging_circularisation_delta_v,
-        total_delta_v_m_s=total_delta_v,
-        time_of_flight_s=time_of_flight,
-        f_ring_radial_margin_m=periapsis - F_RING_REFERENCE_RADIUS_M,
-        periapsis_below_d_ring_inner_edge_m=D_RING_INNER_EDGE_RADIUS_M - periapsis,
-        staging_e_ring_radial_margin_m=staging - ALTERNATE_E_RING_OUTER_RADIUS_M,
+        origin_state=generic_result.origin_state,
+        destination_state=generic_result.destination_state,
+        method=generic_result.method,
+        source=generic_result.source,
+        arrival_v_infinity_m_s=generic_result.arrival_v_infinity_m_s,
+        periapsis_radius_m=generic_result.periapsis_radius_m,
+        staging_radius_m=generic_result.staging_radius_m,
+        transfer_semimajor_axis_m=generic_result.transfer_semimajor_axis_m,
+        hyperbolic_periapsis_speed_m_s=generic_result.hyperbolic_periapsis_speed_m_s,
+        transfer_periapsis_speed_m_s=generic_result.transfer_periapsis_speed_m_s,
+        capture_to_ellipse_delta_v_m_s=generic_result.capture_to_ellipse_delta_v_m_s,
+        transfer_apoapsis_speed_m_s=generic_result.transfer_apoapsis_speed_m_s,
+        staging_circular_speed_m_s=generic_result.staging_circular_speed_m_s,
+        staging_circularisation_delta_v_m_s=(generic_result.staging_circularisation_delta_v_m_s),
+        total_delta_v_m_s=generic_result.total_delta_v_m_s,
+        time_of_flight_s=generic_result.time_of_flight_s,
+        f_ring_radial_margin_m=generic_result.periapsis_radius_m - F_RING_REFERENCE_RADIUS_M,
+        periapsis_below_d_ring_inner_edge_m=(
+            D_RING_INNER_EDGE_RADIUS_M - generic_result.periapsis_radius_m
+        ),
+        staging_e_ring_radial_margin_m=(
+            generic_result.staging_radius_m - ALTERNATE_E_RING_OUTER_RADIUS_M
+        ),
         ring_clearance_status=RING_CLEARANCE_STATUS,
         transfer_safety_margin_status=TRANSFER_SAFETY_MARGIN_STATUS,
-        periapsis_radius_provenance=periapsis_radius_provenance.strip(),
+        periapsis_radius_provenance=generic_result.periapsis_radius_provenance,
         replaces_budget_term=REPLACED_BUDGET_TERM,
         assumptions=(
             "Saturn is a point mass and both burns are tangential and impulsive.",
