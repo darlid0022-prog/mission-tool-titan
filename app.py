@@ -14,10 +14,10 @@ from app_services import (
     compute_cached_trajectory,
 )
 from mission.capabilities import (
-    CONNECTED_CHAIN_DESTINATIONS,
+    MOON_DESTINATIONS,
+    PLANET_DESTINATIONS,
     PLANNED_DESTINATIONS,
     PLANNED_MISSION_FEATURES,
-    SUPPORTED_DESTINATIONS,
 )
 from mission.dv_budget import compose_complete_dv_budget
 from mission.feasibility_check import evaluate_single_stage_chemical_feasibility
@@ -184,9 +184,23 @@ with col_inputs:
         st.header(UI_TEXT["architecture_header"])
         destination = st.selectbox(
             UI_TEXT["destination_label"],
-            SUPPORTED_DESTINATIONS,
+            PLANET_DESTINATIONS,
+            index=PLANET_DESTINATIONS.index("Saturn"),
             help=UI_TEXT["destination_help"],
         )
+        available_moons = [
+            moon
+            for moon, parent_planet in MOON_DESTINATIONS.items()
+            if parent_planet == destination
+        ]
+        moon_choices = [UI_TEXT["no_moon_option"], *available_moons]
+        moon_choice = st.selectbox(
+            UI_TEXT["moon_label"],
+            moon_choices,
+            index=moon_choices.index("Titan") if "Titan" in moon_choices else 0,
+            help=UI_TEXT["moon_help"],
+        )
+        selected_moon = None if moon_choice == UI_TEXT["no_moon_option"] else moon_choice
         departure_type = st.radio(
             UI_TEXT["departure_type"],
             ["Direct", "LEO"],
@@ -237,7 +251,7 @@ with col_inputs:
     st.info(UI_TEXT["titan_scope"])
 
     with st.expander(UI_TEXT["planned_capabilities"]):
-        st.write(UI_TEXT["connected_destinations"] + ", ".join(CONNECTED_CHAIN_DESTINATIONS))
+        st.write(UI_TEXT["connected_destinations"] + ", ".join(MOON_DESTINATIONS.keys()))
         st.write(UI_TEXT["planned_destinations"] + ", ".join(PLANNED_DESTINATIONS))
         for feature in PLANNED_MISSION_FEATURES:
             st.write(f"- {feature}")
@@ -296,16 +310,25 @@ with st.spinner(UI_TEXT["earth_saturn_spinner"]):
         launch_window_end,
         leo_altitude_km,
     )
-    complete_mission = compute_earth_saturn_titan_mission(
-        traj["earth_saturn_leg"],
-        saturn_periapsis_radius_m=float(saturn_periapsis_radius_km) * 1_000.0,
-        saturn_periapsis_radius_provenance=(
-            "User-selected Saturn-centered radius; nominal value preserves the "
-            "PyKEP Saturn radius plus UI capture altitude."
-        ),
-        saturn_staging_radius_m=float(saturn_staging_radius_km) * 1_000.0,
-        titan_capture_altitude_m=float(titan_capture_altitude_km) * 1_000.0,
-    )
+
+if "earth_saturn_leg" not in traj:
+    st.warning(traj.get("note", UI_TEXT["destination_not_implemented"]))
+    st.stop()
+
+if selected_moon is None:
+    st.info(UI_TEXT["direct_arrival_only_note"])
+    st.stop()
+
+complete_mission = compute_earth_saturn_titan_mission(
+    traj["earth_saturn_leg"],
+    saturn_periapsis_radius_m=float(saturn_periapsis_radius_km) * 1_000.0,
+    saturn_periapsis_radius_provenance=(
+        "User-selected Saturn-centered radius; nominal value preserves the "
+        "PyKEP Saturn radius plus UI capture altitude."
+    ),
+    saturn_staging_radius_m=float(saturn_staging_radius_km) * 1_000.0,
+    titan_capture_altitude_m=float(titan_capture_altitude_km) * 1_000.0,
+)
 
 staging_result = complete_mission.saturn_arrival_staging
 titan_transfer = complete_mission.saturn_titan_transfer
