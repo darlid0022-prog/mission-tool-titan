@@ -14,27 +14,16 @@ METHOD = "hohmann_circular_coplanar"
 
 
 @dataclass(frozen=True)
-class StagingRadiusGuard:
-    """Optional body-specific lower bound for the departure staging radius."""
-
-    minimum_radius_m: float
-    description: str
-
-
-@dataclass(frozen=True)
-class MoonCaptureAltitudeGuard:
-    """Optional body-specific lower bound for the moon capture altitude."""
-
-    minimum_altitude_m: float
-    description: str
-
-
-@dataclass(frozen=True)
 class ParentMoonTransferResult:
-    """Typed result shared by parent-to-moon transfer studies for any pair."""
+    """Typed result shared by parent-to-moon transfer studies for any pair.
 
-    parent_body: str
-    moon_body: str
+    Field names deliberately mirror the original SaturnTitanTransferResult
+    (`origin`/`destination` rather than `parent_body`/`moon_body`) so this
+    generic engine is a drop-in physics core for that facade.
+    """
+
+    origin: str
+    destination: str
     method: str
     source: str
     parent_staging_radius_m: float
@@ -84,15 +73,15 @@ def compute_parent_to_moon_transfer(
     moon_orbit_radius_m: float,
     moon_capture_altitude_m: float,
     source: str,
-    staging_radius_guard: StagingRadiusGuard | None = None,
-    moon_capture_altitude_guard: MoonCaptureAltitudeGuard | None = None,
 ) -> ParentMoonTransferResult:
     """Compute a first-order circular, coplanar Hohmann parent-to-moon transfer.
 
-    All inputs and outputs use SI units. The two-body Hohmann-transfer equations
-    are body agnostic; body-specific geometry or environmental constraints
-    (ring guards, non-atmospheric capture-altitude guards, ...) are supplied as
-    optional guards rather than hard-coded into the physics.
+    All inputs and outputs use SI units. This is the bare two-body physics
+    core: it performs only basic type/finiteness/positivity validation.
+    Body-specific geometry or environmental constraints (ring guards,
+    non-atmospheric capture-altitude guards, ...) are the caller's
+    responsibility - see mission/moon_transfer.py's Saturn/Titan facade for
+    an example that validates those before calling this function.
     """
     parent = _require_non_empty_string("parent_body", parent_body)
     moon = _require_non_empty_string("moon_body", moon_body)
@@ -110,55 +99,14 @@ def compute_parent_to_moon_transfer(
         raise ValueError("moon_mu_m3_s2 must be positive.")
     if moon_radius <= 0.0:
         raise ValueError("moon_radius_m must be positive.")
+    if r_1 <= 0.0:
+        raise ValueError("parent_staging_radius_m must be positive.")
     if r_2 <= 0.0:
         raise ValueError("moon_orbit_radius_m must be positive.")
     if capture_altitude < 0.0:
         raise ValueError("moon_capture_altitude_m must be non-negative.")
-
-    if staging_radius_guard is not None:
-        if not isinstance(staging_radius_guard, StagingRadiusGuard):
-            raise TypeError("staging_radius_guard must be a StagingRadiusGuard or None.")
-        minimum_staging_radius = _require_finite_number(
-            "staging_radius_guard.minimum_radius_m",
-            staging_radius_guard.minimum_radius_m,
-        )
-        guard_description = _require_non_empty_string(
-            "staging_radius_guard.description",
-            staging_radius_guard.description,
-        )
-        if minimum_staging_radius <= 0.0:
-            raise ValueError("staging_radius_guard.minimum_radius_m must be positive.")
-        if r_1 <= minimum_staging_radius:
-            raise ValueError(
-                "parent_staging_radius_m must be greater than "
-                f"{guard_description} ({minimum_staging_radius:.0f} m)."
-            )
-    elif r_1 <= 0.0:
-        raise ValueError("parent_staging_radius_m must be positive.")
-
     if r_1 >= r_2:
         raise ValueError(f"parent_staging_radius_m must be less than {moon}'s mean orbital radius.")
-
-    if moon_capture_altitude_guard is not None:
-        if not isinstance(moon_capture_altitude_guard, MoonCaptureAltitudeGuard):
-            raise TypeError(
-                "moon_capture_altitude_guard must be a MoonCaptureAltitudeGuard or None."
-            )
-        minimum_altitude = _require_finite_number(
-            "moon_capture_altitude_guard.minimum_altitude_m",
-            moon_capture_altitude_guard.minimum_altitude_m,
-        )
-        altitude_guard_description = _require_non_empty_string(
-            "moon_capture_altitude_guard.description",
-            moon_capture_altitude_guard.description,
-        )
-        if minimum_altitude < 0.0:
-            raise ValueError("moon_capture_altitude_guard.minimum_altitude_m must be non-negative.")
-        if capture_altitude < minimum_altitude:
-            raise ValueError(
-                "moon_capture_altitude_m must be at least "
-                f"{altitude_guard_description} ({minimum_altitude:.0f} m)."
-            )
 
     transfer_semimajor_axis = (r_1 + r_2) / 2.0
 
@@ -177,8 +125,8 @@ def compute_parent_to_moon_transfer(
     total_delta_v = departure_delta_v + capture_delta_v
 
     return ParentMoonTransferResult(
-        parent_body=parent,
-        moon_body=moon,
+        origin=parent,
+        destination=moon,
         method=METHOD,
         source=source_name,
         parent_staging_radius_m=r_1,
@@ -231,32 +179,30 @@ def adapt_parent_moon_transfer_to_leg(
         delta_v=result.total_delta_v_m_s,
         method=result.method,
         notes=(
-            f"{result.source}; {result.moon_body} v-infinity remains distinct from "
+            f"{result.source}; {result.destination} v-infinity remains distinct from "
             "propulsive delta-v."
         ),
     )
     events = [
         Event(
-            name=f"{result.parent_body} staging departure",
-            body=result.parent_body,
+            name=f"{result.origin} staging departure",
+            body=result.origin,
             event_type="departure",
             epoch=departure_epoch,
-            notes=f"Impulsive departure from the circular {result.parent_body} staging orbit.",
+            notes=f"Impulsive departure from the circular {result.origin} staging orbit.",
         ),
         Event(
-            name=f"{result.moon_body} capture",
-            body=result.moon_body,
+            name=f"{result.destination} capture",
+            body=result.destination,
             event_type="capture",
             epoch=arrival_epoch,
-            notes=f"Impulsive fully propulsive circular capture at {result.moon_body}.",
+            notes=f"Impulsive fully propulsive circular capture at {result.destination}.",
         ),
     ]
     return Leg(
-        origin=result.parent_body,
-        destination=result.moon_body,
+        origin=result.origin,
+        destination=result.destination,
         trajectory=trajectory,
         events=events,
-        notes=(
-            f"Preliminary circular, coplanar {result.parent_body}-to-{result.moon_body} transfer."
-        ),
+        notes=(f"Preliminary circular, coplanar {result.origin}-to-{result.destination} transfer."),
     )

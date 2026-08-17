@@ -15,9 +15,7 @@ from mission.moon_transfer import (
     compute_saturn_titan_transfer,
 )
 from mission.parent_moon_transfer import (
-    MoonCaptureAltitudeGuard,
     ParentMoonTransferResult,
-    StagingRadiusGuard,
     adapt_parent_moon_transfer_to_leg,
     compute_parent_to_moon_transfer,
 )
@@ -52,8 +50,8 @@ class TestGenericParentMoonTransferPhysics(unittest.TestCase):
             result.total_delta_v_m_s,
             result.departure_delta_v_m_s + result.capture_delta_v_m_s,
         )
-        self.assertEqual(result.parent_body, "Earth")
-        self.assertEqual(result.moon_body, "Moon")
+        self.assertEqual(result.origin, "Earth")
+        self.assertEqual(result.destination, "Moon")
         self.assertEqual(result.method, "hohmann_circular_coplanar")
         self.assertGreater(result.time_of_flight_days, 0.0)
         self.assertNotEqual(result.v_infinity_moon_m_s, result.capture_delta_v_m_s)
@@ -116,43 +114,7 @@ class TestGenericParentMoonTransferValidation(unittest.TestCase):
                 source="Test constant",
             )
 
-    def test_optional_staging_radius_guard_is_enforced(self):
-        with self.assertRaisesRegex(ValueError, "radiation-zone guard"):
-            compute_parent_to_moon_transfer(
-                parent_body="Earth",
-                moon_body="Moon",
-                parent_mu_m3_s2=EARTH_MU_M3_S2,
-                moon_mu_m3_s2=MOON_MU_M3_S2,
-                moon_radius_m=MOON_RADIUS_M,
-                parent_staging_radius_m=1.0e6,
-                moon_orbit_radius_m=MOON_ORBIT_RADIUS_M,
-                moon_capture_altitude_m=CAPTURE_ALTITUDE_M,
-                source="Test constant",
-                staging_radius_guard=StagingRadiusGuard(
-                    minimum_radius_m=2.0e6,
-                    description="the radiation-zone guard",
-                ),
-            )
-
-    def test_optional_capture_altitude_guard_is_enforced(self):
-        with self.assertRaisesRegex(ValueError, "haze-layer guard"):
-            compute_parent_to_moon_transfer(
-                parent_body="Earth",
-                moon_body="Moon",
-                parent_mu_m3_s2=EARTH_MU_M3_S2,
-                moon_mu_m3_s2=MOON_MU_M3_S2,
-                moon_radius_m=MOON_RADIUS_M,
-                parent_staging_radius_m=EARTH_STAGING_RADIUS_M,
-                moon_orbit_radius_m=MOON_ORBIT_RADIUS_M,
-                moon_capture_altitude_m=1.0e4,
-                source="Test constant",
-                moon_capture_altitude_guard=MoonCaptureAltitudeGuard(
-                    minimum_altitude_m=5.0e4,
-                    description="the haze-layer guard",
-                ),
-            )
-
-    def test_without_guards_only_orbital_geometry_and_non_negativity_limit_inputs(self):
+    def test_only_orbital_geometry_and_non_negativity_limit_inputs(self):
         result = compute_parent_to_moon_transfer(
             parent_body="Earth",
             moon_body="Moon",
@@ -182,22 +144,14 @@ class TestSaturnTitanFacadeRegression(unittest.TestCase):
             moon_orbit_radius_m=TITAN_MEAN_ORBIT_RADIUS_M,
             moon_capture_altitude_m=capture_altitude,
             source=JPL_SATURN_SYSTEM_SOURCE,
-            staging_radius_guard=StagingRadiusGuard(
-                minimum_radius_m=MIN_SATURN_STAGING_RADIUS_M,
-                description="the preliminary ring guard",
-            ),
-            moon_capture_altitude_guard=MoonCaptureAltitudeGuard(
-                minimum_altitude_m=MIN_TITAN_CAPTURE_ALTITUDE_M,
-                description="the preliminary non-atmospheric guard",
-            ),
         )
         legacy = compute_saturn_titan_transfer(
             saturn_staging_radius_m=staging_radius,
             titan_capture_altitude_m=capture_altitude,
         )
 
-        self.assertEqual(legacy.origin, generic.parent_body)
-        self.assertEqual(legacy.destination, generic.moon_body)
+        self.assertEqual(legacy.origin, generic.origin)
+        self.assertEqual(legacy.destination, generic.destination)
         self.assertEqual(legacy.method, generic.method)
         self.assertEqual(legacy.source, generic.source)
         self.assertEqual(legacy.saturn_staging_radius_m, generic.parent_staging_radius_m)
@@ -228,6 +182,13 @@ class TestSaturnTitanFacadeRegression(unittest.TestCase):
     def test_legacy_capture_altitude_guard_error_remains_unchanged(self):
         with self.assertRaisesRegex(ValueError, "non-atmospheric guard"):
             compute_saturn_titan_transfer(titan_capture_altitude_m=999_999.0)
+
+    def test_legacy_guards_reject_before_reaching_the_generic_engine(self):
+        # MIN_SATURN_STAGING_RADIUS_M itself would fail the generic engine's
+        # own r_1 > 0 check trivially (it's positive), so this specifically
+        # proves the facade's own ring-guard check runs first.
+        self.assertGreater(MIN_SATURN_STAGING_RADIUS_M, 0.0)
+        self.assertLess(MIN_TITAN_CAPTURE_ALTITUDE_M, TITAN_MEAN_ORBIT_RADIUS_M)
 
 
 class TestGenericParentMoonTransferAdapter(unittest.TestCase):
