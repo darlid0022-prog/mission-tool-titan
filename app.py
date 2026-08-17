@@ -25,6 +25,11 @@ pages = [
         icon=":material/tune:",
         default=True,
     ),
+    st.Page(
+        "pages/trajectory_3d.py",
+        title="3D trajectory",
+        icon=":material/3d_rotation:",
+    ),
 ]
 
 navigation = st.navigation(pages)

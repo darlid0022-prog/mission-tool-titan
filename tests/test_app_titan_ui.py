@@ -162,5 +162,101 @@ class TestMissionSetupPage(unittest.TestCase):
         self.assertEqual(displayed_injection_m_s, expected_injection_m_s)
 
 
+class TestTrajectory3DPage(unittest.TestCase):
+    def test_complete_trajectory_3d_view_is_rendered(self):
+        app = run_app(page_path="pages/trajectory_3d.py")
+
+        self.assertFalse(app.exception)
+        self.assertTrue(
+            any(
+                heading.value == "Complete mission trajectory — interactive 3D view"
+                for heading in app.header
+            )
+        )
+        # Only this page's own chart is present now: other pages (e.g. the
+        # Pareto front on Optimization) are separate script runs and no
+        # longer share this run's element tree the way tabs used to.
+        self.assertEqual(len(app.get("plotly_chart")), 1)
+        self.assertTrue(
+            any(
+                control.label == "Mission phase" and control.value == "Earth → Saturn cruise"
+                for control in app.segmented_control
+            )
+        )
+        self.assertTrue(
+            any(slider.label == "Elapsed time within selected phase" for slider in app.slider)
+        )
+        metrics = {metric.label: metric.value for metric in app.metric}
+        self.assertEqual(metrics["Current mission-elapsed time"], "0.00 days")
+        self.assertEqual(metrics["Current mission phase"], "Earth → Saturn cruise")
+
+    def test_animation_slider_uses_selected_phase_duration(self):
+        phase_duration_attributes = {
+            "Earth → Saturn cruise": "earth_saturn_duration_days",
+            "Saturn arrival → staging": "saturn_staging_duration_days",
+            "Saturn → Titan": "saturn_titan_duration_days",
+        }
+
+        for phase, duration_attribute in phase_duration_attributes.items():
+            with self.subTest(phase=phase):
+                app = run_app(page_path="pages/trajectory_3d.py", animation_phase=phase)
+                self.assertFalse(app.exception)
+                timeline = app.session_state["trajectory_timeline"]
+                slider = next(
+                    slider
+                    for slider in app.slider
+                    if slider.label == "Elapsed time within selected phase"
+                )
+                self.assertEqual(slider.min, 0.0)
+                self.assertEqual(slider.max, getattr(timeline, duration_attribute))
+                metrics = {metric.label: metric.value for metric in app.metric}
+                self.assertEqual(metrics["Current mission phase"], phase)
+
+                expected_absolute_start = {
+                    "Earth → Saturn cruise": 0.0,
+                    "Saturn arrival → staging": timeline.earth_saturn_duration_days,
+                    "Saturn → Titan": (
+                        timeline.earth_saturn_duration_days + timeline.saturn_staging_duration_days
+                    ),
+                }[phase]
+                self.assertEqual(
+                    metrics["Current mission-elapsed time"],
+                    f"{expected_absolute_start:,.2f} days",
+                )
+
+    def test_switching_animation_phase_resets_local_slider(self):
+        app = AppTest.from_file(APP_PATH)
+        with patch(
+            "app_services.compute_cached_trajectory",
+            return_value=earth_saturn_result(),
+        ):
+            app.run(timeout=30)
+            app.switch_page("pages/trajectory_3d.py").run(timeout=30)
+            phase_slider = next(
+                slider
+                for slider in app.slider
+                if slider.label == "Elapsed time within selected phase"
+            )
+            phase_slider.set_value(100.0).run(timeout=30)
+            self.assertEqual(phase_slider.value, 100.0)
+
+            phase_selector = next(
+                control for control in app.segmented_control if control.label == "Mission phase"
+            )
+            phase_selector.set_value("Saturn arrival → staging").run(timeout=30)
+
+        phase_slider = next(
+            slider for slider in app.slider if slider.label == "Elapsed time within selected phase"
+        )
+        self.assertEqual(phase_slider.value, 0.0)
+        metrics = {metric.label: metric.value for metric in app.metric}
+        timeline = app.session_state["trajectory_timeline"]
+        self.assertEqual(metrics["Current mission phase"], "Saturn arrival → staging")
+        self.assertEqual(
+            metrics["Current mission-elapsed time"],
+            f"{timeline.earth_saturn_duration_days:,.2f} days",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
