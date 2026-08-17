@@ -30,8 +30,8 @@ class TestSaturnTitanUi(unittest.TestCase):
         )
 
     @staticmethod
-    def _run_app():
-        earth_saturn_result = {
+    def _earth_saturn_result():
+        return {
             "note": "Test Earth-to-Saturn result",
             "dv_budget": {
                 "dV from LEO": 1_000.0,
@@ -41,8 +41,18 @@ class TestSaturnTitanUi(unittest.TestCase):
             "dv_total": 1_000.0,
             "earth_saturn_leg": TestSaturnTitanUi._earth_saturn_leg(),
         }
-        with patch("app_services.compute_cached_trajectory", return_value=earth_saturn_result):
-            return AppTest.from_file(APP_PATH).run(timeout=30)
+
+    @staticmethod
+    def _run_app(animation_phase=None):
+        app = AppTest.from_file(APP_PATH)
+        if animation_phase is not None:
+            app.session_state["mission_animation_phase"] = animation_phase
+            app.session_state["mission_phase_elapsed_days"] = 0.0
+        with patch(
+            "app_services.compute_cached_trajectory",
+            return_value=TestSaturnTitanUi._earth_saturn_result(),
+        ):
+            return app.run(timeout=30)
 
     def test_preliminary_section_displays_nominal_results_and_source(self):
         app = self._run_app()
@@ -136,13 +146,87 @@ class TestSaturnTitanUi(unittest.TestCase):
             )
         )
         self.assertEqual(len(app.get("plotly_chart")), 1)
-        self.assertTrue(any(slider.label == "Mission elapsed time" for slider in app.slider))
+        self.assertTrue(
+            any(
+                control.label == "Mission phase" and control.value == "Earth → Saturn cruise"
+                for control in app.segmented_control
+            )
+        )
+        self.assertTrue(
+            any(slider.label == "Elapsed time within selected phase" for slider in app.slider)
+        )
         metrics = {metric.label: metric.value for metric in app.metric}
         self.assertEqual(metrics["Current mission-elapsed time"], "0.00 days")
-        self.assertEqual(metrics["Current mission phase"], "Earth → Saturn transfer")
+        self.assertEqual(metrics["Current mission phase"], "Earth → Saturn cruise")
         date_inputs = {date_input.label: date_input.value for date_input in app.date_input}
         self.assertEqual(date_inputs[UI_TEXT["launch_start"]], DEFAULT_LAUNCH_WINDOW_START)
         self.assertEqual(date_inputs[UI_TEXT["launch_end"]], DEFAULT_LAUNCH_WINDOW_END)
+
+    def test_animation_slider_uses_selected_phase_duration(self):
+        phase_duration_attributes = {
+            "Earth → Saturn cruise": "earth_saturn_duration_days",
+            "Saturn arrival → staging": "saturn_staging_duration_days",
+            "Saturn → Titan": "saturn_titan_duration_days",
+        }
+
+        for phase, duration_attribute in phase_duration_attributes.items():
+            with self.subTest(phase=phase):
+                app = self._run_app(phase)
+                self.assertFalse(app.exception)
+                timeline = app.session_state["trajectory_timeline"]
+                slider = next(
+                    slider
+                    for slider in app.slider
+                    if slider.label == "Elapsed time within selected phase"
+                )
+                self.assertEqual(slider.min, 0.0)
+                self.assertEqual(slider.max, getattr(timeline, duration_attribute))
+                metrics = {metric.label: metric.value for metric in app.metric}
+                self.assertEqual(metrics["Current mission phase"], phase)
+
+                expected_absolute_start = {
+                    "Earth → Saturn cruise": 0.0,
+                    "Saturn arrival → staging": timeline.earth_saturn_duration_days,
+                    "Saturn → Titan": (
+                        timeline.earth_saturn_duration_days + timeline.saturn_staging_duration_days
+                    ),
+                }[phase]
+                self.assertEqual(
+                    metrics["Current mission-elapsed time"],
+                    f"{expected_absolute_start:,.2f} days",
+                )
+
+    def test_switching_animation_phase_resets_local_slider(self):
+        app = AppTest.from_file(APP_PATH)
+        with patch(
+            "app_services.compute_cached_trajectory",
+            return_value=self._earth_saturn_result(),
+        ):
+            app.run(timeout=30)
+            phase_slider = next(
+                slider
+                for slider in app.slider
+                if slider.label == "Elapsed time within selected phase"
+            )
+            phase_slider.set_value(100.0).run(timeout=30)
+            self.assertEqual(phase_slider.value, 100.0)
+
+            phase_selector = next(
+                control for control in app.segmented_control if control.label == "Mission phase"
+            )
+            phase_selector.set_value("Saturn arrival → staging").run(timeout=30)
+
+        phase_slider = next(
+            slider for slider in app.slider if slider.label == "Elapsed time within selected phase"
+        )
+        self.assertEqual(phase_slider.value, 0.0)
+        metrics = {metric.label: metric.value for metric in app.metric}
+        timeline = app.session_state["trajectory_timeline"]
+        self.assertEqual(metrics["Current mission phase"], "Saturn arrival → staging")
+        self.assertEqual(
+            metrics["Current mission-elapsed time"],
+            f"{timeline.earth_saturn_duration_days:,.2f} days",
+        )
 
     def test_complete_budget_is_connected_to_mass_sizing_without_legacy_capture(self):
         mass_result = {

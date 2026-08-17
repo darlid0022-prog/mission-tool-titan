@@ -69,10 +69,14 @@ UI_TEXT: Final[dict[str, str]] = {
         "Saturn-centred panels use different reference frames and scales. Body sizes are not "
         "shown to scale."
     ),
-    "mission_elapsed_time": "Mission elapsed time",
-    "mission_elapsed_time_help": (
-        "Moves the spacecraft marker along pre-sampled trajectory points without rerunning "
-        "the orbital solver."
+    "mission_phase_selector": "Mission phase",
+    "mission_phase_selector_help": (
+        "Selects one mission phase and resets the spacecraft marker to that phase's start."
+    ),
+    "phase_elapsed_time": "Elapsed time within selected phase",
+    "phase_elapsed_time_help": (
+        "Moves the spacecraft marker within the selected phase using pre-sampled trajectory "
+        "points, without rerunning the orbital solver."
     ),
     "current_elapsed_time": "Current mission-elapsed time",
     "current_mission_phase": "Current mission phase",

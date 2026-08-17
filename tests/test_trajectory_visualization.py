@@ -145,13 +145,22 @@ class TestCompleteMissionVisualization(unittest.TestCase):
                 self.assertEqual(position.frame, expected_frame)
 
     def test_animated_figure_adds_one_marker_to_the_active_panel(self):
-        position = interpolate_spacecraft_position(self.timeline, 0.0)
-        figure = build_complete_mission_figure(self.scene, position)
+        earth_end = self.timeline.earth_saturn_duration_days
+        staging_end = earth_end + self.timeline.saturn_staging_duration_days
+        cases = (
+            (0.0, "scene"),
+            (earth_end, "scene2"),
+            (staging_end, "scene2"),
+        )
+        for elapsed_days, expected_scene in cases:
+            with self.subTest(elapsed_days=elapsed_days):
+                position = interpolate_spacecraft_position(self.timeline, elapsed_days)
+                figure = build_complete_mission_figure(self.scene, position)
 
-        self.assertEqual(len(figure.data), 13)
-        marker = figure.data[-1]
-        self.assertEqual(marker.name, "Spacecraft — current position")
-        self.assertEqual(marker.scene, "scene")
+                self.assertEqual(len(figure.data), 13)
+                marker = figure.data[-1]
+                self.assertEqual(marker.name, "Spacecraft — current position")
+                self.assertEqual(marker.scene, expected_scene)
 
 
 if __name__ == "__main__":
