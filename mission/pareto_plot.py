@@ -78,7 +78,7 @@ def _hover_template(title: str) -> str:
         f"<b>{title}</b><br>"
         "Connected delta-v: %{x:,.3f} m/s<br>"
         "Total mission duration: %{y:,.3f} days<br>"
-        "Wet mass: %{customdata[0]:,.3f} kg<br>"
+        "Simplified wet mass: %{customdata[0]:,.3f} kg<br>"
         "Earth → Saturn TOF: %{customdata[1]:,.3f} days<br>"
         "Earth departure date: %{customdata[2]}<br>"
         "Departure MJD2000: %{customdata[3]:,.6f}<extra></extra>"
@@ -126,7 +126,7 @@ def build_pareto_front_figure(result: ParetoSearchResult) -> go.Figure:
                 "colorscale": "Viridis",
                 "size": 10,
                 "opacity": 0.9,
-                "colorbar": {"title": "Wet mass<br>(kg)"},
+                "colorbar": {"title": "Simplified wet mass<br>(kg)"},
                 "line": {"color": "rgba(255,255,255,0.55)", "width": 1},
             },
             customdata=_custom_data(regular),

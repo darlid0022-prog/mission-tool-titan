@@ -4,8 +4,8 @@ from typing import Final
 
 UI_TEXT: Final[dict[str, str]] = {
     "app_caption": (
-        "Connected preliminary Earth → Saturn → Titan mission chain with an explicit "
-        "propulsive delta-v and mass budget."
+        "Deterministic first-order Earth → Saturn → Titan mission chain with explicit "
+        "propulsive delta-v, simplified mass sizing, and isolated feasibility studies."
     ),
     "architecture_header": "1. Mission architecture",
     "destination_label": "Interplanetary solver target",
@@ -34,40 +34,51 @@ UI_TEXT: Final[dict[str, str]] = {
     "propulsion_header": "3. Propulsion",
     "isp": "Main engine specific impulse (s)",
     "instruments_header": "4. Instruments",
-    "instruments_caption": "Add or edit rows directly in the table below.",
+    "instruments_caption": (
+        "The default aggregate science payload is 143.5 kg and 323 W. Add or edit rows "
+        "directly; a zero data rate means that no aggregate value is currently available."
+    ),
     "invalid_dates": "The end date must be on or after the start date.",
     "earth_saturn_spinner": "Calculating the Earth → Saturn trajectory…",
     "results_header": "Results (updated after calculation)",
     "complete_chain_note": (
-        "Connected preliminary Earth → Saturn → Titan budget. The legacy circular "
-        "Saturn-capture term is replaced by capture-to-ellipse and staging circularization."
+        "Connected first-order Earth → Saturn → Titan budget. The legacy circular "
+        "Saturn-capture term is replaced by the modeled capture-to-ellipse and staging "
+        "circularization burns."
     ),
-    "provisional_budget": "Preliminary delta-v budget",
+    "provisional_budget": "Connected propulsive delta-v budget",
     "budget_caption": (
-        "The displayed values include every currently modeled propulsive burn. DSM / "
-        "fly-by corrections remain zero because no such maneuver is modeled yet."
+        "The displayed values include every currently modeled propulsive burn. A zero for "
+        "DSM / fly-by corrections explicitly means that this architecture models no such "
+        "maneuver; it is not a missing numerical result."
     ),
+    "dsm_not_modeled": "DSM / fly-by corrections (not modeled)",
     "maneuver": "Maneuver",
     "value_m_s": "Value (m/s)",
     "dv_sum": "Sum of budgeted delta-v values",
     "mass_budget": "Mass budget",
     "mass_model_warning": (
-        "Preliminary sizing: dry mass currently scales from the instrument table and does not "
-        "yet represent a complete spacecraft bus."
+        "Simplified sizing model — does not couple propulsion hardware mass to propellant "
+        "mass. See the single-stage feasibility study below for the calibrated model's "
+        "conclusion on this mission's delta-v budget."
     ),
     "direct_warning": (
         "Direct mode still treats departure v∞ as a preliminary equivalent delta-v. "
         "The mass budget is not a launch-vehicle sizing result."
     ),
     "instrument_mass": "Instrument mass",
-    "dry_mass": "Dry mass",
-    "propellant_mass": "Propellant mass",
-    "wet_mass": "Total wet mass",
+    "dry_mass": "Simplified dry mass",
+    "propellant_mass": "Simplified propellant mass",
+    "wet_mass": "Simplified total wet mass",
     "pareto_header": "Connected mission trade space — Pareto front",
     "pareto_caption": (
         "The fixed 1,176-point study varies Earth departure date and Earth → Saturn time "
         "of flight. All 38 non-dominated points are shown; marker color reports wet mass, "
-        "which is not an independent objective while Isp and payload remain fixed."
+        "which is not an independent objective with the fixed 320 s Isp and 143.5 kg "
+        "aggregate payload. "
+        "This uses the simplified sizing model, which does not couple propulsion hardware "
+        "mass to propellant mass. See the single-stage feasibility study below for the "
+        "calibrated model's conclusion on this mission's delta-v budget."
     ),
     "pareto_spinner": "Loading the deterministic Pareto front…",
     "pareto_comparison": (
@@ -75,7 +86,7 @@ UI_TEXT: Final[dict[str, str]] = {
         "mission reference. Relative to the sampled minimum-delta-v point, it requires "
         "{delta_v_difference:.3f} m/s more (+{delta_v_percent:.2f}%), "
         "{duration_difference:.0f} more days (+{duration_percent:.2f}%), and "
-        "{mass_difference:.3f} kg more wet mass (+{mass_percent:.2f}%)."
+        "{mass_difference:.3f} kg more simplified wet mass (+{mass_percent:.2f}%)."
     ),
     "single_stage_feasibility_header": "Single-stage chemical feasibility — preliminary model",
     "single_stage_feasibility_caption": (
@@ -163,7 +174,8 @@ UI_TEXT: Final[dict[str, str]] = {
     "titan_edl_header": "Titan EDL — preliminary ballistic-entry model",
     "titan_edl_warning": (
         "Exploratory alternative only: this direct-entry study is not included in the "
-        "connected delta-v or mass budget and does not replace the validated circular-capture case."
+        "connected delta-v or mass budget and does not replace the connected circular-capture "
+        "reference case."
     ),
     "edl_incoming_v_infinity": "Incoming Titan-relative v∞",
     "edl_interface_altitude": "Atmospheric-interface altitude",

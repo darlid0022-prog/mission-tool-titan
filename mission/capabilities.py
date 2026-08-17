@@ -23,6 +23,6 @@ PLANNED_DESTINATIONS = (
 PLANNED_MISSION_FEATURES = (
     "High-fidelity Saturn to Titan trajectory",
     "Flyby and deep-space manoeuvres",
-    "Landing and atmospheric descent",
+    "High-fidelity Titan EDL and landing dynamics",
     "Final-orbit lowering",
 )

@@ -238,7 +238,9 @@ with col_inputs:
             "Cible": st.column_config.TextColumn("Target"),
             "Masse (kg)": st.column_config.NumberColumn("Mass (kg)", min_value=0.0),
             "Puissance (W)": st.column_config.NumberColumn("Power (W)", min_value=0.0),
-            "Débit (bps)": st.column_config.NumberColumn("Data rate (bps)", min_value=0.0),
+            "Débit (bps)": st.column_config.NumberColumn(
+                "Data rate (bps; 0 = not available)", min_value=0.0
+            ),
         },
     )
 
@@ -303,6 +305,10 @@ with col_results:
     st.subheader(UI_TEXT["provisional_budget"])
     st.caption(UI_TEXT["budget_caption"])
     displayed_dv_rows = list(complete_dv_budget.as_dict().items())
+    displayed_dv_rows[1] = (
+        UI_TEXT["dsm_not_modeled"],
+        displayed_dv_rows[1][1],
+    )
     if departure_type == "Direct":
         displayed_dv_rows[0] = (
             UI_TEXT["direct_departure_value"],
@@ -321,9 +327,9 @@ with col_results:
         st.warning(UI_TEXT["direct_warning"])
     if mass_ratio > 20:
         st.warning(
-            f"Estimated mass ratio: {mass_ratio:,.0f}. Chemical propulsion at "
-            f"{isp_s:.0f} s is unrealistic for this delta-v budget without a "
-            "multi-stage architecture."
+            f"Simplified mass ratio: {mass_ratio:,.0f}. This indicates that one "
+            f"non-discarding chemical stage at {isp_s:.0f} s is unsuitable for the modeled "
+            "delta-v; see the calibrated feasibility study below."
         )
     c1, c2, c3, c4 = st.columns(4)
     c1.metric(UI_TEXT["instrument_mass"], f"{mass['instrument_mass_kg']:.1f} kg")

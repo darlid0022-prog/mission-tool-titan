@@ -43,7 +43,7 @@ class TestParetoFrontFigure(unittest.TestCase):
             with self.subTest(trace=trace.name):
                 self.assertIn("Connected delta-v", trace.hovertemplate)
                 self.assertIn("Total mission duration", trace.hovertemplate)
-                self.assertIn("Wet mass", trace.hovertemplate)
+                self.assertIn("Simplified wet mass", trace.hovertemplate)
                 self.assertIn("Earth → Saturn TOF", trace.hovertemplate)
                 self.assertIn("Earth departure date", trace.hovertemplate)
                 self.assertEqual(len(trace.customdata), len(trace.x))

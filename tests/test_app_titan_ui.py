@@ -99,14 +99,18 @@ class TestSaturnTitanUi(unittest.TestCase):
         self.assertFalse(app.exception)
         metrics = {metric.label: metric.value for metric in app.metric}
         self.assertEqual(metrics["Sum of budgeted delta-v values"], "9903 m/s")
-        for label in ("Dry mass", "Propellant mass", "Total wet mass"):
+        for label in (
+            "Simplified dry mass",
+            "Simplified propellant mass",
+            "Simplified total wet mass",
+        ):
             self.assertNotEqual(metrics[label], "0.0 kg", msg=label)
         self.assertFalse(
             any(widget.label == "Saturn capture altitude (km)" for widget in app.number_input)
         )
         self.assertTrue(
             any(
-                "does not yet represent a complete spacecraft bus" in warning.value
+                "does not couple propulsion hardware mass to propellant mass" in warning.value
                 for warning in app.warning
             )
         )

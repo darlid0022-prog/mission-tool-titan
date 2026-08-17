@@ -23,7 +23,7 @@ class TestAppCapabilities(unittest.TestCase):
 
     def test_unimplemented_mission_features_are_declared_as_planned(self):
         self.assertIn("High-fidelity Saturn to Titan trajectory", PLANNED_MISSION_FEATURES)
-        self.assertIn("Landing and atmospheric descent", PLANNED_MISSION_FEATURES)
+        self.assertIn("High-fidelity Titan EDL and landing dynamics", PLANNED_MISSION_FEATURES)
 
 
 if __name__ == "__main__":
