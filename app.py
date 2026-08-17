@@ -30,6 +30,11 @@ pages = [
         title="3D trajectory",
         icon=":material/3d_rotation:",
     ),
+    st.Page(
+        "pages/saturn_system_studies.py",
+        title="Saturn & Titan studies",
+        icon=":material/public:",
+    ),
 ]
 
 navigation = st.navigation(pages)

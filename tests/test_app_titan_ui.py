@@ -258,5 +258,69 @@ class TestTrajectory3DPage(unittest.TestCase):
         )
 
 
+class TestSaturnSystemStudiesPage(unittest.TestCase):
+    def test_arrival_to_staging_section_displays_nominal_results_and_ring_status(self):
+        app = run_app(page_path="pages/saturn_system_studies.py")
+
+        self.assertFalse(app.exception)
+        self.assertTrue(
+            any(
+                heading.value == "Saturn arrival → staging orbit — preliminary model"
+                for heading in app.header
+            )
+        )
+        metrics = {metric.label: metric.value for metric in app.metric}
+        self.assertEqual(metrics["Capture-to-ellipse delta-v"], "2,280.8 m/s")
+        self.assertEqual(metrics["Staging circularization delta-v"], "4,501.6 m/s")
+        self.assertEqual(metrics["Arrival-to-staging total delta-v"], "6,782.4 m/s")
+        self.assertEqual(metrics["Periapsis-to-apoapsis time"], "1.125 days")
+        self.assertEqual(metrics["Periapsis below D-ring inner edge"], "4,570 km")
+        self.assertEqual(metrics["Staging orbit beyond E-ring edge"], "+118,000 km")
+        self.assertTrue(
+            any(
+                "Planet–ring corridor at periapsis" in warning.value
+                and "Cassini's 2017 Grand Finale" in warning.value
+                and "three-dimensional ring-plane geometry" in warning.value
+                for warning in app.warning
+            )
+        )
+
+    def test_preliminary_section_displays_nominal_results_and_source(self):
+        app = run_app(page_path="pages/saturn_system_studies.py")
+
+        self.assertFalse(app.exception)
+        self.assertTrue(
+            any(heading.value == "Saturn → Titan — preliminary model" for heading in app.header)
+        )
+        metrics = {metric.label: metric.value for metric in app.metric}
+        self.assertEqual(metrics["Departure delta-v from staging orbit"], "1,257.6 m/s")
+        self.assertEqual(metrics["Titan-relative v∞ (non-propulsive)"], "1,049.8 m/s")
+        self.assertEqual(metrics["Titan capture delta-v"], "862.7 m/s")
+        self.assertEqual(metrics["Saturn → Titan modeled delta-v"], "2,120.3 m/s")
+        self.assertEqual(metrics["Saturn → Titan time of flight"], "5.133 days")
+        self.assertTrue(any("JPL SAT441" in caption.value for caption in app.caption))
+
+    def test_isolated_titan_edl_section_displays_direct_entry_without_budget_change(self):
+        app = run_app(page_path="pages/saturn_system_studies.py")
+
+        self.assertFalse(app.exception)
+        self.assertTrue(
+            any(
+                heading.value == "Titan EDL — preliminary ballistic-entry model"
+                for heading in app.header
+            )
+        )
+        metrics = {metric.label: metric.value for metric in app.metric}
+        self.assertEqual(metrics["Atmospheric-interface entry velocity"], "2,402.6 m/s")
+        self.assertEqual(metrics["Estimated deployment altitude"], "151.2 km")
+        self.assertEqual(metrics["Avoided circular-capture burn"], "862.7 m/s")
+        self.assertTrue(
+            any(
+                "not included in the connected delta-v or mass budget" in warning.value
+                for warning in app.warning
+            )
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
