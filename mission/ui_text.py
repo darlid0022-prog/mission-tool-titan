@@ -77,6 +77,23 @@ UI_TEXT: Final[dict[str, str]] = {
         "{duration_difference:.0f} more days (+{duration_percent:.2f}%), and "
         "{mass_difference:.3f} kg more wet mass (+{mass_percent:.2f}%)."
     ),
+    "single_stage_feasibility_header": "Single-stage chemical feasibility — preliminary model",
+    "single_stage_feasibility_caption": (
+        "This isolated Hesperos-calibrated study tests one non-discarding chemical stage. "
+        "It is not merged into the connected delta-v, mass budget, or Pareto objectives."
+    ),
+    "single_stage_required_delta_v": "Required connected delta-v",
+    "single_stage_maximum_delta_v": "Maximum feasible single-stage delta-v",
+    "single_stage_threshold_factor": "Required / feasible threshold",
+    "single_stage_feasible": "The calibrated single-stage mass solution converges.",
+    "single_stage_infeasible_finding": (
+        "The calibrated model confirms that this delta-v budget is not feasible with one "
+        "non-discarding chemical stage. The mission requires a multi-stage or discardable-stage "
+        "architecture, a delta-v reduction strategy such as Cassini-Huygens-style VVEJGA gravity "
+        "assists, or both. This is a model finding, not an application error. Multi-stage sizing "
+        "is outside the current scope."
+    ),
+    "single_stage_model_source": "Calibrated mass-model version: {model_version}.",
     "trajectory_3d_header": "Complete mission trajectory — interactive 3D view",
     "trajectory_3d_caption": (
         "Drag to rotate, scroll to zoom, and double-click to reset. The heliocentric and "

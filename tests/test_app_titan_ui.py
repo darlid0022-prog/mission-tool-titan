@@ -214,6 +214,27 @@ class TestSaturnTitanUi(unittest.TestCase):
             delta=1e-9,
         )
 
+    def test_single_stage_feasibility_is_displayed_as_a_finding_without_crashing(self):
+        app = self._run_app()
+
+        self.assertFalse(app.exception)
+        self.assertTrue(
+            any(
+                heading.value == "Single-stage chemical feasibility — preliminary model"
+                for heading in app.header
+            )
+        )
+        metrics = {metric.label: metric.value for metric in app.metric}
+        self.assertEqual(metrics["Required connected delta-v"], "9,902.655 m/s")
+        self.assertEqual(metrics["Maximum feasible single-stage delta-v"], "3,833.463 m/s")
+        self.assertEqual(metrics["Required / feasible threshold"], "2.583×")
+        self.assertTrue(
+            any(
+                "This is a model finding, not an application error" in info.value
+                for info in app.info
+            )
+        )
+
     def test_animation_slider_uses_selected_phase_duration(self):
         phase_duration_attributes = {
             "Earth → Saturn cruise": "earth_saturn_duration_days",

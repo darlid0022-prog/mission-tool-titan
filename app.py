@@ -20,7 +20,9 @@ from mission.capabilities import (
     SUPPORTED_DESTINATIONS,
 )
 from mission.dv_budget import compose_complete_dv_budget
+from mission.feasibility_check import evaluate_single_stage_chemical_feasibility
 from mission.full_mission import compute_earth_saturn_titan_mission
+from mission.mass_model import PayloadItem
 from mission.pareto_plot import build_pareto_front_figure, select_pareto_highlights
 from mission.sizing import compute_mass_budget
 from mission.titan_edl import compute_titan_edl
@@ -278,6 +280,21 @@ complete_dv_budget = compose_complete_dv_budget(
 dv_total = complete_dv_budget.total_m_s
 mass = compute_mass_budget(dv_total, isp_s, instruments_df)
 mass_ratio = mass["wet_mass_kg"] / mass["dry_mass_kg"] if mass["dry_mass_kg"] > 0 else 1.0
+payload_items = tuple(
+    PayloadItem(
+        name=(str(row["Instrument"]).strip() or f"Payload item {index + 1}"),
+        mass_kg=float(row["Masse (kg)"]),
+        max_power_w=float(row["Puissance (W)"]),
+        data_rate_bps=float(row["Débit (bps)"]),
+    )
+    for index, (_, row) in enumerate(instruments_df.fillna(0.0).iterrows())
+)
+single_stage_feasibility = evaluate_single_stage_chemical_feasibility(
+    dv_total,
+    float(isp_s),
+    payload_items,
+)
+
 
 with col_results:
     st.header(UI_TEXT["results_header"])
@@ -341,6 +358,32 @@ with st.container(border=True):
             duration_percent=duration_percent,
             mass_difference=baseline.wet_mass_kg - optimum.wet_mass_kg,
             mass_percent=mass_percent,
+        )
+    )
+
+st.header(UI_TEXT["single_stage_feasibility_header"])
+st.caption(UI_TEXT["single_stage_feasibility_caption"])
+with st.container(border=True):
+    f1, f2, f3 = st.columns(3)
+    f1.metric(
+        UI_TEXT["single_stage_required_delta_v"],
+        f"{single_stage_feasibility.required_delta_v_m_s:,.3f} m/s",
+    )
+    f2.metric(
+        UI_TEXT["single_stage_maximum_delta_v"],
+        f"{single_stage_feasibility.maximum_feasible_delta_v_m_s:,.3f} m/s",
+    )
+    f3.metric(
+        UI_TEXT["single_stage_threshold_factor"],
+        f"{single_stage_feasibility.threshold_exceedance_factor:.3f}×",
+    )
+    if single_stage_feasibility.is_feasible:
+        st.success(UI_TEXT["single_stage_feasible"])
+    else:
+        st.info(UI_TEXT["single_stage_infeasible_finding"])
+    st.caption(
+        UI_TEXT["single_stage_model_source"].format(
+            model_version=single_stage_feasibility.model_version
         )
     )
 
