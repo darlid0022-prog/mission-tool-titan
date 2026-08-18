@@ -28,14 +28,16 @@ CANDIDATE_TABLE_COLUMNS = (
     "Launch time (UTC)",
     "Saturn arrival (UTC)",
     "Scenario end (UTC)",
-    "Time of flight (days)",
-    "Time of flight (years)",
+    "Earth → Saturn flight time (days)",
+    "Earth → Saturn flight time (years)",
+    "Total reference-scenario duration (days)",
+    "Total reference-scenario duration (years)",
     "C3 (km²/s²)",
     "v∞ Earth (m/s)",
     "v∞ Saturn (m/s)",
-    "Delta-v departure (m/s)",
+    "Earth departure Δv (m/s)",
     "Delta-v capture (m/s)",
-    "Delta-v Titan circularization (m/s)",
+    "Saturn-centered circularization Δv (m/s)",
     "Delta-v total (m/s)",
 )
 
@@ -79,14 +81,16 @@ def build_candidates_dataframe(
             "Scenario end (UTC)": candidate.scenario_end_datetime.astimezone(
                 timezone.utc
             ).isoformat(timespec="minutes"),
-            "Time of flight (days)": candidate.time_of_flight_days,
-            "Time of flight (years)": candidate.time_of_flight_years,
+            "Earth → Saturn flight time (days)": candidate.time_of_flight_days,
+            "Earth → Saturn flight time (years)": candidate.time_of_flight_years,
+            "Total reference-scenario duration (days)": candidate.total_duration_days,
+            "Total reference-scenario duration (years)": candidate.total_duration_years,
             "C3 (km²/s²)": candidate.c3_km2_s2,
             "v∞ Earth (m/s)": candidate.v_infinity_earth_m_s,
             "v∞ Saturn (m/s)": candidate.v_infinity_saturn_m_s,
-            "Delta-v departure (m/s)": candidate.delta_v_departure_m_s,
+            "Earth departure Δv (m/s)": candidate.delta_v_departure_m_s,
             "Delta-v capture (m/s)": candidate.delta_v_capture_m_s,
-            "Delta-v Titan circularization (m/s)": candidate.delta_v_titan_circularization_m_s,
+            "Saturn-centered circularization Δv (m/s)": candidate.delta_v_titan_circularization_m_s,
             "Delta-v total (m/s)": candidate.delta_v_total_m_s,
         }
         for candidate in candidates
@@ -100,11 +104,17 @@ def build_candidates_chart(
     selected_rank: int | None,
     pareto_candidate_ranks: tuple[int, ...] | None = None,
 ) -> go.Figure:
-    """Delta-v total (y) vs time of flight (x): one axis per physical
-    quantity (never a dual y-axis), a single neutral hue for ordinary
-    candidates, and the selected candidate picked out with a distinct
-    highlight marker - the same highlight pattern already used for the
-    connected-mission Pareto front (mission/pareto_plot.py).
+    """Delta-v total (y) vs Earth -> Saturn flight time (x): one axis per
+    physical quantity (never a dual y-axis), a single neutral hue for
+    ordinary candidates, and the selected candidate picked out with a
+    distinct highlight marker - the same highlight pattern already used for
+    the connected-mission Pareto front (mission/pareto_plot.py).
+
+    The x-axis is deliberately the Earth -> Saturn cruise only (candidate.
+    time_of_flight_days), not candidate.total_duration_days (which also
+    covers the post-arrival Saturn capture and Titan-orbital-radius
+    circularization) - labeled explicitly as "Earth -> Saturn flight time"
+    so it is never read as the full reference-scenario duration.
     """
     _validate_candidates(candidates)
     if not candidates:
@@ -121,7 +131,7 @@ def build_candidates_chart(
         return (
             f"<b>{title}</b><br>"
             "Rank: %{customdata[0]}<br>"
-            "Time of flight: %{x:,.1f} days<br>"
+            "Earth → Saturn flight time: %{x:,.1f} days<br>"
             "Delta-v total: %{y:,.1f} m/s<br>"
             "Launch: %{customdata[1]}<extra></extra>"
         )
@@ -191,7 +201,7 @@ def build_candidates_chart(
         height=440,
         margin={"l": 20, "r": 20, "t": 30, "b": 20},
         xaxis={
-            "title": "Time of flight (days)",
+            "title": "Earth → Saturn flight time (days)",
             "gridcolor": colors.GRIDLINE,
             "zeroline": False,
         },

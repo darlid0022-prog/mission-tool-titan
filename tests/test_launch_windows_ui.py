@@ -467,14 +467,16 @@ class TestUnitsAndLabels(unittest.TestCase):
                 "Launch time (UTC)",
                 "Saturn arrival (UTC)",
                 "Scenario end (UTC)",
-                "Time of flight (days)",
-                "Time of flight (years)",
+                "Earth → Saturn flight time (days)",
+                "Earth → Saturn flight time (years)",
+                "Total reference-scenario duration (days)",
+                "Total reference-scenario duration (years)",
                 "C3 (km²/s²)",
                 "v∞ Earth (m/s)",
                 "v∞ Saturn (m/s)",
-                "Delta-v departure (m/s)",
+                "Earth departure Δv (m/s)",
                 "Delta-v capture (m/s)",
-                "Delta-v Titan circularization (m/s)",
+                "Saturn-centered circularization Δv (m/s)",
                 "Delta-v total (m/s)",
             ],
         )
@@ -483,13 +485,14 @@ class TestUnitsAndLabels(unittest.TestCase):
             "Best launch date/time (UTC)",
             "Saturn arrival (UTC)",
             "Scenario end (UTC)",
-            "Duration",
+            "Earth → Saturn flight time",
+            "Total reference-scenario duration",
             "C3",
             "v∞ Earth",
             "v∞ Saturn",
-            "Delta-v departure",
+            "Earth departure Δv",
             "Delta-v capture",
-            "Delta-v Titan circularization",
+            "Saturn-centered circularization Δv",
             "Delta-v total",
         ):
             self.assertIn(expected_label, metric_labels)
@@ -499,6 +502,48 @@ class TestUnitsAndLabels(unittest.TestCase):
                 for w in app.warning
             )
         )
+        self.assertTrue(
+            any(
+                "Titan's mean orbital radius — not Titan orbit insertion" in c.value
+                for c in app.caption
+            )
+        )
+        self.assertTrue(
+            any(
+                "follows the configured Earth parking orbit" in c.value
+                for c in app.caption
+            )
+        )
+
+    def test_flight_time_and_total_duration_are_never_the_same_displayed_value(self):
+        """Non-regression for the Duration ambiguity: Earth -> Saturn flight
+        time (interplanetary cruise only) and total reference-scenario
+        duration (through Saturn capture + Titan-orbital-radius
+        circularization) must render as two distinct metrics with two
+        distinct values - never collapsed into one "Duration" figure.
+        """
+        with patch(
+            "launch_window_service.get_launch_window_service",
+            return_value=_FixtureLaunchWindowService(candidate_count=1),
+        ):
+            app = _run_to_launch_windows(AppTest.from_file(APP_PATH))
+            app = _submit_search(app)
+
+        self.assertFalse(app.exception)
+        metrics = {m.label: m.value for m in app.metric}
+        self.assertIn("Earth → Saturn flight time", metrics)
+        self.assertIn("Total reference-scenario duration", metrics)
+        self.assertNotEqual(
+            metrics["Earth → Saturn flight time"], metrics["Total reference-scenario duration"]
+        )
+        # The fixture candidate's scenario end (2033-09-20) is ~19 days after
+        # its Saturn arrival (2033-09-01): the gap must show up numerically,
+        # not just as a different label on an identical number.
+        table = next(d for d in app.dataframe if "Rank" in d.value.columns).value
+        flight_time = table["Earth → Saturn flight time (days)"].iloc[0]
+        total_duration = table["Total reference-scenario duration (days)"].iloc[0]
+        self.assertGreater(total_duration, flight_time)
+        self.assertAlmostEqual(total_duration - flight_time, 18.75, places=2)
 
 
 class TestPageRendersWithoutException(unittest.TestCase):

@@ -223,11 +223,24 @@ else:
         )
     with st.container(horizontal=True):
         st.metric(
-            "Duration",
+            "Earth → Saturn flight time",
             f"{selected_candidate.time_of_flight_days:,.1f} days "
             f"({selected_candidate.time_of_flight_years:,.2f} yr)",
+            help="The interplanetary cruise only - Earth departure to Saturn arrival.",
             border=True,
         )
+        st.metric(
+            "Total reference-scenario duration",
+            f"{selected_candidate.total_duration_days:,.2f} days "
+            f"({selected_candidate.total_duration_years:,.2f} yr)",
+            help=(
+                "Earth departure to scenario end: the Earth → Saturn flight time above "
+                "plus the Saturn capture-to-ellipse burn and the circularization to "
+                "Titan's orbital radius that happen after arrival."
+            ),
+            border=True,
+        )
+    with st.container(horizontal=True):
         st.metric("C3", f"{selected_candidate.c3_km2_s2:,.2f} km²/s²", border=True)
         st.metric(
             "v∞ Earth", f"{selected_candidate.v_infinity_earth_m_s:,.1f} m/s", border=True
@@ -242,7 +255,7 @@ else:
     )
     with st.container(horizontal=True):
         st.metric(
-            "Delta-v departure",
+            "Earth departure Δv",
             f"{selected_candidate.delta_v_departure_m_s:,.1f} m/s",
             border=True,
         )
@@ -250,13 +263,18 @@ else:
             "Delta-v capture", f"{selected_candidate.delta_v_capture_m_s:,.1f} m/s", border=True
         )
         st.metric(
-            "Delta-v Titan circularization",
+            "Saturn-centered circularization Δv",
             f"{selected_candidate.delta_v_titan_circularization_m_s:,.1f} m/s",
             border=True,
         )
         st.metric(
             "Delta-v total", f"{selected_candidate.delta_v_total_m_s:,.1f} m/s", border=True
         )
+    st.caption(
+        "Earth departure Δv follows the configured Earth parking orbit — see Assumptions "
+        "below for the exact altitude used. Saturn-centered circularization Δv is "
+        "circularization at Titan's mean orbital radius — not Titan orbit insertion."
+    )
 
     st.dataframe(
         launch_window_plot.build_candidates_dataframe(
