@@ -1,12 +1,22 @@
-"""Isolated Saturn arrival-to-staging, Saturn -> Titan transfer, and Titan
-EDL studies, rebuilt from the mission-setup inputs stored in session_state.
+"""Saturn hyperbolic-arrival/capture (authoritative model), plus the legacy
+Saturn arrival-to-staging, Saturn -> Titan transfer, and Titan EDL studies -
+all rebuilt from the mission-setup inputs stored in session_state.
 """
+
+import math
 
 import streamlit as st
 
 import app_services
 from mission import colors
+from mission.constants import F_RING_REFERENCE_RADIUS_M
 from mission.ui_text import UI_TEXT
+
+
+def _bulleted(items: tuple[str, ...]) -> None:
+    """Render one cohesive markdown list instead of one isolated bullet per call."""
+    st.markdown("\n".join(f"- {item}" for item in items))
+
 
 bundle = app_services.require_mission_bundle()
 if bundle is None:
@@ -21,6 +31,107 @@ if bundle.staging_result is None:
 staging_result = bundle.staging_result
 titan_transfer = bundle.titan_transfer
 titan_edl = bundle.titan_edl
+connected = bundle.connected_first_order
+
+st.header(UI_TEXT["connected_first_order_header"])
+st.badge(colors.ARRIVAL.label, color=colors.BADGE_COLOR[colors.ARRIVAL.label])
+if connected is None:
+    # Explicit placeholder rather than a guessed number: this model is expected
+    # to be populated whenever a connected Saturn->Titan mission is selected
+    # (see app_services.compute_mission_bundle); if it is ever absent, say so
+    # instead of silently falling back to the legacy sections below.
+    st.warning(
+        "The authoritative Saturn hyperbolic-arrival-and-capture model is not available "
+        "for this mission configuration. Expected data interface: "
+        "app_services.MissionBundle.connected_first_order "
+        "(mission.connected_physics.ConnectedFirstOrderResult)."
+    )
+else:
+    st.info(UI_TEXT["connected_first_order_warning"])
+    with st.container(border=True):
+        st.subheader(UI_TEXT["hyperbolic_arrival_subheader"])
+        st.caption(UI_TEXT["hyperbolic_arrival_help"])
+        with st.container(horizontal=True):
+            st.metric(
+                UI_TEXT["arrival_v_infinity_new"],
+                f"{connected.heliocentric.arrival_v_infinity_m_s:,.1f} m/s",
+                help=UI_TEXT["hyperbolic_arrival_help"],
+                border=True,
+            )
+            st.metric(
+                UI_TEXT["hyperbola_periapsis_radius"],
+                f"{connected.saturn_hyperbola.periapsis_radius_m / 1_000:,.0f} km",
+                help=UI_TEXT["radius_vs_altitude_help"],
+                border=True,
+            )
+            st.metric(
+                UI_TEXT["hyperbola_eccentricity"],
+                f"{connected.saturn_hyperbola.eccentricity:.3f}",
+                border=True,
+            )
+            st.metric(
+                UI_TEXT["hyperbola_turn_angle"],
+                f"{math.degrees(connected.saturn_hyperbola.turn_angle_rad):.1f}°",
+                border=True,
+            )
+
+        f_ring_margin_m = connected.saturn_hyperbola.periapsis_radius_m - F_RING_REFERENCE_RADIUS_M
+        st.metric(
+            UI_TEXT["f_ring_margin"],
+            f"{f_ring_margin_m / 1_000:,.0f} km",
+            help=UI_TEXT["f_ring_margin_help"],
+            border=True,
+        )
+
+        st.subheader(UI_TEXT["propulsive_insertion_subheader"])
+        st.caption(UI_TEXT["propulsive_insertion_help"])
+        st.metric(
+            UI_TEXT["insertion_delta_v"],
+            f"{connected.saturn_capture.capture_delta_v_m_s:,.1f} m/s",
+            border=True,
+        )
+
+        st.subheader(UI_TEXT["capture_ellipse_subheader"])
+        st.caption(UI_TEXT["capture_ellipse_help"])
+        with st.container(horizontal=True):
+            st.metric(
+                UI_TEXT["ellipse_periapsis_radius"],
+                f"{connected.saturn_capture.periapsis_radius_m / 1_000:,.0f} km",
+                help=UI_TEXT["radius_vs_altitude_help"],
+                border=True,
+            )
+            st.metric(
+                UI_TEXT["ellipse_apoapsis_radius"],
+                f"{connected.saturn_capture.apoapsis_radius_m / 1_000:,.0f} km",
+                help=UI_TEXT["radius_vs_altitude_help"],
+                border=True,
+            )
+            st.metric(
+                UI_TEXT["ellipse_eccentricity"],
+                f"{connected.saturn_capture.eccentricity:.3f}",
+                border=True,
+            )
+            st.metric(
+                UI_TEXT["periapsis_apoapsis_duration"],
+                f"{connected.saturn_capture.time_of_flight_days:.3f} days",
+                border=True,
+            )
+
+        st.subheader(UI_TEXT["circularization_subheader"])
+        st.caption(UI_TEXT["circularization_help"])
+        st.metric(
+            UI_TEXT["circularization_delta_v"],
+            f"{connected.saturn_capture.circularisation_delta_v_m_s:,.1f} m/s",
+            border=True,
+        )
+
+        st.caption(f"Method: `{connected.method}`.")
+
+        with st.expander(UI_TEXT["assumptions_exclusions"]):
+            st.markdown(UI_TEXT["assumptions"])
+            _bulleted(connected.assumptions)
+            st.markdown(UI_TEXT["exclusions"])
+            _bulleted(connected.exclusions)
 
 st.header(UI_TEXT["staging_header"])
 st.badge(colors.ARRIVAL.label, color=colors.BADGE_COLOR[colors.ARRIVAL.label])
@@ -38,11 +149,13 @@ with st.container(border=True):
         st.metric(
             UI_TEXT["periapsis_radius"],
             f"{staging_result.periapsis_radius_m / 1_000:,.0f} km",
+            help=UI_TEXT["radius_vs_altitude_help"],
             border=True,
         )
         st.metric(
             UI_TEXT["staging_radius"],
             f"{staging_result.staging_radius_m / 1_000:,.0f} km",
+            help=UI_TEXT["radius_vs_altitude_help"],
             border=True,
         )
 
@@ -97,11 +210,9 @@ with st.container(border=True):
 
     with st.expander(UI_TEXT["assumptions_exclusions"]):
         st.markdown(UI_TEXT["assumptions"])
-        for assumption in staging_result.assumptions:
-            st.write(f"- {assumption}")
+        _bulleted(staging_result.assumptions)
         st.markdown(UI_TEXT["exclusions"])
-        for exclusion in staging_result.exclusions:
-            st.write(f"- {exclusion}")
+        _bulleted(staging_result.exclusions)
 
 st.header(UI_TEXT["titan_header"])
 st.badge(colors.LUNAR_TRANSFER.label, color=colors.BADGE_COLOR[colors.LUNAR_TRANSFER.label])
@@ -113,6 +224,7 @@ with st.container(border=True):
     st.metric(
         UI_TEXT["titan_capture_altitude"],
         f"{titan_transfer.titan_capture_altitude_m / 1_000:,.0f} km",
+        help=UI_TEXT["radius_vs_altitude_help"],
         border=True,
     )
 
@@ -152,11 +264,9 @@ with st.container(border=True):
 
     with st.expander(UI_TEXT["assumptions_exclusions"]):
         st.markdown(UI_TEXT["assumptions"])
-        for assumption in titan_transfer.assumptions:
-            st.write(f"- {assumption}")
+        _bulleted(titan_transfer.assumptions)
         st.markdown(UI_TEXT["exclusions"])
-        for exclusion in titan_transfer.exclusions:
-            st.write(f"- {exclusion}")
+        _bulleted(titan_transfer.exclusions)
 
 st.header(UI_TEXT["titan_edl_header"])
 st.badge(colors.LANDING.label, color=colors.BADGE_COLOR[colors.LANDING.label])
@@ -219,12 +329,9 @@ with st.container(border=True):
 
     with st.expander(UI_TEXT["assumptions_exclusions"]):
         st.markdown(UI_TEXT["assumptions"])
-        for assumption in titan_edl.assumptions:
-            st.write(f"- {assumption}")
+        _bulleted(titan_edl.assumptions)
         st.markdown(UI_TEXT["exclusions"])
-        for exclusion in titan_edl.exclusions:
-            st.write(f"- {exclusion}")
+        _bulleted(titan_edl.exclusions)
 
     with st.expander(UI_TEXT["edl_sources"]):
-        for source in titan_edl.sources:
-            st.write(f"- {source}")
+        _bulleted(titan_edl.sources)

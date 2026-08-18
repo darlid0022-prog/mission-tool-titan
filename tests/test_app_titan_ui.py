@@ -195,9 +195,13 @@ class TestMissionSetupPage(unittest.TestCase):
         metrics = {metric.label: metric.value for metric in app.metric}
         self.assertEqual(metrics["Connected delta-v"], "12,163 m/s")
         self.assertEqual(metrics["Wet mass (simplified)"], "10,797 kg")
-        self.assertEqual(metrics["Duration to Titan"], "2,211.8 days")
+        self.assertEqual(
+            metrics["Mission duration (Earth departure → Saturn capture)"], "2,211.8 days"
+        )
         self.assertEqual(metrics["Single-stage exceedance"], "3.17×")
-        self.assertEqual(metrics["Flyby gain coverage"], "117.8%")
+        # Removed from the scorecard: the isolated flyby demonstrators are not
+        # directly additive as delta-v savings (see pages/gravity_assists.py).
+        self.assertNotIn("Flyby gain coverage", metrics)
 
     def test_summary_exposes_share_and_pdf_actions(self):
         app = run_app()
@@ -317,6 +321,17 @@ class TestTrajectory3DPage(unittest.TestCase):
         self.assertTrue(app.segmented_control)
         self.assertTrue(app.slider)
         self.assertIn("trajectory_scene", app.session_state)
+
+    def test_discloses_the_legacy_scene_is_not_the_authoritative_budget_model(self):
+        app = run_app(page_path="pages/trajectory_3d.py")
+
+        self.assertFalse(app.exception)
+        self.assertTrue(
+            any(
+                "not the authoritative hyperbolic-arrival-and-capture model" in warning.value
+                for warning in app.warning
+            )
+        )
 
     def test_historical_mode_renders_five_leg_tour_without_direct_animation_controls(self):
         app = AppTest.from_file(APP_PATH)
@@ -485,14 +500,68 @@ class TestSaturnSystemStudiesPage(unittest.TestCase):
         app = run_app(page_path="pages/saturn_system_studies.py")
 
         self.assertFalse(app.exception)
+        # The new authoritative model (top of page) and the legacy
+        # arrival-to-staging study (below it) are both the Arrival phase.
         self.assertEqual(
             badge_values(app),
             [
+                ":green-badge[Arrival / orbit insertion]",
                 ":green-badge[Arrival / orbit insertion]",
                 ":violet-badge[Lunar transfer]",
                 ":red-badge[Landing]",
             ],
         )
+
+    def test_authoritative_model_section_distinguishes_arrival_insertion_and_circularization(
+        self,
+    ):
+        app = run_app(page_path="pages/saturn_system_studies.py")
+
+        self.assertFalse(app.exception)
+        self.assertTrue(
+            any(
+                heading.value
+                == "Saturn hyperbolic arrival & capture — authoritative model"
+                for heading in app.header
+            )
+        )
+        subheaders = {sub.value for sub in app.subheader}
+        # The four physically distinct phases the model separates.
+        self.assertIn("Hyperbolic arrival", subheaders)
+        self.assertIn("Propulsive capture-to-ellipse insertion", subheaders)
+        self.assertIn("Capture ellipse", subheaders)
+        self.assertIn("Circularization at Titan's orbital radius", subheaders)
+
+        metrics = {metric.label: metric.value for metric in app.metric}
+        self.assertEqual(metrics["Saturn arrival v∞"], "5,442.8 m/s")
+        self.assertEqual(metrics["Hyperbola periapsis radius"], "150,000 km")
+        self.assertEqual(metrics["Hyperbola eccentricity"], "1.117")
+        self.assertEqual(metrics["Hyperbola deflection angle"], "127.1°")
+        self.assertEqual(metrics["Margin outside F ring"], "9,820 km")
+        self.assertEqual(metrics["Insertion delta-v"], "1,914.3 m/s")
+        self.assertEqual(metrics["Ellipse periapsis radius"], "150,000 km")
+        self.assertEqual(metrics["Ellipse apoapsis radius"], "1,221,870 km")
+        self.assertEqual(metrics["Ellipse eccentricity"], "0.781")
+        self.assertEqual(metrics["Periapsis → apoapsis time"], "3.354 days")
+        self.assertEqual(metrics["Circularization delta-v"], "2,966.2 m/s")
+
+        # No Titan encounter/capture claimed anywhere in this section.
+        self.assertTrue(
+            any(
+                "does not model a Titan encounter" in info.value
+                for info in app.info
+            )
+        )
+
+        with self.subTest(check="assumptions_exclusions_render_as_one_list_per_call"):
+            markdown_values = [markdown.value for markdown in app.markdown]
+            multiline_lists = [
+                value
+                for value in markdown_values
+                if value.count("\n- ") >= 1 or value.startswith("- ")
+                if value.count("\n") >= 1
+            ]
+            self.assertTrue(multiline_lists, "expected at least one multi-item bullet list")
 
     def test_arrival_to_staging_section_displays_nominal_results_and_ring_status(self):
         app = run_app(page_path="pages/saturn_system_studies.py")
@@ -665,6 +734,15 @@ class TestGravityAssistsPage(unittest.TestCase):
             {"Venus flyby", "Earth flyby", "Jupiter flyby"},
         )
         self.assertTrue(any("Incoming v∞" == metric.label for metric in app.metric))
+
+    def test_caption_discloses_isolation_from_a_connected_vvejga_trajectory(self):
+        app = run_app(page_path="pages/gravity_assists.py")
+
+        self.assertFalse(app.exception)
+        captions = " ".join(caption.value for caption in app.caption)
+        self.assertIn("not form a connected VVEJGA trajectory", captions)
+        self.assertIn("not directly additive as delta-v savings", captions)
+        self.assertIn("Unpowered flyby", captions)
 
 
 class TestNavigationAcrossAllPages(unittest.TestCase):

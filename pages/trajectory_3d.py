@@ -172,6 +172,14 @@ if bundle.staging_result is None or bundle.titan_transfer is None:
 
 st.header(UI_TEXT["trajectory_3d_header"])
 st.caption(UI_TEXT["trajectory_3d_caption"])
+st.warning(
+    "This animated scene renders the legacy Saturn arrival-to-staging and "
+    "Saturn → Titan transfer studies (Saturn & Titan studies page), not the "
+    "authoritative hyperbolic-arrival-and-capture model the connected delta-v budget "
+    "on Mission setup is computed from. Its 'Titan orbit'/'Titan encounter' labels "
+    "refer to that legacy model's simplified Titan-centered capture, which is not "
+    "included in the connected budget."
+)
 with st.container(border=True):
     trajectory_scene_key = (
         bundle.earth_saturn_trajectory.departure_mjd2000,
