@@ -8,7 +8,7 @@ import streamlit as st
 
 import app_services
 from mission import colors
-from mission.trajectory_plot import build_complete_mission_figure
+from mission.trajectory_plot import build_complete_mission_figure, build_complete_mission_table
 from mission.trajectory_visualization import (
     CompleteMissionScene3D,
     MissionAnimationTimeline3D,
@@ -128,6 +128,13 @@ def render_trajectory_animation(
         key="complete_mission_trajectory_3d",
         config={"displaylogo": False, "scrollZoom": True},
     )
+    # Accessible alternative to the chart above: every curve and marker point
+    # (both panels), as a keyboard- and screen-reader-navigable table, for
+    # anyone who cannot read the 3D chart and for exporting/verifying the
+    # exact coordinates. Built from the figure itself, so it can never drift
+    # from what is actually plotted.
+    with st.expander("View trajectory data as a table"):
+        st.dataframe(build_complete_mission_table(trajectory_figure), width="stretch")
 
 
 bundle = app_services.require_mission_bundle()

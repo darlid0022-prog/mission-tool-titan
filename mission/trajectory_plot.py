@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -11,6 +12,14 @@ from .trajectory_visualization import (
     SpacecraftPosition3D,
     TrajectoryCurve3D,
 )
+
+# scene -> (panel label, unit) for the two 3D subplots build_complete_mission_figure
+# always creates (see its make_subplots call below). Used only by
+# build_complete_mission_table to label the accessible data-table alternative.
+_SCENE_PANEL: dict[str, tuple[str, str]] = {
+    "scene": ("Heliocentric transfer — Sun-centred J2000 ecliptic", "AU"),
+    "scene2": ("Saturn system — Saturn-centred coplanar model", "km"),
+}
 
 # Default styling per curve `role`. The 3D scene always renders on a fixed
 # dark background (see colors.SCENE_BACKGROUND) regardless of the Streamlit
@@ -213,3 +222,38 @@ def build_complete_mission_figure(
         uirevision="complete-mission-trajectory-v1",
     )
     return figure
+
+
+def build_complete_mission_table(figure: go.Figure) -> pd.DataFrame:
+    """Flatten every curve/marker trace of a built figure into one data table.
+
+    Accessible alternative to the 3D chart (screen-reader/keyboard users, and
+    exact-number export/verification): reads coordinates directly off the
+    already-built Figure rather than recomputing them, so the table can never
+    drift from what is actually plotted.
+    """
+    if not isinstance(figure, go.Figure):
+        raise TypeError("figure must be a plotly.graph_objects.Figure.")
+
+    rows: list[dict[str, object]] = []
+    for trace in figure.data:
+        panel, unit = _SCENE_PANEL.get(trace.scene, ("Unknown panel", ""))
+        is_curve = trace.mode is not None and "lines" in trace.mode
+        xs, ys, zs = trace.x or (), trace.y or (), trace.z or ()
+        for index, (x, y, z) in enumerate(zip(xs, ys, zs, strict=True)):
+            rows.append(
+                {
+                    "Element": trace.name,
+                    "Type": "Curve" if is_curve else "Marker",
+                    "Panel": panel,
+                    "Point index": index,
+                    "x": x,
+                    "y": y,
+                    "z": z,
+                    "Unit": unit,
+                }
+            )
+    return pd.DataFrame(
+        rows,
+        columns=["Element", "Type", "Panel", "Point index", "x", "y", "z", "Unit"],
+    )

@@ -5,10 +5,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+import pandas as pd
 import plotly.graph_objects as go
 
 from . import colors
 from .pareto import ParetoPoint, ParetoSearchResult
+
+# customdata column order fixed by _custom_data() below - used only to label
+# the accessible data-table alternative built from a figure's own traces.
+_CUSTOMDATA_COLUMNS = (
+    "Wet mass (kg)",
+    "Earth → Saturn TOF (days)",
+    "Earth departure date",
+    "Departure MJD2000",
+)
 
 MJD2000_EPOCH = datetime(2000, 1, 1)
 
@@ -175,3 +185,35 @@ def build_pareto_front_figure(result: ParetoSearchResult) -> go.Figure:
         uirevision="connected-mission-pareto-v1",
     )
     return figure
+
+
+def build_pareto_table(figure: go.Figure) -> pd.DataFrame:
+    """Flatten every point of a built Pareto figure into one data table.
+
+    Accessible alternative to the chart (screen-reader/keyboard users, and
+    exact-number export/verification): reads x/y/customdata directly off the
+    already-built Figure rather than recomputing them, so the table can never
+    drift from what is actually plotted. "Role" distinguishes the two
+    highlighted points (Minimum connected delta-v, Current mission baseline)
+    from the regular Pareto-optimal front, exactly as color/symbol do in the
+    chart itself.
+    """
+    if not isinstance(figure, go.Figure):
+        raise TypeError("figure must be a plotly.graph_objects.Figure.")
+
+    rows: list[dict[str, object]] = []
+    for trace in figure.data:
+        xs, ys = trace.x or (), trace.y or ()
+        customdata = trace.customdata if trace.customdata is not None else ()
+        for x, y, extra in zip(xs, ys, customdata, strict=True):
+            row: dict[str, object] = {
+                "Role": trace.name,
+                "Total delta-v (m/s)": x,
+                "Total duration (days)": y,
+            }
+            row.update(zip(_CUSTOMDATA_COLUMNS, extra, strict=True))
+            rows.append(row)
+    return pd.DataFrame(
+        rows,
+        columns=["Role", "Total delta-v (m/s)", "Total duration (days)", *_CUSTOMDATA_COLUMNS],
+    )

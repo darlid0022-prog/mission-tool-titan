@@ -1,7 +1,11 @@
 import unittest
 
 from mission.pareto import compute_connected_pareto_front
-from mission.pareto_plot import build_pareto_front_figure, select_pareto_highlights
+from mission.pareto_plot import (
+    build_pareto_front_figure,
+    build_pareto_table,
+    select_pareto_highlights,
+)
 
 
 class TestParetoFrontFigure(unittest.TestCase):
@@ -47,6 +51,52 @@ class TestParetoFrontFigure(unittest.TestCase):
                 self.assertIn("Earth → Saturn TOF", trace.hovertemplate)
                 self.assertIn("Earth departure date", trace.hovertemplate)
                 self.assertEqual(len(trace.customdata), len(trace.x))
+
+
+class TestParetoTable(unittest.TestCase):
+    """Accessible data-table alternative to the Pareto chart (see pages/optimization.py)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.result = compute_connected_pareto_front()
+        cls.figure = build_pareto_front_figure(cls.result)
+        cls.table = build_pareto_table(cls.figure)
+
+    def test_table_row_count_matches_the_chart_exactly(self):
+        self.assertEqual(len(self.table), sum(len(trace.x) for trace in self.figure.data))
+        self.assertEqual(len(self.table), 39)
+
+    def test_table_columns_are_labeled_with_units(self):
+        self.assertEqual(
+            list(self.table.columns),
+            [
+                "Role",
+                "Total delta-v (m/s)",
+                "Total duration (days)",
+                "Wet mass (kg)",
+                "Earth → Saturn TOF (days)",
+                "Earth departure date",
+                "Departure MJD2000",
+            ],
+        )
+
+    def test_table_includes_both_highlighted_reference_rows(self):
+        roles = set(self.table["Role"])
+        self.assertIn("Minimum connected delta-v", roles)
+        self.assertIn("Current mission baseline", roles)
+        self.assertEqual((self.table["Role"] == "Minimum connected delta-v").sum(), 1)
+        self.assertEqual((self.table["Role"] == "Current mission baseline").sum(), 1)
+
+    def test_table_values_match_the_baseline_trace_exactly(self):
+        baseline_trace = next(t for t in self.figure.data if t.name == "Current mission baseline")
+        baseline_row = self.table[self.table["Role"] == "Current mission baseline"].iloc[0]
+        self.assertEqual(baseline_row["Total delta-v (m/s)"], baseline_trace.x[0])
+        self.assertEqual(baseline_row["Total duration (days)"], baseline_trace.y[0])
+        self.assertEqual(baseline_row["Wet mass (kg)"], baseline_trace.customdata[0][0])
+
+    def test_rejects_a_non_figure_argument(self):
+        with self.assertRaisesRegex(TypeError, "must be a plotly"):
+            build_pareto_table(object())
 
 
 if __name__ == "__main__":

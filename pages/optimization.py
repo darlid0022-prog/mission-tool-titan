@@ -8,7 +8,11 @@ mission/pareto.py - so this page needs no session_state from other pages.
 import streamlit as st
 
 from app_services import PARETO_MODEL_VERSION, compute_cached_pareto_front
-from mission.pareto_plot import build_pareto_front_figure, select_pareto_highlights
+from mission.pareto_plot import (
+    build_pareto_front_figure,
+    build_pareto_table,
+    select_pareto_highlights,
+)
 from mission.ui_text import UI_TEXT
 
 st.header(UI_TEXT["pareto_header"])
@@ -25,6 +29,13 @@ with st.container(border=True):
         key="connected_mission_pareto_front",
         config={"displaylogo": False, "scrollZoom": True},
     )
+    # Accessible alternative to the chart above: every plotted point (regular
+    # Pareto front plus the two highlighted references) as a keyboard- and
+    # screen-reader-navigable table, for anyone who cannot read the chart and
+    # for exporting/verifying the exact numbers. Built from the figure itself,
+    # so it can never drift from what is actually plotted.
+    with st.expander("View Pareto front data as a table"):
+        st.dataframe(build_pareto_table(pareto_figure), width="stretch")
     baseline = pareto_highlights.baseline
     optimum = pareto_highlights.delta_v_optimum
     delta_v_percent = 100.0 * (baseline.total_delta_v_m_s / optimum.total_delta_v_m_s - 1.0)

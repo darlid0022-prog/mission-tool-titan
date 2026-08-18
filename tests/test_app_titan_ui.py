@@ -198,6 +198,24 @@ class TestTrajectory3DPage(unittest.TestCase):
         # transfer) - same color as its badge on every other page.
         self.assertEqual(badge_values(app), [":blue-badge[Interplanetary transfer]"])
 
+    def test_chart_has_a_keyboard_accessible_data_table_alternative(self):
+        app = run_app(page_path="pages/trajectory_3d.py")
+
+        self.assertFalse(app.exception)
+        expander = next(
+            e for e in app.expander if e.label == "View trajectory data as a table"
+        )
+        # st.expander is a native, keyboard-operable disclosure widget (no
+        # mouse-only affordance) and its content, a plain st.dataframe, is
+        # present in the tree regardless of the (collapsed-by-default) open
+        # state - both are queryable here without simulating a click.
+        table = expander.dataframe[0].value
+        self.assertEqual(
+            list(table.columns),
+            ["Element", "Type", "Panel", "Point index", "x", "y", "z", "Unit"],
+        )
+        self.assertGreater(len(table), 0)
+
     def test_complete_trajectory_3d_view_is_rendered(self):
         app = run_app(page_path="pages/trajectory_3d.py")
 
@@ -394,6 +412,28 @@ class TestFeasibilityPage(unittest.TestCase):
 
 
 class TestOptimizationPage(unittest.TestCase):
+    def test_chart_has_a_keyboard_accessible_data_table_alternative(self):
+        app = run_app(page_path="pages/optimization.py")
+
+        self.assertFalse(app.exception)
+        expander = next(
+            e for e in app.expander if e.label == "View Pareto front data as a table"
+        )
+        table = expander.dataframe[0].value
+        self.assertEqual(
+            list(table.columns),
+            [
+                "Role",
+                "Total delta-v (m/s)",
+                "Total duration (days)",
+                "Wet mass (kg)",
+                "Earth → Saturn TOF (days)",
+                "Earth departure date",
+                "Departure MJD2000",
+            ],
+        )
+        self.assertEqual(len(table), 39)
+
     def test_pareto_chart_renders_38_front_points_and_highlights_references(self):
         pareto_result = compute_connected_pareto_front()
         captured = {}

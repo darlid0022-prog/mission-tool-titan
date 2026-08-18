@@ -3,7 +3,7 @@ import unittest
 
 from mission.full_mission import compute_earth_saturn_titan_mission
 from mission.models import Leg, TrajectoryResult
-from mission.trajectory_plot import build_complete_mission_figure
+from mission.trajectory_plot import build_complete_mission_figure, build_complete_mission_table
 from mission.trajectory_visualization import (
     build_complete_mission_scene,
     build_mission_animation_timeline,
@@ -161,6 +161,74 @@ class TestCompleteMissionVisualization(unittest.TestCase):
                 marker = figure.data[-1]
                 self.assertEqual(marker.name, "Spacecraft — current position")
                 self.assertEqual(marker.scene, expected_scene)
+
+
+class TestCompleteMissionTable(unittest.TestCase):
+    """Accessible data-table alternative to the 3D chart (see pages/trajectory_3d.py)."""
+
+    @classmethod
+    def setUpClass(cls):
+        earth_saturn_leg = Leg(
+            origin="Earth",
+            destination="Saturn",
+            trajectory=TrajectoryResult(
+                departure_mjd2000=9_681.181818181818,
+                arrival_mjd2000=12_537.181818181829,
+                tof_years=7.82,
+                v_inf_depart=10_432.306468285773,
+                v_inf_arrival=6_490.744714263188,
+                method="lambert",
+            ),
+        )
+        mission_result = compute_earth_saturn_titan_mission(
+            earth_saturn_leg,
+            saturn_periapsis_radius_m=62_330_000.0,
+            saturn_periapsis_radius_provenance="Regression fixture.",
+            saturn_staging_radius_m=600_000_000.0,
+            titan_capture_altitude_m=1_500_000.0,
+        )
+        cls.scene = build_complete_mission_scene(mission_result, samples=48)
+        cls.figure = build_complete_mission_figure(cls.scene)
+        cls.table = build_complete_mission_table(cls.figure)
+
+    def test_table_row_count_matches_the_chart_exactly(self):
+        self.assertEqual(len(self.table), sum(len(trace.x) for trace in self.figure.data))
+        # 7 curves x 48 samples, plus 5 single-point landmark markers.
+        self.assertEqual(len(self.table), 7 * 48 + 5)
+
+    def test_table_columns_are_labeled_with_units(self):
+        self.assertEqual(
+            list(self.table.columns),
+            ["Element", "Type", "Panel", "Point index", "x", "y", "z", "Unit"],
+        )
+
+    def test_every_curve_and_marker_element_is_present(self):
+        self.assertEqual(
+            set(self.table["Element"]),
+            {trace.name for trace in self.figure.data},
+        )
+        self.assertEqual(set(self.table["Type"]), {"Curve", "Marker"})
+
+    def test_panels_carry_their_own_reference_frame_and_unit(self):
+        heliocentric = self.table[self.table["Element"] == "Earth orbit"]
+        saturn_panel = self.table[self.table["Element"] == "Titan orbit"]
+        self.assertTrue((heliocentric["Unit"] == "AU").all())
+        self.assertTrue(heliocentric["Panel"].str.contains("Heliocentric").all())
+        self.assertTrue((saturn_panel["Unit"] == "km").all())
+        self.assertTrue(saturn_panel["Panel"].str.contains("Saturn system").all())
+
+    def test_table_values_match_the_curve_trace_exactly(self):
+        trace = next(t for t in self.figure.data if t.name == "Earth orbit")
+        rows = self.table[self.table["Element"] == "Earth orbit"].reset_index(drop=True)
+        self.assertEqual(len(rows), len(trace.x))
+        self.assertEqual(rows.loc[0, "x"], trace.x[0])
+        self.assertEqual(rows.loc[0, "y"], trace.y[0])
+        self.assertEqual(rows.loc[0, "z"], trace.z[0])
+        self.assertEqual(rows.loc[len(rows) - 1, "x"], trace.x[-1])
+
+    def test_rejects_a_non_figure_argument(self):
+        with self.assertRaisesRegex(TypeError, "must be a plotly"):
+            build_complete_mission_table(object())
 
 
 if __name__ == "__main__":
