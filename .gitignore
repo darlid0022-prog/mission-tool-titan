@@ -8,3 +8,10 @@ coverage.xml
 htmlcov/
 .mypy_cache/
 .ruff_cache/
+.pytest_cache/
+.venv/
+.env
+.env.*
+.streamlit/secrets.toml
+.cache/
+*.log
