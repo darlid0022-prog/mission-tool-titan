@@ -12,6 +12,8 @@ from urllib.parse import urlencode
 import pandas as pd
 import streamlit as st
 
+from mission import physics
+from mission.bodies import resolve_body
 from mission.capabilities import MOON_DESTINATIONS, PLANET_DESTINATIONS
 from mission.dv_budget import MissionDeltaVBudget, compose_complete_dv_budget
 from mission.feasibility_check import (
@@ -26,12 +28,15 @@ from mission.full_mission import (
 )
 from mission.gravity_assist import (
     GravityAssistResult,
+    MissionSegment,
+    OrbitInsertionResult,
+    compute_cassini_historical_tour,
     compute_earth_flyby_demonstration,
     compute_jupiter_flyby_demonstration,
     compute_venus_flyby_demonstration,
 )
 from mission.mass_model import PayloadItem
-from mission.models import TrajectoryResult
+from mission.models import Leg, TrajectoryResult
 from mission.moon_transfer import SaturnTitanTransferResult
 from mission.pareto import ParetoSearchResult, compute_connected_pareto_front
 from mission.saturn_staging import SaturnArrivalStagingResult
@@ -53,6 +58,15 @@ MISSION_QUERY_RESTORED_KEY = "mission_query_restored"
 MISSION_SETUP_REQUIRED_MESSAGE = (
     "Configure and calculate a mission on the Mission setup page first."
 )
+
+# Trajectory-type choices, offered only for a Saturn destination (see
+# pages/mission_setup.py). TRAJECTORY_TYPE_DIRECT is the pre-existing,
+# unchanged Lambert-solve behavior; TRAJECTORY_TYPE_CASSINI_HISTORICAL
+# replaces it with the real 1997-2004 Cassini VVEJGA tour's own dates and
+# delta-v (see mission/gravity_assist.py's compute_cassini_historical_tour).
+TRAJECTORY_TYPE_DIRECT = "Direct"
+TRAJECTORY_TYPE_CASSINI_HISTORICAL = "Cassini historical gravity assist"
+TRAJECTORY_TYPES = (TRAJECTORY_TYPE_DIRECT, TRAJECTORY_TYPE_CASSINI_HISTORICAL)
 
 
 @st.cache_data(max_entries=32, persist="disk", show_spinner=False)
@@ -111,6 +125,10 @@ class MissionSetupInputs:
     launch_window_end: date
     isp_s: float
     instruments_df: pd.DataFrame
+    # Defaults to the pre-existing behavior so every old call site (and every
+    # decoded pre-this-feature share link) keeps computing the same Lambert-
+    # solve mission it always did.
+    trajectory_type: str = TRAJECTORY_TYPE_DIRECT
 
 
 INSTRUMENT_COLUMNS = (
@@ -163,6 +181,7 @@ def encode_mission_setup_query(inputs: MissionSetupInputs) -> dict[str, str]:
         "launch_window_end": inputs.launch_window_end.isoformat(),
         "isp_s": inputs.isp_s,
         "instruments": _instrument_records(inputs.instruments_df),
+        "trajectory_type": inputs.trajectory_type,
     }
     serialized = json.dumps(
         payload,
@@ -202,6 +221,11 @@ def decode_mission_setup_query(
     departure_type = payload.get("departure_type")
     if departure_type not in {"Direct", "LEO"}:
         raise ValueError("The shared departure type is not supported.")
+    # Absent for links shared before this option existed: falls back to the
+    # pre-existing Direct-solve behavior, same as a fresh MissionSetupInputs.
+    trajectory_type = payload.get("trajectory_type", TRAJECTORY_TYPE_DIRECT)
+    if trajectory_type not in TRAJECTORY_TYPES:
+        raise ValueError("The shared trajectory type is not supported.")
 
     try:
         launch_window_start = date.fromisoformat(payload["launch_window_start"])
@@ -270,6 +294,7 @@ def decode_mission_setup_query(
         launch_window_end=launch_window_end,
         isp_s=_validated_number("Isp", payload.get("isp_s"), minimum=100.0, maximum=100_000.0),
         instruments_df=instruments_df,
+        trajectory_type=trajectory_type,
     )
 
 
@@ -334,6 +359,10 @@ class MissionBundle:
     combined_flyby_gain_m_s: float
     single_stage_deficit_m_s: float
     flyby_deficit_coverage: float | None
+    # Populated only for TRAJECTORY_TYPE_CASSINI_HISTORICAL - the five real
+    # Cassini VVEJGA legs this bundle's delta-v/duration were computed from.
+    # None for every other trajectory type/destination.
+    cassini_tour: tuple[MissionSegment, ...] | None
 
 
 def compute_mission_bundle(inputs: MissionSetupInputs) -> MissionBundle:
@@ -358,12 +387,84 @@ def compute_mission_bundle(inputs: MissionSetupInputs) -> MissionBundle:
         raise DestinationNotImplementedError(
             traj.get("note", UI_TEXT["destination_not_implemented"])
         )
-    # Build either the connected Saturn->Titan chain when a moon is selected,
-    # or a simplified planet-only mission when no moon is selected. The latter
-    # still provides sensible DV/mass numbers by composing the Earth->planet
-    # Lambert budget and leaving Saturn/Titan-specific terms as zero.
+    # Build one of three mission shapes: the historical Cassini-style
+    # gravity-assist trajectory (real dates/delta-v, Saturn only), the
+    # connected Saturn->Titan chain when a moon is selected, or a simplified
+    # planet-only mission when no moon is selected. The latter two still
+    # provide sensible DV/mass numbers by composing the Earth->planet Lambert
+    # budget and leaving Saturn/Titan-specific terms as zero.
     earth_leg = traj["earth_saturn_leg"]
-    if inputs.selected_moon is None:
+    cassini_tour: tuple[MissionSegment, ...] | None = None
+    if inputs.destination == "Saturn" and inputs.trajectory_type == TRAJECTORY_TYPE_CASSINI_HISTORICAL:
+        # The whole point of a gravity-assist tour is that its flybys are
+        # unpowered: only the real Earth-departure injection and the real
+        # Saturn Orbit Insertion (SOI) capture burn cost delta-v, and the
+        # mission duration is the real Oct 1997 -> Jul 2004 cruise - none of
+        # this depends on the user's chosen launch window/departure type.
+        cassini_tour = compute_cassini_historical_tour()
+        departure_segment = cassini_tour[0]
+        soi_segment = cassini_tour[-1]
+        soi_result = soi_segment.result
+        assert isinstance(soi_result, OrbitInsertionResult)
+
+        earth = resolve_body("Earth")
+        assert earth.pykep_body is not None
+        r_leo = earth.pykep_body.get_radius() + float(inputs.leo_altitude_km) * 1_000.0
+        v_inf_depart = math.sqrt(
+            sum(value**2 for value in departure_segment.departure_v_infinity_m_s)
+        )
+        departure_delta_v = physics.delta_v_injection(v_inf_depart, earth.get_mu_self(), r_leo)
+
+        historical_trajectory = TrajectoryResult(
+            departure_mjd2000=departure_segment.departure_epoch_mjd2000,
+            arrival_mjd2000=soi_segment.arrival_epoch_mjd2000,
+            tof_years=(
+                (soi_segment.arrival_epoch_mjd2000 - departure_segment.departure_epoch_mjd2000)
+                / 365.25
+            ),
+            v_inf_depart=v_inf_depart,
+            v_inf_arrival=soi_result.v_infinity_magnitude_m_s,
+            delta_v=departure_delta_v,
+            method="cassini_historical_vvejga",
+            notes=(
+                "Real Cassini VVEJGA tour (Earth -> Venus -> Venus -> Earth -> Jupiter -> "
+                "Saturn); delta_v is Earth-departure injection only, matching how every "
+                "other Earth-departure leg in this app reports delta_v."
+            ),
+        )
+        historical_leg = Leg(
+            origin="Earth",
+            destination="Saturn",
+            trajectory=historical_trajectory,
+            notes="Historical Cassini-style gravity-assist departure-to-SOI summary leg.",
+        )
+        complete_mission = compute_earth_destination_mission(
+            historical_leg,
+            destination_planet="Saturn",
+            moon=None,
+        )
+
+        staging_result = None
+        titan_transfer = None
+        titan_edl = None
+
+        # SOI captured Cassini into an ellipse (not a circular staging orbit,
+        # and with no further burns modeled here), so its delta-v is carried
+        # on the "capture to transfer ellipse" term; every Titan-chain-specific
+        # term is correctly zero since this trajectory type does not model a
+        # moon transfer at all.
+        complete_dv_budget = MissionDeltaVBudget(
+            earth_departure_m_s=departure_delta_v,
+            dsm_flyby_m_s=0.0,
+            saturn_capture_to_ellipse_m_s=soi_result.delta_v_m_s,
+            saturn_staging_circularisation_m_s=0.0,
+            saturn_titan_departure_m_s=0.0,
+            titan_capture_m_s=0.0,
+        )
+        dv_total = complete_dv_budget.total_m_s
+        mass = compute_mass_budget(dv_total, inputs.isp_s, inputs.instruments_df)
+        mass_ratio = mass["wet_mass_kg"] / mass["dry_mass_kg"] if mass["dry_mass_kg"] > 0 else 1.0
+    elif inputs.selected_moon is None:
         # Planet-only mission: use the generic assembler which returns an
         # EarthDestinationMissionResult with arrival_staging/moon_transfer == None.
         complete_mission = compute_earth_destination_mission(
@@ -484,6 +585,7 @@ def compute_mission_bundle(inputs: MissionSetupInputs) -> MissionBundle:
         combined_flyby_gain_m_s=combined_flyby_gain_m_s,
         single_stage_deficit_m_s=single_stage_deficit_m_s,
         flyby_deficit_coverage=flyby_deficit_coverage,
+        cassini_tour=cassini_tour,
     )
 
 

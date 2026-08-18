@@ -81,6 +81,46 @@ def badge_values(app: AppTest) -> list[str]:
 
 
 class TestMissionSetupPage(unittest.TestCase):
+    def test_trajectory_type_choice_defaults_to_direct_for_saturn(self):
+        app = run_app()
+
+        self.assertFalse(app.exception)
+        trajectory_type_radio = next(
+            radio for radio in app.radio if radio.label == "Trajectory type"
+        )
+        self.assertEqual(
+            list(trajectory_type_radio.options),
+            ["Direct", "Cassini historical gravity assist"],
+        )
+        self.assertEqual(trajectory_type_radio.value, "Direct")
+
+    def test_selecting_the_historical_trajectory_type_updates_the_scorecard(self):
+        app = AppTest.from_file(APP_PATH)
+        with patch(
+            "app_services.compute_cached_trajectory",
+            return_value=earth_saturn_result(),
+        ):
+            app.run(timeout=30)
+            trajectory_type_radio = next(
+                radio for radio in app.radio if radio.label == "Trajectory type"
+            )
+            trajectory_type_radio.set_value("Cassini historical gravity assist")
+            next(button for button in app.button if "Calculate" in button.label).click().run(
+                timeout=30
+            )
+
+        self.assertFalse(app.exception)
+        metrics = {metric.label: metric.value for metric in app.metric}
+        # Real historical total (Earth-departure injection + SOI capture only),
+        # not the mocked earth_saturn_result()'s connected-chain total.
+        self.assertNotEqual(metrics["Connected delta-v"], "9,903 m/s")
+        self.assertTrue(
+            any(
+                "Historical Cassini-style gravity-assist trajectory" in info.value
+                for info in app.info
+            )
+        )
+
     @staticmethod
     def shared_inputs() -> MissionSetupInputs:
         return MissionSetupInputs(

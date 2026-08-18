@@ -53,6 +53,27 @@ with st.form("orbital_inputs"):
         help=UI_TEXT["moon_help"],
     )
     selected_moon = None if moon_choice == UI_TEXT["no_moon_option"] else moon_choice
+    if destination == "Saturn":
+        default_trajectory_type = (
+            stored_inputs.trajectory_type
+            if stored_inputs and stored_inputs.trajectory_type in app_services.TRAJECTORY_TYPES
+            else app_services.TRAJECTORY_TYPE_DIRECT
+        )
+        trajectory_type = st.radio(
+            "Trajectory type",
+            app_services.TRAJECTORY_TYPES,
+            index=app_services.TRAJECTORY_TYPES.index(default_trajectory_type),
+            help=(
+                "Direct solves a Lambert transfer over your chosen launch window below. "
+                "The historical option instead uses the real Cassini Venus-Venus-Earth-"
+                "Jupiter gravity-assist tour (1997-2004): its own real dates and delta-v "
+                "(Earth-departure injection plus the Saturn Orbit Insertion burn only - "
+                "every flyby in between is unpowered) replace the connected budget below, "
+                "independent of the launch window and moon selection above."
+            ),
+        )
+    else:
+        trajectory_type = app_services.TRAJECTORY_TYPE_DIRECT
     departure_type = st.radio(
         UI_TEXT["departure_type"],
         ["Direct", "LEO"],
@@ -191,6 +212,7 @@ mission_inputs = app_services.MissionSetupInputs(
     launch_window_end=launch_window_end,
     isp_s=isp_s,
     instruments_df=instruments_df,
+    trajectory_type=trajectory_type,
 )
 app_services.store_mission_setup_inputs(mission_inputs)
 if submitted:
@@ -208,15 +230,25 @@ if bundle is None:
     st.stop()
 
 displayed_dv_rows = list(bundle.complete_dv_budget.as_dict().items())
-displayed_dv_rows[1] = (
-    UI_TEXT["dsm_not_modeled"],
-    displayed_dv_rows[1][1],
-)
-if departure_type == "Direct":
-    displayed_dv_rows[0] = (
-        UI_TEXT["direct_departure_value"],
-        displayed_dv_rows[0][1],
+if trajectory_type == app_services.TRAJECTORY_TYPE_CASSINI_HISTORICAL:
+    displayed_dv_rows[1] = (
+        "Venus/Venus/Earth/Jupiter flybys (unpowered)",
+        displayed_dv_rows[1][1],
     )
+    displayed_dv_rows[2] = (
+        "Saturn Orbit Insertion (SOI)",
+        displayed_dv_rows[2][1],
+    )
+else:
+    displayed_dv_rows[1] = (
+        UI_TEXT["dsm_not_modeled"],
+        displayed_dv_rows[1][1],
+    )
+    if departure_type == "Direct":
+        displayed_dv_rows[0] = (
+            UI_TEXT["direct_departure_value"],
+            displayed_dv_rows[0][1],
+        )
 
 trajectory = bundle.earth_saturn_trajectory
 assert trajectory.departure_mjd2000 is not None
@@ -284,7 +316,15 @@ if share_url := st.session_state.get("mission_share_url"):
     st.code(share_url, language=None)
 
 st.header(UI_TEXT["results_header"])
-st.info(UI_TEXT["complete_chain_note"])
+if trajectory_type == app_services.TRAJECTORY_TYPE_CASSINI_HISTORICAL:
+    st.info(
+        "Historical Cassini-style gravity-assist trajectory: delta-v and duration below "
+        "are the real Earth-departure injection, the real Saturn Orbit Insertion (SOI) "
+        "burn, and the real October 1997 - July 2004 cruise - not a Lambert solve of the "
+        "launch window or moon selection above."
+    )
+else:
+    st.info(UI_TEXT["complete_chain_note"])
 
 st.subheader(UI_TEXT["provisional_budget"])
 st.caption(UI_TEXT["budget_caption"])
