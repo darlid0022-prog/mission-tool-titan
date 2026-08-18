@@ -1,12 +1,13 @@
 import json
 import unittest
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
 from streamlit.testing.v1 import AppTest
 
+import launch_window_service as lw
 from app_services import (
     MISSION_SETUP_STATE_KEY,
     MissionSetupInputs,
@@ -15,18 +16,17 @@ from app_services import (
 )
 from mission import physics
 from mission.bodies import resolve_body
+from mission.launch_search import evaluate_launch_scenario
+from mission.launch_search_ephemeris import solve_earth_saturn_lambert
 from mission.models import Leg, TrajectoryResult
 from mission.pareto import compute_connected_pareto_front
 from mission.pareto_plot import build_pareto_front_figure
-from mission.trajectory_visualization import (
-    CompleteMissionScene3D,
-    MissionAnimationTimeline3D,
-)
 
 APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
 
 
 def earth_saturn_leg() -> Leg:
+    solved = solve_earth_saturn_lambert(9_681.181818181818, 12_537.181818181829, 16)
     return Leg(
         origin="Earth",
         destination="Saturn",
@@ -37,6 +37,10 @@ def earth_saturn_leg() -> Leg:
             v_inf_depart=10_432.306468285773,
             v_inf_arrival=6_490.744714263188,
             method="lambert",
+            departure_position_m=solved.departure_position_m,
+            arrival_position_m=solved.arrival_position_m,
+            transfer_departure_velocity_m_s=solved.transfer_departure_velocity_m_s,
+            central_mu_m3_s2=resolve_body("Earth").get_mu_central_body(),
         ),
     )
 
@@ -223,9 +227,7 @@ class TestMissionSetupPage(unittest.TestCase):
         metrics = {metric.label: metric.value for metric in app.metric}
         self.assertEqual(metrics["Connected delta-v"], "12,531 m/s")
         self.assertEqual(metrics["Wet mass (simplified)"], "12,138 kg")
-        self.assertEqual(
-            metrics["Earth → Saturn flight time"], "2,856.0 days"
-        )
+        self.assertEqual(metrics["Earth → Saturn flight time"], "2,856.0 days")
         self.assertEqual(metrics["Total reference-scenario duration"], "2,859.4 days")
         self.assertEqual(metrics["Connected Saturn periapsis"], "150,000 km")
         self.assertEqual(metrics["Final Saturn-centred radius"], "1,221,870 km")
@@ -261,13 +263,9 @@ class TestMissionSetupPage(unittest.TestCase):
             app.run(timeout=30)
 
         self.assertFalse(app.exception)
-        self.assertFalse(
-            any(e.label == "Planned capabilities" for e in app.expander)
-        )
+        self.assertFalse(any(e.label == "Planned capabilities" for e in app.expander))
         # No leftover "-", "*", or blank placeholder anywhere on the page.
-        self.assertFalse(
-            [m.value for m in app.markdown if m.value.strip() in ("-", "*", "")]
-        )
+        self.assertFalse([m.value for m in app.markdown if m.value.strip() in ("-", "*", "")])
 
     def test_planned_capabilities_section_still_renders_when_non_empty(self):
         app = run_app()
@@ -312,19 +310,12 @@ class TestMissionSetupPage(unittest.TestCase):
 
         self.assertFalse(app.exception)
         links = app.get("page_link")
-        matching = [
-            link
-            for link in links
-            if link.proto.label == "Find an optimized launch window"
-        ]
+        matching = [link for link in links if link.proto.label == "Find an optimized launch window"]
         self.assertEqual(len(matching), 1)
         self.assertIn("launch_windows", matching[0].proto.page)
         # Rendering the link must not itself change which scenario is active.
         self.assertTrue(
-            any(
-                "Active scenario: Mission setup baseline" in c.value
-                for c in app.caption
-            )
+            any("Active scenario: Mission setup baseline" in c.value for c in app.caption)
         )
 
     def test_summary_exposes_share_and_pdf_actions(self):
@@ -435,34 +426,36 @@ class TestMissionSetupPage(unittest.TestCase):
 
 
 class TestTrajectory3DPage(unittest.TestCase):
-    def test_direct_mode_keeps_existing_animated_3d_rendering(self):
+    def test_direct_mode_renders_animated_heliocentric_and_static_saturn_scenes(self):
         app = run_app(page_path="pages/trajectory_3d.py")
 
         self.assertFalse(app.exception)
-        # The legacy animated chart plus the new generic-segment scene chart.
         self.assertEqual(len(app.get("plotly_chart")), 2)
-        self.assertTrue(app.segmented_control)
-        self.assertTrue(app.slider)
-        self.assertIn("trajectory_scene", app.session_state)
+        display = next(
+            control for control in app.segmented_control if control.label == "Trajectory display"
+        )
+        self.assertEqual(display.value, "Animated")
+        self.assertFalse(app.slider)
 
-    def test_discloses_the_legacy_scene_is_not_the_authoritative_budget_model(self):
+    def test_direct_page_uses_connected_capture_and_rejects_titan_claims(self):
         app = run_app(page_path="pages/trajectory_3d.py")
 
         self.assertFalse(app.exception)
         self.assertTrue(
             any(
-                "not the authoritative hyperbolic-arrival-and-capture model" in warning.value
-                for warning in app.warning
+                "not a phased Titan encounter or Titan-centred insertion" in caption.value
+                for caption in app.caption
             )
+        )
+        self.assertFalse(
+            any("legacy Saturn arrival-to-staging" in warning.value for warning in app.warning)
         )
 
     def test_historical_mode_renders_five_leg_tour_without_direct_animation_controls(self):
         app = AppTest.from_file(APP_PATH)
         with patch("app_services.compute_cached_trajectory", return_value=earth_saturn_result()):
             app.run(timeout=30)
-            trajectory_type = next(
-                radio for radio in app.radio if radio.label == "Trajectory type"
-            )
+            trajectory_type = next(radio for radio in app.radio if radio.label == "Trajectory type")
             trajectory_type.set_value("Cassini historical gravity assist")
             next(button for button in app.button if "Calculate" in button.label).click().run(
                 timeout=30
@@ -478,27 +471,28 @@ class TestTrajectory3DPage(unittest.TestCase):
         self.assertFalse(app.segmented_control)
         self.assertFalse(app.slider)
 
-    def test_current_phase_badge_matches_the_default_selected_phase(self):
-        app = run_app(page_path="pages/trajectory_3d.py")
-
-        self.assertFalse(app.exception)
-        # Default selected phase is "Earth → Saturn cruise" (interplanetary
-        # transfer) - same color as its badge on every other page.
-        self.assertEqual(badge_values(app), [":blue-badge[Interplanetary transfer]"])
-
     def test_chart_has_a_keyboard_accessible_data_table_alternative(self):
         app = run_app(page_path="pages/trajectory_3d.py")
 
         self.assertFalse(app.exception)
-        expander = next(e for e in app.expander if e.label == "View trajectory data as a table")
-        # st.expander is a native, keyboard-operable disclosure widget (no
-        # mouse-only affordance) and its content, a plain st.dataframe, is
-        # present in the tree regardless of the (collapsed-by-default) open
-        # state - both are queryable here without simulating a click.
+        expander = next(e for e in app.expander if e.label == "View segment data as a table")
         table = expander.dataframe[0].value
         self.assertEqual(
             list(table.columns),
-            ["Element", "Type", "Panel", "Point index", "x", "y", "z", "Unit"],
+            [
+                "Segment",
+                "Type",
+                "Origin",
+                "Destination",
+                "Point index",
+                "x",
+                "y",
+                "z",
+                "Departure date",
+                "Arrival date",
+                "Duration (days)",
+                "Delta-v (m/s)",
+            ],
         )
         self.assertGreater(len(table), 0)
 
@@ -512,140 +506,87 @@ class TestTrajectory3DPage(unittest.TestCase):
                 for heading in app.header
             )
         )
-        # Only this page's own charts are present now: other pages (e.g. the
-        # Pareto front on Optimization) are separate script runs and no
-        # longer share this run's element tree the way tabs used to. Two
-        # charts: the legacy animated scene and the new generic-segment scene.
         self.assertEqual(len(app.get("plotly_chart")), 2)
         self.assertTrue(
             any(
-                control.label == "Mission phase" and control.value == "Earth → Saturn cruise"
+                control.label == "Trajectory display" and control.value == "Animated"
                 for control in app.segmented_control
             )
         )
         self.assertTrue(
-            any(slider.label == "Elapsed time within selected phase" for slider in app.slider)
-        )
-        metrics = {metric.label: metric.value for metric in app.metric}
-        self.assertEqual(metrics["Current mission-elapsed time"], "0.00 days")
-        self.assertEqual(metrics["Current mission phase"], "Earth → Saturn cruise")
-
-    def test_animation_slider_uses_selected_phase_duration(self):
-        phase_duration_attributes = {
-            "Earth → Saturn cruise": "earth_saturn_duration_days",
-            "Saturn arrival → staging": "saturn_staging_duration_days",
-            "Saturn → Titan": "saturn_titan_duration_days",
-        }
-
-        for phase, duration_attribute in phase_duration_attributes.items():
-            with self.subTest(phase=phase):
-                app = run_app(page_path="pages/trajectory_3d.py", animation_phase=phase)
-                self.assertFalse(app.exception)
-                timeline = app.session_state["trajectory_timeline"]
-                slider = next(
-                    slider
-                    for slider in app.slider
-                    if slider.label == "Elapsed time within selected phase"
-                )
-                self.assertEqual(slider.min, 0.0)
-                self.assertEqual(slider.max, getattr(timeline, duration_attribute))
-                metrics = {metric.label: metric.value for metric in app.metric}
-                self.assertEqual(metrics["Current mission phase"], phase)
-
-                expected_absolute_start = {
-                    "Earth → Saturn cruise": 0.0,
-                    "Saturn arrival → staging": timeline.earth_saturn_duration_days,
-                    "Saturn → Titan": (
-                        timeline.earth_saturn_duration_days + timeline.saturn_staging_duration_days
-                    ),
-                }[phase]
-                self.assertEqual(
-                    metrics["Current mission-elapsed time"],
-                    f"{expected_absolute_start:,.2f} days",
-                )
-
-    def test_switching_animation_phase_resets_local_slider(self):
-        app = AppTest.from_file(APP_PATH)
-        with patch(
-            "app_services.compute_cached_trajectory",
-            return_value=earth_saturn_result(),
-        ):
-            app.run(timeout=30)
-            app.switch_page("pages/trajectory_3d.py").run(timeout=30)
-            phase_slider = next(
-                slider
-                for slider in app.slider
-                if slider.label == "Elapsed time within selected phase"
+            any(
+                "graphical interpolation, not an independent dynamical propagation" in caption.value
+                for caption in app.caption
             )
-            phase_slider.set_value(100.0).run(timeout=30)
-            self.assertEqual(phase_slider.value, 100.0)
-
-            phase_selector = next(
-                control for control in app.segmented_control if control.label == "Mission phase"
-            )
-            phase_selector.set_value("Saturn arrival → staging").run(timeout=30)
-
-        phase_slider = next(
-            slider for slider in app.slider if slider.label == "Elapsed time within selected phase"
-        )
-        self.assertEqual(phase_slider.value, 0.0)
-        metrics = {metric.label: metric.value for metric in app.metric}
-        timeline = app.session_state["trajectory_timeline"]
-        self.assertEqual(metrics["Current mission phase"], "Saturn arrival → staging")
-        self.assertEqual(
-            metrics["Current mission-elapsed time"],
-            f"{timeline.earth_saturn_duration_days:,.2f} days",
         )
 
-    def test_stale_animation_objects_are_rebuilt_after_module_reload(self):
-        app = AppTest.from_file(APP_PATH)
-        with patch(
-            "app_services.compute_cached_trajectory",
-            return_value=earth_saturn_result(),
-        ):
-            app.run(timeout=30)
-            app.switch_page("pages/trajectory_3d.py").run(timeout=30)
-            app.session_state["trajectory_scene"] = object()
-            app.session_state["trajectory_timeline"] = object()
-            app.run(timeout=30)
-
+    def test_static_fallback_keeps_the_direct_scene(self):
+        app = run_app(page_path="pages/trajectory_3d.py")
+        display = next(
+            control for control in app.segmented_control if control.label == "Trajectory display"
+        )
+        display.set_value("Static").run(timeout=30)
         self.assertFalse(app.exception)
-        self.assertIsInstance(
-            app.session_state["trajectory_scene"],
-            CompleteMissionScene3D,
-        )
-        self.assertIsInstance(
-            app.session_state["trajectory_timeline"],
-            MissionAnimationTimeline3D,
-        )
+        self.assertEqual(len(app.get("plotly_chart")), 2)
+        spec = json.loads(app.get("plotly_chart")[0].proto.spec)
+        self.assertNotIn("frames", spec)
 
     def test_generic_scene_section_offers_all_four_camera_presets_in_direct_mode(self):
         app = run_app(page_path="pages/trajectory_3d.py")
 
         self.assertFalse(app.exception)
-        self.assertTrue(
-            any(sub.value == "Generic segment view (Saturn system)" for sub in app.subheader)
-        )
         view_preset = next(
-            select for select in app.selectbox if select.label == "Camera view"
+            select
+            for select in app.selectbox
+            if select.label == "Camera view" and len(select.options) == 4
         )
         self.assertEqual(list(view_preset.options), ["Global", "Rings", "Periapsis", "Titan"])
         self.assertEqual(view_preset.value, "Global")
 
-    def test_generic_scene_section_real_scale_toggle_changes_marker_sizes(self):
+    def test_direct_animation_export_is_available(self):
         app = run_app(page_path="pages/trajectory_3d.py")
         self.assertFalse(app.exception)
-
-        scale_radio = next(
-            radio for radio in app.radio if radio.label == "Body marker scale"
+        self.assertTrue(
+            any(
+                button.label == "Download standalone HTML (offline-capable)"
+                for button in app.download_button
+            )
         )
-        self.assertEqual(scale_radio.value, "Enlarged (readable)")
-        readable_sizes = _plotly_marker_sizes(app.get("plotly_chart")[-1])
 
-        scale_radio.set_value("Real scale").run(timeout=30)
+    def test_active_launch_candidate_drives_the_animated_scene(self):
+        scenario = evaluate_launch_scenario(10_408.0, 12_428.0, sample_count=16)
+        epoch = datetime(2000, 1, 1, tzinfo=UTC)
+        candidate = lw.LaunchWindowCandidate(
+            rank=1,
+            departure_datetime=epoch + timedelta(days=scenario.launch_mjd2000),
+            saturn_arrival_datetime=epoch + timedelta(days=scenario.saturn_arrival_mjd2000),
+            scenario_end_datetime=epoch + timedelta(days=scenario.reference_phase_end_mjd2000),
+            time_of_flight_days=scenario.interplanetary_duration_days,
+            c3_km2_s2=scenario.c3_m2_s2 / 1_000_000.0,
+            v_infinity_earth_m_s=scenario.earth_v_infinity_m_s,
+            v_infinity_saturn_m_s=scenario.saturn_v_infinity_m_s,
+            delta_v_departure_m_s=scenario.delta_v_by_manoeuvre_m_s[0][1],
+            delta_v_capture_m_s=scenario.delta_v_by_manoeuvre_m_s[1][1],
+            delta_v_titan_circularization_m_s=(scenario.delta_v_by_manoeuvre_m_s[2][1]),
+            delta_v_total_m_s=scenario.total_delta_v_m_s,
+            scenario_id=scenario.scenario_id,
+            notes=scenario.assumptions,
+            segments=scenario.segments,
+        )
+        app = AppTest.from_file(APP_PATH)
+        with patch("app_services.compute_cached_trajectory", return_value=earth_saturn_result()):
+            app.run(timeout=30)
+            app.session_state[lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY] = candidate
+            app.switch_page("pages/trajectory_3d.py").run(timeout=30)
+
         self.assertFalse(app.exception)
-        scaled_sizes = _plotly_marker_sizes(app.get("plotly_chart")[-1])
-        self.assertNotEqual(readable_sizes, scaled_sizes)
+        self.assertTrue(any(scenario.scenario_id in caption.value for caption in app.caption))
+        self.assertTrue(
+            any(
+                control.label == "Trajectory display" and control.value == "Animated"
+                for control in app.segmented_control
+            )
+        )
 
     def test_generic_scene_section_offers_a_table_and_html_download(self):
         app = run_app(page_path="pages/trajectory_3d.py")
@@ -682,9 +623,7 @@ class TestTrajectory3DPage(unittest.TestCase):
         app = AppTest.from_file(APP_PATH)
         with patch("app_services.compute_cached_trajectory", return_value=earth_saturn_result()):
             app.run(timeout=30)
-            trajectory_type = next(
-                radio for radio in app.radio if radio.label == "Trajectory type"
-            )
+            trajectory_type = next(radio for radio in app.radio if radio.label == "Trajectory type")
             trajectory_type.set_value("Cassini historical gravity assist")
             next(button for button in app.button if "Calculate" in button.label).click().run(
                 timeout=30
@@ -693,14 +632,9 @@ class TestTrajectory3DPage(unittest.TestCase):
 
         self.assertFalse(app.exception)
         self.assertTrue(
-            any(
-                sub.value == "Generic segment view (gravity-assist tour)"
-                for sub in app.subheader
-            )
+            any(sub.value == "Generic segment view (gravity-assist tour)" for sub in app.subheader)
         )
-        view_preset = next(
-            select for select in app.selectbox if select.label == "Camera view"
-        )
+        view_preset = next(select for select in app.selectbox if select.label == "Camera view")
         self.assertEqual(list(view_preset.options), ["Global"])
 
 
@@ -729,8 +663,7 @@ class TestSaturnSystemStudiesPage(unittest.TestCase):
         self.assertFalse(app.exception)
         self.assertTrue(
             any(
-                heading.value
-                == "Saturn hyperbolic arrival & capture — authoritative model"
+                heading.value == "Saturn hyperbolic arrival & capture — authoritative model"
                 for heading in app.header
             )
         )
@@ -755,12 +688,7 @@ class TestSaturnSystemStudiesPage(unittest.TestCase):
         self.assertEqual(metrics["Circularization delta-v"], "2,966.2 m/s")
 
         # No Titan encounter/capture claimed anywhere in this section.
-        self.assertTrue(
-            any(
-                "does not model a Titan encounter" in info.value
-                for info in app.info
-            )
-        )
+        self.assertTrue(any("does not model a Titan encounter" in info.value for info in app.info))
 
         with self.subTest(check="assumptions_exclusions_render_as_one_list_per_call"):
             markdown_values = [markdown.value for markdown in app.markdown]
