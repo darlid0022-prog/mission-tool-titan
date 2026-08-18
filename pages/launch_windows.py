@@ -285,3 +285,27 @@ else:
         else:
             st.caption("The connected engine did not report any assumptions for this search.")
         st.caption(f"Engine: {result.engine_name}")
+
+    st.divider()
+    mission_setup_inputs = app_services.load_mission_setup_inputs()
+    if mission_setup_inputs is None:
+        st.info(
+            "Configure and calculate a mission on the Mission setup page first, then "
+            "you can send this candidate's launch date to the 3D trajectory view."
+        )
+    else:
+        if st.button(
+            "Send selected candidate to 3D view",
+            icon=":material/3d_rotation:",
+            help=(
+                "Narrows Mission setup's launch window to this candidate's departure "
+                "date (every other Mission setup input is kept) and opens the 3D "
+                "trajectory page - the same Lambert engine and 3D page every other "
+                "page already uses, not a second one."
+            ),
+        ):
+            updated_inputs = lw.apply_candidate_to_mission_setup(
+                selected_candidate, mission_setup_inputs
+            )
+            app_services.store_mission_setup_inputs(updated_inputs)
+            st.switch_page("pages/trajectory_3d.py")

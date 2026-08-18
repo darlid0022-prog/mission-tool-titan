@@ -1,6 +1,9 @@
 import unittest
 from datetime import date, datetime, timezone
 
+import pandas as pd
+
+import app_services
 from launch_window_service import (
     LAUNCH_WINDOW_OBJECTIVE_MIN_DELTA_V,
     LAUNCH_WINDOW_OBJECTIVES,
@@ -9,6 +12,7 @@ from launch_window_service import (
     LaunchWindowCandidate,
     LaunchWindowSearchRequest,
     LaunchWindowSearchResult,
+    apply_candidate_to_mission_setup,
     get_launch_window_service,
 )
 
@@ -187,6 +191,49 @@ class TestNoEngineConnectedByDefault(unittest.TestCase):
         # is the explicit "not connected" signal pages/launch_windows.py
         # checks for.
         self.assertIsNone(get_launch_window_service())
+
+
+class TestApplyCandidateToMissionSetup(unittest.TestCase):
+    def _mission_setup_inputs(self) -> app_services.MissionSetupInputs:
+        return app_services.MissionSetupInputs(
+            destination="Saturn",
+            selected_moon="Titan",
+            departure_type="LEO",
+            leo_altitude_km=300.0,
+            saturn_periapsis_radius_km=62_500.0,
+            saturn_staging_radius_km=610_000.0,
+            titan_capture_altitude_km=1_600.0,
+            launch_window_start=date(2026, 1, 1),
+            launch_window_end=date(2026, 12, 31),
+            isp_s=340.0,
+            instruments_df=pd.DataFrame(columns=app_services.INSTRUMENT_COLUMNS),
+            trajectory_type=app_services.TRAJECTORY_TYPE_CASSINI_HISTORICAL,
+        )
+
+    def test_narrows_the_launch_window_to_the_candidates_departure_day(self):
+        candidate = LaunchWindowCandidate(**_valid_candidate_kwargs())
+        updated = apply_candidate_to_mission_setup(candidate, self._mission_setup_inputs())
+        self.assertEqual(updated.launch_window_start, date(2026, 7, 1))
+        self.assertEqual(updated.launch_window_end, date(2026, 7, 2))
+
+    def test_forces_the_direct_trajectory_type(self):
+        candidate = LaunchWindowCandidate(**_valid_candidate_kwargs())
+        updated = apply_candidate_to_mission_setup(candidate, self._mission_setup_inputs())
+        self.assertEqual(updated.trajectory_type, app_services.TRAJECTORY_TYPE_DIRECT)
+
+    def test_leaves_every_other_field_unchanged(self):
+        original = self._mission_setup_inputs()
+        candidate = LaunchWindowCandidate(**_valid_candidate_kwargs())
+        updated = apply_candidate_to_mission_setup(candidate, original)
+        self.assertEqual(updated.destination, original.destination)
+        self.assertEqual(updated.selected_moon, original.selected_moon)
+        self.assertEqual(updated.departure_type, original.departure_type)
+        self.assertEqual(updated.leo_altitude_km, original.leo_altitude_km)
+        self.assertEqual(updated.saturn_periapsis_radius_km, original.saturn_periapsis_radius_km)
+        self.assertEqual(updated.saturn_staging_radius_km, original.saturn_staging_radius_km)
+        self.assertEqual(updated.titan_capture_altitude_km, original.titan_capture_altitude_km)
+        self.assertEqual(updated.isp_s, original.isp_s)
+        self.assertIs(updated.instruments_df, original.instruments_df)
 
 
 if __name__ == "__main__":

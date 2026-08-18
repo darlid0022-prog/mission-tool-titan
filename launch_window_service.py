@@ -31,10 +31,14 @@ it is never mistaken for real engine output.
 
 from __future__ import annotations
 
+import dataclasses
 import math
 from dataclasses import dataclass
-from datetime import date, datetime
-from typing import Protocol, runtime_checkable
+from datetime import date, datetime, timedelta
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from app_services import MissionSetupInputs
 
 # Julian year in days - matches the convention already used for
 # TrajectoryResult.tof_years elsewhere in this app (trajectory.py).
@@ -245,3 +249,50 @@ def get_launch_window_service() -> LaunchWindowSearchService | None:
     search results.
     """
     return None
+
+
+def apply_candidate_to_mission_setup(
+    candidate: LaunchWindowCandidate,
+    current_inputs: "MissionSetupInputs",
+) -> "MissionSetupInputs":
+    """Adapt one chosen candidate into an updated Mission-setup input set.
+
+    Minimal, isolated "send to 3D" adapter: it narrows `current_inputs`'
+    launch window to the single day the candidate departs on and forces
+    the Direct trajectory type, then returns the updated inputs for the
+    caller to store (see app_services.store_mission_setup_inputs). It does
+    not compute or duplicate any trajectory itself - narrowing the launch
+    window and letting the existing, unmodified Mission-setup pipeline
+    (trajectory.py's compute_trajectory, already used everywhere else in
+    this app) resolve it is how this app already lets a user pick a
+    specific departure date, and how it already reaches
+    pages/trajectory_3d.py (the completed, unmodified 3D page) without a
+    second trajectory or visualization engine.
+
+    Every other field (destination, moon, radii, Isp, instruments) is
+    copied unchanged from `current_inputs`: this adapter only ever answers
+    "when do we leave", never "what mission are we flying". Requires an
+    existing MissionSetupInputs (from app_services.load_mission_setup_inputs())
+    - callers should offer this action only once a mission is configured,
+    matching every other page's existing "configure a mission first" guard,
+    rather than this module inventing default mission parameters that could
+    drift from Mission setup's own defaults.
+
+    Isolated deliberately: once the real engine can hand off exact position
+    vectors (or a full trajectory object) directly, this function is the
+    only place that needs to change - neither
+    LaunchWindowCandidate/LaunchWindowSearchResult above nor
+    pages/trajectory_3d.py would need to.
+    """
+    # Local import: app_services is the UI orchestration layer this module
+    # is deliberately kept independent of at import time (see module
+    # docstring on isolation), even though no import cycle exists today.
+    from app_services import TRAJECTORY_TYPE_DIRECT
+
+    departure_date = candidate.departure_datetime.date()
+    return dataclasses.replace(
+        current_inputs,
+        launch_window_start=departure_date,
+        launch_window_end=departure_date + timedelta(days=1),
+        trajectory_type=TRAJECTORY_TYPE_DIRECT,
+    )
