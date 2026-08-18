@@ -195,15 +195,25 @@ class TestMissionSetupPage(unittest.TestCase):
         app = run_app()
 
         self.assertFalse(app.exception)
+        # Lunar transfer and Landing are marked "(not included)" - the
+        # connected budget (mission.dv_budget.MissionDeltaVBudget) has no
+        # field for either phase, so the key must not imply they contribute
+        # to the delta-v total, while still using the same shared colors.
         self.assertEqual(
             badge_values(app),
             [
                 ":orange-badge[Launch]",
                 ":blue-badge[Interplanetary transfer]",
                 ":green-badge[Arrival / orbit insertion]",
-                ":violet-badge[Lunar transfer]",
-                ":red-badge[Landing]",
+                ":violet-badge[Lunar transfer (not included)]",
+                ":red-badge[Landing (not included)]",
             ],
+        )
+        self.assertTrue(
+            any(
+                "Lunar transfer and Landing are not modeled" in caption.value
+                for caption in app.caption
+            )
         )
 
     def test_scorecard_displays_live_connected_results(self):
@@ -229,6 +239,93 @@ class TestMissionSetupPage(unittest.TestCase):
         # Removed from the scorecard: the isolated flyby demonstrators are not
         # directly additive as delta-v savings (see pages/gravity_assists.py).
         self.assertNotIn("Flyby gain coverage", metrics)
+
+    def test_scorecard_delta_v_matches_the_provisional_budget_table_sum(self):
+        app = run_app()
+
+        self.assertFalse(app.exception)
+        metrics = {metric.label: metric.value for metric in app.metric}
+        # Different formatting (thousands separator), same underlying
+        # bundle.dv_total value in both places.
+        self.assertEqual(metrics["Connected delta-v"], "12,531 m/s")
+        self.assertEqual(metrics["Sum of budgeted delta-v values"], "12531 m/s")
+
+    def test_planned_capabilities_section_is_absent_when_every_collection_is_empty(self):
+        with (
+            patch("app_services.compute_cached_trajectory", return_value=earth_saturn_result()),
+            patch("mission.capabilities.MOON_DESTINATIONS", {}),
+            patch("mission.capabilities.PLANNED_DESTINATIONS", ()),
+            patch("mission.capabilities.PLANNED_MISSION_FEATURES", ()),
+        ):
+            app = AppTest.from_file(APP_PATH)
+            app.run(timeout=30)
+
+        self.assertFalse(app.exception)
+        self.assertFalse(
+            any(e.label == "Planned capabilities" for e in app.expander)
+        )
+        # No leftover "-", "*", or blank placeholder anywhere on the page.
+        self.assertFalse(
+            [m.value for m in app.markdown if m.value.strip() in ("-", "*", "")]
+        )
+
+    def test_planned_capabilities_section_still_renders_when_non_empty(self):
+        app = run_app()
+
+        self.assertFalse(app.exception)
+        self.assertTrue(any(e.label == "Planned capabilities" for e in app.expander))
+
+    def test_titan_scope_text_points_to_the_dedicated_studies_page(self):
+        app = run_app()
+
+        self.assertFalse(app.exception)
+        info_values = " ".join(i.value for i in app.info)
+        self.assertIn(
+            "Legacy Saturn staging, Titan-transfer, and Titan-entry studies remain "
+            "available on Saturn & Titan studies. They are isolated from the "
+            "connected budget.",
+            info_values,
+        )
+        self.assertNotIn("legacy Saturn staging and moon-transfer studies below", info_values)
+
+    def test_date_source_shows_a_calendar_date_with_mjd2000_as_a_technical_detail(self):
+        app = run_app()
+
+        self.assertFalse(app.exception)
+        captions = [c.value for c in app.caption]
+        self.assertTrue(
+            any(
+                "Date source: Mission setup Earth → Saturn trajectory solution "
+                "(2026-07-04 → 2034-04-29 UTC)." == c
+                for c in captions
+            )
+        )
+        self.assertTrue(
+            any(
+                c.startswith("MJD2000 epoch reference (technical): 9681.182 → 12537.182")
+                for c in captions
+            )
+        )
+
+    def test_launch_windows_link_is_present_and_does_not_switch_the_active_scenario(self):
+        app = run_app()
+
+        self.assertFalse(app.exception)
+        links = app.get("page_link")
+        matching = [
+            link
+            for link in links
+            if link.proto.label == "Find an optimized launch window"
+        ]
+        self.assertEqual(len(matching), 1)
+        self.assertIn("launch_windows", matching[0].proto.page)
+        # Rendering the link must not itself change which scenario is active.
+        self.assertTrue(
+            any(
+                "Active scenario: Mission setup baseline" in c.value
+                for c in app.caption
+            )
+        )
 
     def test_summary_exposes_share_and_pdf_actions(self):
         app = run_app()

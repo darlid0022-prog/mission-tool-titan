@@ -44,9 +44,9 @@ UI_TEXT: Final[dict[str, str]] = {
     "calculate": "Calculate trajectory",
     "titan_scope": (
         "The connected budget reaches a Saturn-centered orbit at Titan's orbital radius, "
-        "not Titan itself. The legacy Saturn staging and moon-transfer studies below model "
-        "a further step toward Titan for reference; their assumptions and exclusions "
-        "remain visible."
+        "not Titan itself. Legacy Saturn staging, Titan-transfer, and Titan-entry studies "
+        "remain available on Saturn & Titan studies. They are isolated from the connected "
+        "budget."
     ),
     "planned_capabilities": "Planned capabilities",
     "connected_destinations": "Connected mission destinations: ",
