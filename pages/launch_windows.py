@@ -10,9 +10,12 @@ parallel, on a separate branch). This page never fabricates example search
 results; when no engine is connected it says so explicitly instead.
 """
 
+from datetime import timezone
+
 import streamlit as st
 
 import app_services
+import launch_window_plot
 import launch_window_service as lw
 
 RESULT_STATE_KEY = "launch_window_result"
@@ -164,4 +167,121 @@ elif not result.candidates:
         "the search window or the time-of-flight range."
     )
 else:
-    st.success(f"{len(result.candidates)} candidate(s) found — results view is built in a later step.")
+    candidates = result.candidates
+    st.subheader(f"{len(candidates)} candidate(s) found")
+
+    rank_options = [candidate.rank for candidate in candidates]
+
+    def _format_rank_option(rank: int, _candidates=candidates) -> str:
+        candidate = next(c for c in _candidates if c.rank == rank)
+        launch_date = candidate.departure_datetime.astimezone(timezone.utc).date().isoformat()
+        return f"#{rank} — {launch_date}"
+
+    stored_selected_rank = st.session_state.get(SELECTED_RANK_KEY)
+    default_selected_rank = (
+        stored_selected_rank if stored_selected_rank in rank_options else rank_options[0]
+    )
+    selected_rank = st.selectbox(
+        "Selected candidate",
+        rank_options,
+        index=rank_options.index(default_selected_rank),
+        format_func=_format_rank_option,
+        help="The candidate highlighted in the table and chart below, and sent to the 3D page.",
+    )
+    st.session_state[SELECTED_RANK_KEY] = selected_rank
+    selected_candidate = next(c for c in candidates if c.rank == selected_rank)
+
+    st.warning(
+        "Arrival at Titan's orbital radius does not guarantee a phased encounter with "
+        "Titan: Titan must actually be at that point in its orbit when the spacecraft "
+        "arrives. This search targets Saturn/Titan's orbital radius only, not a phased "
+        "Titan intercept."
+    )
+
+    with st.container(horizontal=True):
+        st.metric(
+            "Best launch date/time (UTC)",
+            selected_candidate.departure_datetime.astimezone(timezone.utc).strftime(
+                "%Y-%m-%d %H:%M"
+            ),
+            border=True,
+        )
+        st.metric(
+            "Saturn arrival (UTC)",
+            selected_candidate.saturn_arrival_datetime.astimezone(timezone.utc).strftime(
+                "%Y-%m-%d %H:%M"
+            ),
+            border=True,
+        )
+        st.metric(
+            "Scenario end (UTC)",
+            selected_candidate.scenario_end_datetime.astimezone(timezone.utc).strftime(
+                "%Y-%m-%d %H:%M"
+            ),
+            border=True,
+        )
+    with st.container(horizontal=True):
+        st.metric(
+            "Duration",
+            f"{selected_candidate.time_of_flight_days:,.1f} days "
+            f"({selected_candidate.time_of_flight_years:,.2f} yr)",
+            border=True,
+        )
+        st.metric("C3", f"{selected_candidate.c3_km2_s2:,.2f} km²/s²", border=True)
+        st.metric(
+            "v∞ Earth", f"{selected_candidate.v_infinity_earth_m_s:,.1f} m/s", border=True
+        )
+        st.metric(
+            "v∞ Saturn", f"{selected_candidate.v_infinity_saturn_m_s:,.1f} m/s", border=True
+        )
+    with st.container(horizontal=True):
+        st.metric(
+            "Delta-v departure",
+            f"{selected_candidate.delta_v_departure_m_s:,.1f} m/s",
+            border=True,
+        )
+        st.metric(
+            "Delta-v capture", f"{selected_candidate.delta_v_capture_m_s:,.1f} m/s", border=True
+        )
+        st.metric(
+            "Delta-v Titan circularization",
+            f"{selected_candidate.delta_v_titan_circularization_m_s:,.1f} m/s",
+            border=True,
+        )
+        st.metric(
+            "Delta-v total", f"{selected_candidate.delta_v_total_m_s:,.1f} m/s", border=True
+        )
+
+    st.dataframe(
+        launch_window_plot.build_candidates_dataframe(candidates, selected_rank=selected_rank),
+        width="stretch",
+        hide_index=True,
+    )
+    st.caption(
+        'Click any column header to sort. "Selected" marks the candidate highlighted '
+        "below and on the chart — also the accessible, screen-reader-navigable "
+        "alternative to the chart, built from the same data."
+    )
+
+    st.plotly_chart(
+        launch_window_plot.build_candidates_chart(
+            candidates,
+            selected_rank=selected_rank,
+            pareto_candidate_ranks=result.pareto_candidate_ranks,
+        ),
+        width="stretch",
+        key="launch_window_candidates_chart",
+        config={"displaylogo": False, "scrollZoom": True},
+    )
+    if result.pareto_candidate_ranks is None:
+        st.caption(
+            "Pareto front over these candidates: not yet available from the connected "
+            "engine — reserved for the trade-off objective."
+        )
+
+    with st.expander("Assumptions"):
+        if result.assumptions:
+            st.markdown("\n".join(f"- {note}" for note in result.assumptions))
+        else:
+            st.caption("The connected engine did not report any assumptions for this search.")
+        st.caption(f"Engine: {result.engine_name}")
