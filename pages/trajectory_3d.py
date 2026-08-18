@@ -134,6 +134,13 @@ bundle = app_services.require_mission_bundle()
 if bundle is None:
     st.stop()
 
+# Only connected Saturn->Titan missions include staging and Titan-transfer studies
+# required to build the full 3D scene. For planet-only arrivals show an informative
+# message and stop early instead of failing with attribute errors.
+if bundle.staging_result is None or bundle.titan_transfer is None:
+    st.info("3D animation is available only for connected Saturn->Titan missions. Select Titan to view the full scene.")
+    st.stop()
+
 st.header(UI_TEXT["trajectory_3d_header"])
 st.caption(UI_TEXT["trajectory_3d_caption"])
 with st.container(border=True):

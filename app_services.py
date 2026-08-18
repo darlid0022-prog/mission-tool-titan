@@ -11,7 +11,12 @@ from mission.feasibility_check import (
     SingleStageFeasibilityResult,
     evaluate_single_stage_chemical_feasibility,
 )
-from mission.full_mission import EarthSaturnTitanMissionResult, compute_earth_saturn_titan_mission
+from mission.full_mission import (
+    EarthDestinationMissionResult,
+    EarthSaturnTitanMissionResult,
+    compute_earth_destination_mission,
+    compute_earth_saturn_titan_mission,
+)
 from mission.gravity_assist import (
     GravityAssistResult,
     compute_earth_flyby_demonstration,
@@ -121,10 +126,14 @@ class MissionBundle:
     """Every result derived from MissionSetupInputs that other pages render."""
 
     traj: dict
-    complete_mission: EarthSaturnTitanMissionResult
-    staging_result: SaturnArrivalStagingResult
-    titan_transfer: SaturnTitanTransferResult
-    titan_edl: TitanEdlResult
+    # For planet-only destinations `complete_mission` will be the generic
+    # EarthDestinationMissionResult and the Saturn/Titan-specific fields will
+    # be None. For Saturn->Titan chains the full EarthSaturnTitanMissionResult
+    # and related studies are populated.
+    complete_mission: EarthDestinationMissionResult | EarthSaturnTitanMissionResult
+    staging_result: SaturnArrivalStagingResult | None
+    titan_transfer: SaturnTitanTransferResult | None
+    titan_edl: TitanEdlResult | None
     complete_dv_budget: MissionDeltaVBudget
     dv_total: float
     mass: dict
@@ -161,34 +170,71 @@ def compute_mission_bundle(inputs: MissionSetupInputs) -> MissionBundle:
         raise DestinationNotImplementedError(
             traj.get("note", UI_TEXT["destination_not_implemented"])
         )
+    # Build either the connected Saturn->Titan chain when a moon is selected,
+    # or a simplified planet-only mission when no moon is selected. The latter
+    # still provides sensible DV/mass numbers by composing the Earth->planet
+    # Lambert budget and leaving Saturn/Titan-specific terms as zero.
+    earth_leg = traj["earth_saturn_leg"]
     if inputs.selected_moon is None:
-        raise DirectArrivalOnlyError(UI_TEXT["direct_arrival_only_note"])
+        # Planet-only mission: use the generic assembler which returns an
+        # EarthDestinationMissionResult with arrival_staging/moon_transfer == None.
+        complete_mission = compute_earth_destination_mission(
+            earth_leg,
+            destination_planet=inputs.destination,
+            moon=None,
+        )
 
-    complete_mission = compute_earth_saturn_titan_mission(
-        traj["earth_saturn_leg"],
-        saturn_periapsis_radius_m=float(inputs.saturn_periapsis_radius_km) * 1_000.0,
-        saturn_periapsis_radius_provenance=(
-            "User-selected Saturn-centered radius; nominal value preserves the "
-            "PyKEP Saturn radius plus UI capture altitude."
-        ),
-        saturn_staging_radius_m=float(inputs.saturn_staging_radius_km) * 1_000.0,
-        titan_capture_altitude_m=float(inputs.titan_capture_altitude_km) * 1_000.0,
-    )
+        staging_result = None
+        titan_transfer = None
+        titan_edl = None
 
-    staging_result = complete_mission.saturn_arrival_staging
-    titan_transfer = complete_mission.saturn_titan_transfer
-    titan_edl = compute_titan_edl(
-        titan_transfer.v_infinity_titan_m_s,
-        titan_transfer.capture_delta_v_m_s,
-    )
-    complete_dv_budget = compose_complete_dv_budget(
-        traj["dv_budget"],
-        staging_result,
-        titan_transfer,
-    )
-    dv_total = complete_dv_budget.total_m_s
-    mass = compute_mass_budget(dv_total, inputs.isp_s, inputs.instruments_df)
-    mass_ratio = mass["wet_mass_kg"] / mass["dry_mass_kg"] if mass["dry_mass_kg"] > 0 else 1.0
+        # Compose a simplified DV budget: keep the Earth departure and DSM/flyby
+        # terms from the Lambert budget and set Saturn/Titan-specific entries to
+        # zero so downstream UI can still render a full table consistently.
+        earth_budget = traj.get("dv_budget", {})
+        earth_departure = float(earth_budget.get("dV from LEO", 0.0))
+        dsm_flyby = float(earth_budget.get("dV DSM/Fly-By", 0.0))
+        complete_dv_budget = MissionDeltaVBudget(
+            earth_departure_m_s=earth_departure,
+            dsm_flyby_m_s=dsm_flyby,
+            saturn_capture_to_ellipse_m_s=0.0,
+            saturn_staging_circularisation_m_s=0.0,
+            saturn_titan_departure_m_s=0.0,
+            titan_capture_m_s=0.0,
+        )
+
+        dv_total = complete_dv_budget.total_m_s
+        mass = compute_mass_budget(dv_total, inputs.isp_s, inputs.instruments_df)
+        mass_ratio = mass["wet_mass_kg"] / mass["dry_mass_kg"] if mass["dry_mass_kg"] > 0 else 1.0
+    else:
+        # Connected Saturn->Titan chain: use the historical facade which builds
+        # the two Saturn-specific studies and returns the full EarthSaturnTitan
+        # mission result expected across the app.
+        complete_mission = compute_earth_saturn_titan_mission(
+            earth_leg,
+            saturn_periapsis_radius_m=float(inputs.saturn_periapsis_radius_km) * 1_000.0,
+            saturn_periapsis_radius_provenance=(
+                "User-selected Saturn-centered radius; nominal value preserves the "
+                "PyKEP Saturn radius plus UI capture altitude."
+            ),
+            saturn_staging_radius_m=float(inputs.saturn_staging_radius_km) * 1_000.0,
+            titan_capture_altitude_m=float(inputs.titan_capture_altitude_km) * 1_000.0,
+        )
+
+        staging_result = complete_mission.saturn_arrival_staging
+        titan_transfer = complete_mission.saturn_titan_transfer
+        titan_edl = compute_titan_edl(
+            titan_transfer.v_infinity_titan_m_s,
+            titan_transfer.capture_delta_v_m_s,
+        )
+        complete_dv_budget = compose_complete_dv_budget(
+            traj["dv_budget"],
+            staging_result,
+            titan_transfer,
+        )
+        dv_total = complete_dv_budget.total_m_s
+        mass = compute_mass_budget(dv_total, inputs.isp_s, inputs.instruments_df)
+        mass_ratio = mass["wet_mass_kg"] / mass["dry_mass_kg"] if mass["dry_mass_kg"] > 0 else 1.0
 
     payload_items = tuple(
         PayloadItem(
@@ -211,8 +257,8 @@ def compute_mission_bundle(inputs: MissionSetupInputs) -> MissionBundle:
     mission_duration_days = (
         float(earth_saturn_trajectory.arrival_mjd2000)
         - float(earth_saturn_trajectory.departure_mjd2000)
-        + staging_result.time_of_flight_days
-        + titan_transfer.time_of_flight_days
+        + (staging_result.time_of_flight_days if staging_result is not None else 0.0)
+        + (titan_transfer.time_of_flight_days if titan_transfer is not None else 0.0)
     )
     flyby_demonstrations = (
         compute_venus_flyby_demonstration(),

@@ -12,6 +12,12 @@ bundle = app_services.require_mission_bundle()
 if bundle is None:
     st.stop()
 
+# Saturn studies require a connected Saturn->Titan mission; for planet-only
+# arrivals inform the user and stop instead of assuming Saturn-specific data.
+if bundle.staging_result is None:
+    st.info("Saturn system studies are available only when a moon destination (Titan) is selected.")
+    st.stop()
+
 staging_result = bundle.staging_result
 titan_transfer = bundle.titan_transfer
 titan_edl = bundle.titan_edl
