@@ -248,7 +248,6 @@ def search_direct_earth_saturn_titan(config: LaunchSearchConfig) -> LaunchSearch
     )
     coarse_pairs = tuple((departure, departure + flight_time) for departure in departures for flight_time in flight_times)
     sample_count = FAST_ARC_SAMPLE_COUNT if config.fast_mode else COARSE_ARC_SAMPLE_COUNT
-    cache_before = heliocentric_state.cache_info().misses
     coarse, rejected = _evaluate_pairs(coarse_pairs, sample_count)
     if not coarse:
         raise RuntimeError("No feasible direct Earth-to-Saturn Lambert solution was found.")
@@ -275,11 +274,16 @@ def search_direct_earth_saturn_titan(config: LaunchSearchConfig) -> LaunchSearch
     all_scenarios_by_id = {item.scenario_id: item for item in (*coarse, *refined)}
     ranked = rank_scenarios(tuple(all_scenarios_by_id.values()), config.objective)
     retained = ranked[: config.keep_count]
+    evaluated_pairs = (*coarse_pairs, *tuple(sorted(refined_pairs)))
+    unique_ephemeris_requests = {
+        *(("Earth", departure) for departure, _ in evaluated_pairs),
+        *(("Saturn", arrival) for _, arrival in evaluated_pairs),
+    }
     return LaunchSearchResult(
         config=config,
         solutions=retained,
         pareto_front=compute_pareto_front(tuple(all_scenarios_by_id.values())),
         rejected_pairs=(*rejected, *refined_rejected),
         evaluated_pair_count=len(coarse_pairs) + len(refined_pairs),
-        ephemeris_evaluation_count=heliocentric_state.cache_info().misses - cache_before,
+        ephemeris_evaluation_count=len(unique_ephemeris_requests),
     )
