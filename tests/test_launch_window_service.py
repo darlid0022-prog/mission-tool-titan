@@ -140,6 +140,36 @@ class TestLaunchWindowCandidateValidation(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "c3_km2_s2"):
             LaunchWindowCandidate(**kwargs)
 
+    def test_total_duration_is_computed_from_dates_and_never_equals_flight_time(self):
+        """Non-regression: total_duration_days (departure -> scenario end,
+        including the post-arrival Saturn capture and Titan-orbital-radius
+        circularization) must be a distinct, independently-computed value
+        from time_of_flight_days (the Earth -> Saturn cruise only, straight
+        from the engine) - never silently collapsed into the same number.
+        """
+        candidate = LaunchWindowCandidate(**_valid_candidate_kwargs())
+        # departure 2026-07-01 12:00 -> scenario end 2033-09-20 00:00.
+        self.assertAlmostEqual(candidate.total_duration_days, 2_637.5, places=6)
+        self.assertNotAlmostEqual(candidate.total_duration_days, candidate.time_of_flight_days)
+        self.assertGreater(candidate.total_duration_days, candidate.time_of_flight_days)
+        self.assertAlmostEqual(
+            candidate.total_duration_days - candidate.time_of_flight_days, 18.75, places=6
+        )
+        self.assertAlmostEqual(candidate.total_duration_years, 2_637.5 / 365.25)
+
+    def test_total_duration_tracks_scenario_end_not_saturn_arrival(self):
+        """total_duration_days must reflect scenario_end_datetime (post-arrival
+        capture + circularization included), not stop at saturn_arrival_datetime."""
+        kwargs = _valid_candidate_kwargs()
+        candidate_short_scenario = LaunchWindowCandidate(
+            **{**kwargs, "scenario_end_datetime": kwargs["saturn_arrival_datetime"]}
+        )
+        candidate_long_scenario = LaunchWindowCandidate(**kwargs)
+        self.assertGreater(
+            candidate_long_scenario.total_duration_days,
+            candidate_short_scenario.total_duration_days,
+        )
+
 
 class TestLaunchWindowSearchResultValidation(unittest.TestCase):
     def test_accepts_a_valid_result_with_no_candidates(self):

@@ -68,7 +68,7 @@ class TestBuildCandidatesChart(unittest.TestCase):
 
     def test_axis_titles_never_mix_two_measures_on_one_axis(self):
         figure = build_candidates_chart((_candidate(1),), selected_rank=1)
-        self.assertEqual(figure.layout.xaxis.title.text, "Time of flight (days)")
+        self.assertEqual(figure.layout.xaxis.title.text, "Earth → Saturn flight time (days)")
         self.assertEqual(figure.layout.yaxis.title.text, "Delta-v total (m/s)")
 
     def test_pareto_ranks_render_as_a_distinct_trace(self):

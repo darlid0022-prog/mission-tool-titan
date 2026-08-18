@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 # Julian year in days - matches the convention already used for
 # TrajectoryResult.tof_years elsewhere in this app (trajectory.py).
 DAYS_PER_YEAR = 365.25
+SECONDS_PER_DAY = 86_400.0
 
 MAX_LAUNCH_WINDOW_RESULTS = 200
 
@@ -167,6 +168,29 @@ class LaunchWindowCandidate:
     def time_of_flight_years(self) -> float:
         """Derived purely from `time_of_flight_days` - never re-requested from the engine."""
         return self.time_of_flight_days / DAYS_PER_YEAR
+
+    @property
+    def total_duration_days(self) -> float:
+        """The full reference-scenario span: departure to scenario end.
+
+        Deliberately NOT the same quantity as `time_of_flight_days` (the
+        Earth -> Saturn cruise only): this also covers the Saturn
+        capture-to-ellipse burn and the circularization to Titan's orbital
+        radius that happen after arrival, per `scenario_end_datetime`.
+        Computed purely from the two already-validated datetimes below - not
+        re-requested from the engine - but numerically identical to it: both
+        datetimes were themselves built from the engine's own MJD2000 epochs,
+        so this recovers the engine's total_duration_days without a second,
+        independently-drifting field.
+        """
+        return (
+            self.scenario_end_datetime - self.departure_datetime
+        ).total_seconds() / SECONDS_PER_DAY
+
+    @property
+    def total_duration_years(self) -> float:
+        """Derived purely from `total_duration_days` - never re-requested from the engine."""
+        return self.total_duration_days / DAYS_PER_YEAR
 
     def segments_for_scene(
         self,
