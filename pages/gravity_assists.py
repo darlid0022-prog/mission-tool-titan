@@ -23,12 +23,18 @@ flyby_demonstrations = (
 
 st.header(":material/rocket_launch: Gravity-assist flyby demonstrators")
 st.caption(
-    "Isolated, energy-conserving patched-conic demonstrations. They are not wired into "
-    "the connected Earth → Saturn → Titan trajectory or its budget."
+    "Isolated, unpowered (non-propulsive), energy-conserving patched-conic "
+    "demonstrations — each computed independently, on its own fixed dates. They do "
+    "not form a connected VVEJGA trajectory, are not wired into the connected "
+    "Earth → Saturn trajectory or its budget, and their heliocentric speed gains "
+    "are not directly additive as delta-v savings (each flyby's gain depends on the "
+    "incoming state the *previous* leg would have delivered, which none of these "
+    "isolated demonstrators supplies to the next)."
 )
 for flyby_result in flyby_demonstrations:
     with st.container(border=True):
         st.subheader(f"{flyby_result.body} flyby")
+        st.caption("Unpowered flyby — no propulsive delta-v is spent on this maneuver.")
         with st.container(horizontal=True):
             st.metric(
                 "Incoming v∞", f"{flyby_result.v_infinity_magnitude_m_s:,.1f} m/s", border=True
@@ -48,6 +54,7 @@ for flyby_result in flyby_demonstrations:
             )
         st.caption(
             f"Periapsis altitude: {flyby_result.periapsis_altitude_m / 1_000:,.0f} km · "
-            f"radius: {flyby_result.periapsis_radius_m / 1_000:,.0f} km · "
-            "body-frame v∞ magnitude is conserved."
+            f"radius: {flyby_result.periapsis_radius_m / 1_000:,.0f} km (altitude is above "
+            "the body's surface; radius is measured from its center — the two differ by the "
+            "body's own radius) · body-frame v∞ magnitude is conserved."
         )

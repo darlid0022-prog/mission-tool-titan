@@ -12,6 +12,7 @@ import pandas as pd
 import streamlit as st
 
 import app_services
+import launch_window_service as lw
 from mission import colors
 from mission.capabilities import (
     MOON_DESTINATIONS,
@@ -134,8 +135,8 @@ st.info(UI_TEXT["titan_scope"])
 with st.expander(UI_TEXT["planned_capabilities"]):
     st.write(UI_TEXT["connected_destinations"] + ", ".join(MOON_DESTINATIONS.keys()))
     st.write(UI_TEXT["planned_destinations"] + ", ".join(PLANNED_DESTINATIONS))
-    for feature in PLANNED_MISSION_FEATURES:
-        st.write(f"- {feature}")
+    # One cohesive markdown list instead of one isolated bullet per st.write call.
+    st.markdown("\n".join(f"- {feature}" for feature in PLANNED_MISSION_FEATURES))
 
 st.header(UI_TEXT["propulsion_header"])
 isp_s = st.number_input(
@@ -244,7 +245,11 @@ else:
         UI_TEXT["dsm_not_modeled"],
         displayed_dv_rows[1][1],
     )
-    if departure_type == "Direct":
+    # The connected Saturn->Titan chain's authoritative model always converts
+    # to an injection burn (see app_services.compute_mission_bundle), so the
+    # "Direct" relabel below only applies where departure_type genuinely still
+    # selects the unconverted v∞ - the planet-only path.
+    if departure_type == "Direct" and bundle.connected_first_order is None:
         displayed_dv_rows[0] = (
             UI_TEXT["direct_departure_value"],
             displayed_dv_rows[0][1],
@@ -275,23 +280,40 @@ with scorecard_slot.container(border=True):
     st.subheader(":material/dashboard: Mission scorecard")
     st.metric("Connected delta-v", f"{bundle.dv_total:,.0f} m/s", border=True)
     st.metric("Wet mass (simplified)", f"{bundle.mass['wet_mass_kg']:,.0f} kg", border=True)
-    st.metric("Duration to Titan", f"{bundle.mission_duration_days:,.1f} days", border=True)
+    st.metric(
+        "Mission duration (Earth departure → Saturn capture)",
+        f"{bundle.mission_duration_days:,.1f} days",
+        help=(
+            "Ends at Saturn orbit insertion/capture. This connected chain does not model "
+            "a Titan encounter or capture, even when a moon-transfer study is selected below."
+        ),
+        border=True,
+    )
     st.metric(
         "Single-stage exceedance",
         f"{bundle.single_stage_feasibility.threshold_exceedance_factor:.2f}×",
         border=True,
     )
-    st.metric(
-        "Flyby gain coverage",
-        f"{bundle.flyby_deficit_coverage:.1%}"
-        if bundle.flyby_deficit_coverage is not None
-        else "N/A",
-        border=True,
-    )
+    st.caption("Live connected-budget values.")
     st.caption(
-        "Live connected-budget values. Flyby coverage compares the sum of the isolated "
-        "Venus, Earth, and Jupiter demonstrations with the current single-stage delta-v deficit."
+        "Gravity-assist delta-v savings are not included above and are not available "
+        "without a connected multi-leg trajectory (see Gravity assists for isolated, "
+        "unpowered flyby demonstrators only)."
     )
+    selected_launch_candidate = st.session_state.get(
+        lw.SELECTED_LAUNCH_WINDOW_CANDIDATE_STATE_KEY
+    )
+    if (
+        isinstance(selected_launch_candidate, lw.LaunchWindowCandidate)
+        and selected_launch_candidate.departure_datetime.date() == mission_inputs.launch_window_start
+    ):
+        st.caption(
+            f"Active scenario: launch window narrowed to "
+            f"{selected_launch_candidate.departure_datetime.date().isoformat()} by a Launch "
+            "windows selection. This scorecard recomputes its own budget independently and "
+            "may not match that page's numbers exactly — see Launch windows for the "
+            "candidate's own delta-v/duration breakdown."
+        )
 
 with st.container(horizontal=True):
     if st.button("Copy share link", icon=":material/link:"):

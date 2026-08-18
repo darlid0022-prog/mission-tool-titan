@@ -2,8 +2,13 @@ import math
 import unittest
 
 from mission.full_mission import compute_earth_saturn_titan_mission
+from mission.gravity_assist import compute_cassini_historical_tour
 from mission.models import Leg, TrajectoryResult
-from mission.trajectory_plot import build_complete_mission_figure, build_complete_mission_table
+from mission.trajectory_plot import (
+    build_cassini_historical_figure,
+    build_complete_mission_figure,
+    build_complete_mission_table,
+)
 from mission.trajectory_visualization import (
     build_complete_mission_scene,
     build_mission_animation_timeline,
@@ -62,9 +67,9 @@ class TestCompleteMissionVisualization(unittest.TestCase):
         curves = {curve.name: curve for curve in self.scene.saturn_curves}
         expected = {
             "Saturn staging orbit": (600_000.0, 600_000.0),
-            "Titan orbit": (1_221_900.0, 1_221_900.0),
+            "Titan orbit": (1_221_870.0, 1_221_870.0),
             "Saturn arrival ellipse": (62_330.0, 600_000.0),
-            "Saturn → Titan transfer": (600_000.0, 1_221_900.0),
+            "Saturn → Titan transfer": (600_000.0, 1_221_870.0),
         }
         for name, (minimum, maximum) in expected.items():
             with self.subTest(curve=name):
@@ -161,6 +166,48 @@ class TestCompleteMissionVisualization(unittest.TestCase):
                 marker = figure.data[-1]
                 self.assertEqual(marker.name, "Spacecraft — current position")
                 self.assertEqual(marker.scene, expected_scene)
+
+
+class TestCassiniHistoricalVisualization(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.tour = compute_cassini_historical_tour()
+        cls.figure = build_cassini_historical_figure(cls.tour)
+
+    def test_has_five_distinct_legend_entries(self):
+        self.assertEqual(
+            [trace.name for trace in self.figure.data],
+            ["Venus 1", "Venus 2", "Earth", "Jupiter", "Saturn insertion"],
+        )
+        self.assertTrue(self.figure.layout.showlegend)
+        self.assertEqual(len({trace.line.dash for trace in self.figure.data}), 5)
+
+    def test_uses_exact_tour_endpoint_positions(self):
+        import pykep as pk
+
+        for trace, segment in zip(self.figure.data, self.tour, strict=True):
+            expected = (segment.departure_position_m, segment.arrival_position_m)
+            self.assertEqual(
+                tuple(trace.x), tuple(position[0] / pk.AU for position in expected)
+            )
+            self.assertEqual(
+                tuple(trace.y), tuple(position[1] / pk.AU for position in expected)
+            )
+            self.assertEqual(
+                tuple(trace.z), tuple(position[2] / pk.AU for position in expected)
+            )
+
+    def test_hover_carries_real_dates_events_and_altitudes(self):
+        for trace, segment in zip(self.figure.data, self.tour, strict=True):
+            self.assertIn("Date:", trace.hovertemplate)
+            self.assertIn("Flyby body / event:", trace.hovertemplate)
+            self.assertIn("Flyby altitude:", trace.hovertemplate)
+            self.assertEqual(trace.customdata[0][1], trace.customdata[1][1])
+            self.assertEqual(
+                trace.customdata[1][2],
+                segment.result.periapsis_altitude_m / 1_000.0,
+            )
+        self.assertEqual(self.figure.data[-1].customdata[-1][1], "insertion")
 
 
 class TestCompleteMissionTable(unittest.TestCase):

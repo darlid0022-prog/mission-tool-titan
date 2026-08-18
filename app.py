@@ -35,6 +35,11 @@ pages = [
         default=True,
     ),
     st.Page(
+        "pages/launch_windows.py",
+        title="Launch windows",
+        icon=":material/search:",
+    ),
+    st.Page(
         "pages/trajectory_3d.py",
         title="3D trajectory",
         icon=":material/3d_rotation:",

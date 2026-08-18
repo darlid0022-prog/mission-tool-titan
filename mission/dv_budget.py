@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from .connected_physics import ConnectedFirstOrderResult, compute_connected_first_order_chain
 from .moon_transfer import SaturnTitanTransferResult
 from .saturn_staging import SaturnArrivalStagingResult
 
@@ -28,10 +29,12 @@ class MissionDeltaVBudget:
         return {
             "Earth departure injection": self.earth_departure_m_s,
             "DSM / fly-by corrections": self.dsm_flyby_m_s,
-            "Saturn capture to transfer ellipse": self.saturn_capture_to_ellipse_m_s,
-            "Saturn staging circularization": self.saturn_staging_circularisation_m_s,
-            "Saturn staging to Titan transfer": self.saturn_titan_departure_m_s,
-            "Titan circular capture": self.titan_capture_m_s,
+            "Saturn capture to 150,000 × 1,221,870 km ellipse": (
+                self.saturn_capture_to_ellipse_m_s
+            ),
+            "Saturn circularization at Titan orbital radius": (
+                self.saturn_staging_circularisation_m_s
+            ),
         }
 
 
@@ -46,16 +49,30 @@ def _require_non_negative_finite(name: str, value: object) -> float:
 
 def compose_complete_dv_budget(
     earth_saturn_budget: dict[str, float],
-    saturn_arrival_staging: SaturnArrivalStagingResult,
-    saturn_titan_transfer: SaturnTitanTransferResult,
+    saturn_arrival_staging: SaturnArrivalStagingResult | None = None,
+    saturn_titan_transfer: SaturnTitanTransferResult | None = None,
+    *,
+    connected_result: ConnectedFirstOrderResult | None = None,
 ) -> MissionDeltaVBudget:
-    """Compose real burns and replace, rather than add, legacy Saturn capture."""
+    """Compose the authoritative first-order chain without redundant burns.
+
+    The two legacy study arguments remain accepted for source compatibility,
+    but their 600,000 km departure and Titan-capture burns are deliberately not
+    included. ``connected_result`` is the sole authority for Saturn burns.
+    """
     if not isinstance(earth_saturn_budget, dict):
         raise TypeError("earth_saturn_budget must be a dict.")
-    if not isinstance(saturn_arrival_staging, SaturnArrivalStagingResult):
-        raise TypeError("saturn_arrival_staging must be a SaturnArrivalStagingResult.")
-    if not isinstance(saturn_titan_transfer, SaturnTitanTransferResult):
-        raise TypeError("saturn_titan_transfer must be a SaturnTitanTransferResult.")
+    if saturn_arrival_staging is not None and not isinstance(
+        saturn_arrival_staging, SaturnArrivalStagingResult
+    ):
+        raise TypeError("saturn_arrival_staging must be a SaturnArrivalStagingResult or None.")
+    if saturn_titan_transfer is not None and not isinstance(
+        saturn_titan_transfer, SaturnTitanTransferResult
+    ):
+        raise TypeError("saturn_titan_transfer must be a SaturnTitanTransferResult or None.")
+    chain = connected_result or compute_connected_first_order_chain()
+    if not isinstance(chain, ConnectedFirstOrderResult):
+        raise TypeError("connected_result must be a ConnectedFirstOrderResult or None.")
 
     try:
         earth_departure = earth_saturn_budget["dV from LEO"]
@@ -68,10 +85,10 @@ def compose_complete_dv_budget(
     return MissionDeltaVBudget(
         earth_departure_m_s=_require_non_negative_finite("earth departure", earth_departure),
         dsm_flyby_m_s=_require_non_negative_finite("DSM / fly-by", dsm_flyby),
-        saturn_capture_to_ellipse_m_s=saturn_arrival_staging.capture_to_ellipse_delta_v_m_s,
+        saturn_capture_to_ellipse_m_s=chain.saturn_capture.capture_delta_v_m_s,
         saturn_staging_circularisation_m_s=(
-            saturn_arrival_staging.staging_circularisation_delta_v_m_s
+            chain.saturn_capture.circularisation_delta_v_m_s
         ),
-        saturn_titan_departure_m_s=saturn_titan_transfer.departure_delta_v_m_s,
-        titan_capture_m_s=saturn_titan_transfer.capture_delta_v_m_s,
+        saturn_titan_departure_m_s=0.0,
+        titan_capture_m_s=0.0,
     )

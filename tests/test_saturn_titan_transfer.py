@@ -29,7 +29,7 @@ class TestSaturnTitanConstants(unittest.TestCase):
         self.assertEqual(SATURN_MU_M3_S2, 3.793120623e16)
         self.assertEqual(TITAN_MU_M3_S2, 8.97813710e12)
         self.assertEqual(TITAN_MEAN_RADIUS_M, 2.57476e6)
-        self.assertEqual(TITAN_MEAN_ORBIT_RADIUS_M, 1.2219e9)
+        self.assertEqual(TITAN_MEAN_ORBIT_RADIUS_M, 1.22187e9)
         self.assertEqual(TITAN_MEAN_ECCENTRICITY, 0.029)
         self.assertAlmostEqual(TITAN_MEAN_INCLINATION_RAD, math.radians(0.3))
         self.assertEqual(TITAN_SIDEREAL_PERIOD_S, 1_377_686.7072)
@@ -48,15 +48,15 @@ class TestSaturnTitanTransfer(unittest.TestCase):
         self.assertAlmostEqual(
             result.saturn_staging_circular_speed_m_s, 7_951.017359, delta=ABS_TOL_M_S
         )
-        self.assertAlmostEqual(result.transfer_departure_speed_m_s, 9_208.592692, delta=ABS_TOL_M_S)
-        self.assertAlmostEqual(result.departure_delta_v_m_s, 1_257.575332, delta=ABS_TOL_M_S)
-        self.assertAlmostEqual(result.transfer_arrival_speed_m_s, 4_521.773971, delta=ABS_TOL_M_S)
-        self.assertAlmostEqual(result.titan_orbital_speed_m_s, 5_571.607245, delta=ABS_TOL_M_S)
-        self.assertAlmostEqual(result.v_infinity_titan_m_s, 1_049.833274, delta=ABS_TOL_M_S)
-        self.assertAlmostEqual(result.time_of_flight_s, 443_499.726268, delta=ABS_TOL_S)
-        self.assertAlmostEqual(result.time_of_flight_days, 5.133099, delta=1e-6)
-        self.assertAlmostEqual(result.capture_delta_v_m_s, 862.725696, delta=ABS_TOL_M_S)
-        self.assertAlmostEqual(result.total_delta_v_m_s, 2_120.301028, delta=ABS_TOL_M_S)
+        self.assertAlmostEqual(result.transfer_departure_speed_m_s, 9_208.555462, delta=ABS_TOL_M_S)
+        self.assertAlmostEqual(result.departure_delta_v_m_s, 1_257.538103, delta=ABS_TOL_M_S)
+        self.assertAlmostEqual(result.transfer_arrival_speed_m_s, 4_521.866710, delta=ABS_TOL_M_S)
+        self.assertAlmostEqual(result.titan_orbital_speed_m_s, 5_571.675643, delta=ABS_TOL_M_S)
+        self.assertAlmostEqual(result.v_infinity_titan_m_s, 1_049.808933, delta=ABS_TOL_M_S)
+        self.assertAlmostEqual(result.time_of_flight_s, 443_488.772096, delta=ABS_TOL_S)
+        self.assertAlmostEqual(result.time_of_flight_days, 5.132972, delta=1e-6)
+        self.assertAlmostEqual(result.capture_delta_v_m_s, 862.714808, delta=ABS_TOL_M_S)
+        self.assertAlmostEqual(result.total_delta_v_m_s, 2_120.252911, delta=ABS_TOL_M_S)
 
     def test_v_infinity_is_separate_from_propulsive_delta_v(self):
         result = compute_saturn_titan_transfer()

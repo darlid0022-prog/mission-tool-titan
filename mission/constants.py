@@ -3,6 +3,24 @@
 # Standard acceleration of gravity used by the Tsiolkovsky equation.
 G0_M_S2 = 9.80665
 
+# IAU 2012 Resolution B2: the astronomical unit is exact.
+ASTRONOMICAL_UNIT_M = 149_597_870_700.0
+
+# JPL DE440 astrodynamic parameters (SI).
+# https://ssd.jpl.nasa.gov/astro_par.html
+SUN_MU_M3_S2 = 1.32712440041279419e20
+
+# Circular-orbit radii used by the first-order heliocentric Hohmann model.
+# Earth is represented at exactly 1 au. Saturn's J2000 semimajor axis is from
+# JPL's 1800--2050 approximate planetary elements.
+# https://ssd.jpl.nasa.gov/planets/approx_pos.html
+EARTH_MEAN_ORBIT_RADIUS_M = ASTRONOMICAL_UNIT_M
+SATURN_MEAN_ORBIT_RADIUS_M = 9.53667594 * ASTRONOMICAL_UNIT_M
+
+# JPL planetary physical parameters.
+# https://ssd.jpl.nasa.gov/planets/phys_par.html
+SATURN_EQUATORIAL_RADIUS_M = 60_268_000.0
+
 # JPL SAT441 values converted from km-based units to SI.
 # https://ssd.jpl.nasa.gov/sats/phys_par/sep.html
 SATURN_MU_M3_S2 = 3.793120623e16
@@ -11,12 +29,19 @@ TITAN_MEAN_RADIUS_M = 2.57476e6
 
 # JPL SAT441 mean elements.
 # https://ssd.jpl.nasa.gov/sats/elem/sep.html
-TITAN_MEAN_ORBIT_RADIUS_M = 1.2219e9
+# Required first-order design convention. This intentionally differs by 30 km
+# from the rounded SAT441 table value retained in older project documents.
+TITAN_MEAN_ORBIT_RADIUS_M = 1_221_870_000.0
 TITAN_MEAN_ECCENTRICITY = 0.029
 TITAN_MEAN_INCLINATION_RAD = 0.005235987755982988
 TITAN_SIDEREAL_PERIOD_S = 1_377_686.7072
 
 JPL_SATURN_SYSTEM_SOURCE = "JPL SAT441"
+JPL_DE440_SOURCE = "JPL DE440 / approximate J2000 planetary elements"
+
+# Saturn-centred design geometry, all measured from Saturn's centre.
+F_RING_REFERENCE_RADIUS_M = 140_180_000.0
+NOMINAL_SATURN_PERIAPSIS_RADIUS_M = 150_000_000.0
 
 # JPL "Planetary Satellite Physical Parameters" (MAR097 / JUP365).
 # https://ssd.jpl.nasa.gov/sats/phys_par/
