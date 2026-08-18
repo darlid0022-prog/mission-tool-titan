@@ -158,7 +158,13 @@ with st.container(border=True):
         bundle.staging_result.staging_radius_m,
         bundle.titan_transfer.titan_orbit_radius_m,
     )
-    if st.session_state.get("trajectory_scene_key") != trajectory_scene_key:
+    cached_scene = st.session_state.get("trajectory_scene")
+    cached_timeline = st.session_state.get("trajectory_timeline")
+    if (
+        st.session_state.get("trajectory_scene_key") != trajectory_scene_key
+        or not isinstance(cached_scene, CompleteMissionScene3D)
+        or not isinstance(cached_timeline, MissionAnimationTimeline3D)
+    ):
         trajectory_scene = build_complete_mission_scene(bundle.complete_mission)
         trajectory_timeline = build_mission_animation_timeline(
             trajectory_scene,

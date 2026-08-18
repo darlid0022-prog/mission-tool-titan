@@ -17,6 +17,10 @@ from mission.bodies import resolve_body
 from mission.models import Leg, TrajectoryResult
 from mission.pareto import compute_connected_pareto_front
 from mission.pareto_plot import build_pareto_front_figure
+from mission.trajectory_visualization import (
+    CompleteMissionScene3D,
+    MissionAnimationTimeline3D,
+)
 
 APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
 
@@ -421,6 +425,28 @@ class TestTrajectory3DPage(unittest.TestCase):
         self.assertEqual(
             metrics["Current mission-elapsed time"],
             f"{timeline.earth_saturn_duration_days:,.2f} days",
+        )
+
+    def test_stale_animation_objects_are_rebuilt_after_module_reload(self):
+        app = AppTest.from_file(APP_PATH)
+        with patch(
+            "app_services.compute_cached_trajectory",
+            return_value=earth_saturn_result(),
+        ):
+            app.run(timeout=30)
+            app.switch_page("pages/trajectory_3d.py").run(timeout=30)
+            app.session_state["trajectory_scene"] = object()
+            app.session_state["trajectory_timeline"] = object()
+            app.run(timeout=30)
+
+        self.assertFalse(app.exception)
+        self.assertIsInstance(
+            app.session_state["trajectory_scene"],
+            CompleteMissionScene3D,
+        )
+        self.assertIsInstance(
+            app.session_state["trajectory_timeline"],
+            MissionAnimationTimeline3D,
         )
 
 
