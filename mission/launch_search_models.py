@@ -144,7 +144,6 @@ class LaunchSearchResult:
     rejected_pairs: tuple[tuple[float, float, str], ...]
     evaluated_pair_count: int
     ephemeris_evaluation_count: int
-    elapsed_seconds: float
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

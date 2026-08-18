@@ -38,6 +38,19 @@ from .mass_model import (
     PayloadItem,
     size_parametric_vehicle,
 )
+from .launch_search import (
+    compute_pareto_front,
+    evaluate_launch_scenario,
+    rank_scenarios,
+    search_direct_earth_saturn_titan,
+)
+from .launch_search_models import (
+    LaunchScenario,
+    LaunchSearchConfig,
+    LaunchSearchResult,
+    SearchObjective,
+    SearchTrajectorySegment,
+)
 from .models import Event, Leg, Mission, TrajectoryResult
 from .moon_transfer import (
     SaturnTitanTransferResult,
@@ -70,6 +83,11 @@ __all__ = [
     "EarthSaturnTitanMissionResult",
     "EarthDestinationMissionResult",
     "MissionDeltaVBudget",
+    "LaunchScenario",
+    "LaunchSearchConfig",
+    "LaunchSearchResult",
+    "SearchObjective",
+    "SearchTrajectorySegment",
     "ConnectedFirstOrderResult",
     "EarthSaturnHohmannResult",
     "SaturnCaptureEllipseResult",
@@ -87,6 +105,10 @@ __all__ = [
     "compute_earth_saturn_titan_mission",
     "compute_earth_destination_mission",
     "compose_complete_dv_budget",
+    "compute_pareto_front",
+    "evaluate_launch_scenario",
+    "rank_scenarios",
+    "search_direct_earth_saturn_titan",
     "compute_connected_first_order_chain",
     "compute_earth_saturn_hohmann",
     "compute_saturn_capture_to_titan_orbit",
