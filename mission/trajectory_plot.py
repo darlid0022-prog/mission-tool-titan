@@ -5,23 +5,36 @@ from __future__ import annotations
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+from . import colors
 from .trajectory_visualization import (
     CompleteMissionScene3D,
     SpacecraftPosition3D,
     TrajectoryCurve3D,
 )
 
+# Default styling per curve `role`. The 3D scene always renders on a fixed
+# dark background (see colors.SCENE_BACKGROUND) regardless of the Streamlit
+# page theme, so every phase color below uses its `.dark` step.
 ROLE_STYLE: dict[str, tuple[str, int, str]] = {
-    "planet_orbit": ("#7C8DA6", 3, "dot"),
-    "moon_orbit": ("#D9A441", 3, "dot"),
-    "capture_orbit": ("#B983FF", 5, "solid"),
-    "staging_orbit": ("#4CC9F0", 4, "dash"),
-    "spacecraft_transfer": ("#FF5A5F", 7, "solid"),
+    "planet_orbit": (colors.REFERENCE_ORBIT, 3, "dot"),
+    "moon_orbit": (colors.REFERENCE_ORBIT_WARM, 3, "dot"),
+    "capture_orbit": (colors.ARRIVAL.dark, 5, "solid"),
+    "staging_orbit": (colors.ARRIVAL.dark, 4, "dash"),
+    "spacecraft_transfer": (colors.INTERPLANETARY_TRANSFER.dark, 7, "solid"),
+}
+
+# Two curves share the "spacecraft_transfer" role (interplanetary vs. lunar
+# transfer) but are different mission phases and so must render in
+# different colors - see mission/colors.py's "one color = one phase" rule.
+# Looked up by name first; role-based ROLE_STYLE above is the default for
+# every other curve.
+CURVE_NAME_STYLE_OVERRIDE: dict[str, tuple[str, int, str]] = {
+    "Saturn → Titan transfer": (colors.LUNAR_TRANSFER.dark, 7, "solid"),
 }
 
 
 def _add_curve(figure: go.Figure, curve: TrajectoryCurve3D, scene_index: int) -> None:
-    color, width, dash = ROLE_STYLE[curve.role]
+    color, width, dash = CURVE_NAME_STYLE_OVERRIDE.get(curve.name) or ROLE_STYLE[curve.role]
     figure.add_trace(
         go.Scatter3d(
             x=curve.x,
@@ -47,9 +60,9 @@ def _axis(title: str) -> dict[str, object]:
     return {
         "title": title,
         "showbackground": True,
-        "backgroundcolor": "rgba(13, 20, 33, 0.75)",
-        "gridcolor": "rgba(160, 174, 192, 0.25)",
-        "zerolinecolor": "rgba(255, 255, 255, 0.35)",
+        "backgroundcolor": colors.SCENE_BACKGROUND,
+        "gridcolor": colors.GRIDLINE,
+        "zerolinecolor": colors.AXIS_ZERO_LINE,
     }
 
 
@@ -108,7 +121,7 @@ def build_complete_mission_figure(
         x=0.0,
         y=0.0,
         z=0.0,
-        color="#FFD166",
+        color=colors.LANDMARK_SUN,
         size=9,
         scene_index=1,
     )
@@ -118,7 +131,7 @@ def build_complete_mission_figure(
         x=lambert.x[0],
         y=lambert.y[0],
         z=lambert.z[0],
-        color="#4CC9F0",
+        color=colors.LAUNCH.dark,
         size=6,
         scene_index=1,
     )
@@ -128,7 +141,7 @@ def build_complete_mission_figure(
         x=lambert.x[-1],
         y=lambert.y[-1],
         z=lambert.z[-1],
-        color="#D9A441",
+        color=colors.LANDMARK_BODY,
         size=8,
         scene_index=1,
     )
@@ -138,7 +151,7 @@ def build_complete_mission_figure(
         x=0.0,
         y=0.0,
         z=0.0,
-        color="#D9A441",
+        color=colors.LANDMARK_BODY,
         size=10,
         scene_index=2,
     )
@@ -148,7 +161,7 @@ def build_complete_mission_figure(
         x=titan_transfer.x[-1],
         y=titan_transfer.y[-1],
         z=titan_transfer.z[-1],
-        color="#E8D9B5",
+        color=colors.LANDMARK_MOON,
         size=7,
         scene_index=2,
     )
@@ -156,6 +169,13 @@ def build_complete_mission_figure(
         if not isinstance(spacecraft_position, SpacecraftPosition3D):
             raise TypeError("spacecraft_position must be a SpacecraftPosition3D.")
         scene_index = 1 if spacecraft_position.frame == "heliocentric" else 2
+        # Same phase, same color as everywhere else in the app: the moving
+        # marker's color follows its current animation phase (see
+        # colors.ANIMATION_PHASE_COLORS), falling back to the launch color
+        # for any (currently unused) unmapped phase name.
+        phase_color = colors.ANIMATION_PHASE_COLORS.get(
+            spacecraft_position.phase_name, colors.LAUNCH
+        )
         figure.add_trace(
             go.Scatter3d(
                 x=[spacecraft_position.x],
@@ -163,7 +183,7 @@ def build_complete_mission_figure(
                 z=[spacecraft_position.z],
                 mode="markers",
                 name="Spacecraft — current position",
-                marker={"color": "#00F5A0", "size": 9, "symbol": "diamond"},
+                marker={"color": phase_color.dark, "size": 9, "symbol": "diamond"},
                 hovertemplate=(
                     f"<b>{spacecraft_position.phase_name}</b><br>"
                     f"Mission elapsed time: {spacecraft_position.elapsed_days:,.2f} days"

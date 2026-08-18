@@ -62,6 +62,16 @@ def run_app(page_path: str | None = None, animation_phase: str | None = None) ->
     return app
 
 
+def badge_values(app: AppTest) -> list[str]:
+    """Read back rendered st.badge() elements as `:{color}-badge[{label}]` strings.
+
+    st.badge isn't yet queryable via AppTest's typed accessors in this
+    Streamlit version - it renders as this markdown directive under the hood,
+    so this reads it back off the plain markdown elements instead.
+    """
+    return [markdown.value for markdown in app.markdown if "-badge[" in markdown.value]
+
+
 class TestMissionSetupPage(unittest.TestCase):
     def test_connected_total_and_default_mass_outputs_are_non_zero(self):
         app = run_app()
@@ -83,6 +93,21 @@ class TestMissionSetupPage(unittest.TestCase):
                 "does not couple propulsion hardware mass to propellant mass" in warning.value
                 for warning in app.warning
             )
+        )
+
+    def test_phase_color_key_lists_all_five_phases_in_chronological_order(self):
+        app = run_app()
+
+        self.assertFalse(app.exception)
+        self.assertEqual(
+            badge_values(app),
+            [
+                ":orange-badge[Launch]",
+                ":blue-badge[Interplanetary transfer]",
+                ":green-badge[Arrival / orbit insertion]",
+                ":violet-badge[Lunar transfer]",
+                ":red-badge[Landing]",
+            ],
         )
 
     def test_scorecard_displays_live_connected_results(self):
@@ -165,6 +190,14 @@ class TestMissionSetupPage(unittest.TestCase):
 
 
 class TestTrajectory3DPage(unittest.TestCase):
+    def test_current_phase_badge_matches_the_default_selected_phase(self):
+        app = run_app(page_path="pages/trajectory_3d.py")
+
+        self.assertFalse(app.exception)
+        # Default selected phase is "Earth → Saturn cruise" (interplanetary
+        # transfer) - same color as its badge on every other page.
+        self.assertEqual(badge_values(app), [":blue-badge[Interplanetary transfer]"])
+
     def test_complete_trajectory_3d_view_is_rendered(self):
         app = run_app(page_path="pages/trajectory_3d.py")
 
@@ -261,6 +294,19 @@ class TestTrajectory3DPage(unittest.TestCase):
 
 
 class TestSaturnSystemStudiesPage(unittest.TestCase):
+    def test_each_section_carries_its_own_mission_phase_badge(self):
+        app = run_app(page_path="pages/saturn_system_studies.py")
+
+        self.assertFalse(app.exception)
+        self.assertEqual(
+            badge_values(app),
+            [
+                ":green-badge[Arrival / orbit insertion]",
+                ":violet-badge[Lunar transfer]",
+                ":red-badge[Landing]",
+            ],
+        )
+
     def test_arrival_to_staging_section_displays_nominal_results_and_ring_status(self):
         app = run_app(page_path="pages/saturn_system_studies.py")
 

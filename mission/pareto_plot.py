@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 
 import plotly.graph_objects as go
 
+from . import colors
 from .pareto import ParetoPoint, ParetoSearchResult
 
 MJD2000_EPOCH = datetime(2000, 1, 1)
@@ -127,7 +128,7 @@ def build_pareto_front_figure(result: ParetoSearchResult) -> go.Figure:
                 "size": 10,
                 "opacity": 0.9,
                 "colorbar": {"title": "Simplified wet mass<br>(kg)"},
-                "line": {"color": "rgba(255,255,255,0.55)", "width": 1},
+                "line": {"color": colors.MARKER_RIM_TRANSLUCENT, "width": 1},
             },
             customdata=_custom_data(regular),
             hovertemplate=_hover_template("Pareto-optimal mission"),
@@ -138,7 +139,9 @@ def build_pareto_front_figure(result: ParetoSearchResult) -> go.Figure:
         _highlight_trace(
             highlights.delta_v_optimum,
             name="Minimum connected delta-v",
-            color="#FF5A5F",
+            # Status color, not a phase color: the delta-v optimum is a
+            # "good" trade-space outcome, not a mission phase.
+            color=colors.STATUS_GOOD.light,
             symbol="star",
             size=18,
         )
@@ -147,7 +150,9 @@ def build_pareto_front_figure(result: ParetoSearchResult) -> go.Figure:
         _highlight_trace(
             highlights.baseline,
             name="Current mission baseline",
-            color="#00F5A0",
+            # Neutral reference color: the current baseline is neither good
+            # nor bad, and (like the optimum star) is not a mission phase.
+            color=colors.NEUTRAL_BASELINE.light,
             symbol="diamond-open",
             size=17,
         )
@@ -157,12 +162,12 @@ def build_pareto_front_figure(result: ParetoSearchResult) -> go.Figure:
         margin={"l": 20, "r": 20, "t": 30, "b": 20},
         xaxis={
             "title": "Connected propulsive delta-v (m/s)",
-            "gridcolor": "rgba(160, 174, 192, 0.25)",
+            "gridcolor": colors.GRIDLINE,
             "zeroline": False,
         },
         yaxis={
             "title": "Total mission duration (days)",
-            "gridcolor": "rgba(160, 174, 192, 0.25)",
+            "gridcolor": colors.GRIDLINE,
             "zeroline": False,
         },
         legend={"orientation": "h", "y": -0.18, "x": 0.5, "xanchor": "center"},

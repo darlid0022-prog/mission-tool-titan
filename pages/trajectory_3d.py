@@ -7,6 +7,7 @@ import math
 import streamlit as st
 
 import app_services
+from mission import colors
 from mission.trajectory_plot import build_complete_mission_figure
 from mission.trajectory_visualization import (
     CompleteMissionScene3D,
@@ -112,6 +113,13 @@ def render_trajectory_animation(
             selected_phase,
             border=True,
         )
+    # Same phase, same color as the moving 3D marker (see
+    # colors.ANIMATION_PHASE_COLORS) and as the Saturn & Titan studies page.
+    current_phase_color = colors.ANIMATION_PHASE_COLORS.get(selected_phase, colors.LAUNCH)
+    st.badge(
+        current_phase_color.label,
+        color=colors.BADGE_COLOR[current_phase_color.label],
+    )
     trajectory_figure = build_complete_mission_figure(scene, spacecraft_position)
     st.plotly_chart(
         trajectory_figure,

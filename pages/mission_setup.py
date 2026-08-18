@@ -12,6 +12,7 @@ import pandas as pd
 import streamlit as st
 
 import app_services
+from mission import colors
 from mission.capabilities import (
     MOON_DESTINATIONS,
     PLANET_DESTINATIONS,
@@ -191,6 +192,10 @@ st.info(UI_TEXT["complete_chain_note"])
 
 st.subheader(UI_TEXT["provisional_budget"])
 st.caption(UI_TEXT["budget_caption"])
+st.caption("Mission-phase key — the same colors used on every page and chart below:")
+with st.container(horizontal=True):
+    for phase in colors.PHASE_ORDER:
+        st.badge(phase.label, color=colors.BADGE_COLOR[phase.label])
 displayed_dv_rows = list(bundle.complete_dv_budget.as_dict().items())
 displayed_dv_rows[1] = (
     UI_TEXT["dsm_not_modeled"],

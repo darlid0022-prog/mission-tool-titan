@@ -5,6 +5,7 @@ EDL studies, rebuilt from the mission-setup inputs stored in session_state.
 import streamlit as st
 
 import app_services
+from mission import colors
 from mission.ui_text import UI_TEXT
 
 bundle = app_services.require_mission_bundle()
@@ -16,6 +17,7 @@ titan_transfer = bundle.titan_transfer
 titan_edl = bundle.titan_edl
 
 st.header(UI_TEXT["staging_header"])
+st.badge(colors.ARRIVAL.label, color=colors.BADGE_COLOR[colors.ARRIVAL.label])
 st.warning(UI_TEXT["staging_warning"])
 
 with st.container(border=True):
@@ -96,6 +98,7 @@ with st.container(border=True):
             st.write(f"- {exclusion}")
 
 st.header(UI_TEXT["titan_header"])
+st.badge(colors.LUNAR_TRANSFER.label, color=colors.BADGE_COLOR[colors.LUNAR_TRANSFER.label])
 st.warning(UI_TEXT["titan_warning"])
 
 with st.container(border=True):
@@ -150,6 +153,7 @@ with st.container(border=True):
             st.write(f"- {exclusion}")
 
 st.header(UI_TEXT["titan_edl_header"])
+st.badge(colors.LANDING.label, color=colors.BADGE_COLOR[colors.LANDING.label])
 st.warning(UI_TEXT["titan_edl_warning"])
 
 with st.container(border=True):
