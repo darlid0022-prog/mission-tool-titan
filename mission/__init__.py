@@ -13,6 +13,15 @@ from .builder import (
     build_mission_from_trajectory_alternatives,
     build_trajectory_result,
 )
+from .connected_physics import (
+    ConnectedFirstOrderResult,
+    EarthSaturnHohmannResult,
+    SaturnCaptureEllipseResult,
+    SaturnHyperbolaResult,
+    compute_connected_first_order_chain,
+    compute_earth_saturn_hohmann,
+    compute_saturn_capture_to_titan_orbit,
+)
 from .dv_budget import MissionDeltaVBudget, compose_complete_dv_budget
 from .full_mission import (
     EarthDestinationMissionResult,
@@ -61,6 +70,10 @@ __all__ = [
     "EarthSaturnTitanMissionResult",
     "EarthDestinationMissionResult",
     "MissionDeltaVBudget",
+    "ConnectedFirstOrderResult",
+    "EarthSaturnHohmannResult",
+    "SaturnCaptureEllipseResult",
+    "SaturnHyperbolaResult",
     "HESPEROS_MODEL_VERSION",
     "Manoeuvre",
     "MassArchitectureInfeasibleError",
@@ -74,6 +87,9 @@ __all__ = [
     "compute_earth_saturn_titan_mission",
     "compute_earth_destination_mission",
     "compose_complete_dv_budget",
+    "compute_connected_first_order_chain",
+    "compute_earth_saturn_hohmann",
+    "compute_saturn_capture_to_titan_orbit",
     "compute_arrival_to_staging",
     "compute_parent_to_moon_transfer",
     "compute_saturn_arrival_to_staging",

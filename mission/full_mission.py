@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .connected_physics import ConnectedFirstOrderResult, compute_connected_first_order_chain
 from .arrival_staging import (
     ArrivalStagingResult,
     StagingRadiusGuard,
@@ -195,6 +196,7 @@ class EarthSaturnTitanMissionResult:
     mission: Mission
     saturn_arrival_staging: SaturnArrivalStagingResult
     saturn_titan_transfer: SaturnTitanTransferResult
+    connected_first_order: ConnectedFirstOrderResult
 
 
 def compute_earth_saturn_titan_mission(
@@ -251,4 +253,5 @@ def compute_earth_saturn_titan_mission(
         mission=mission,
         saturn_arrival_staging=staging_study,
         saturn_titan_transfer=titan_study,
+        connected_first_order=compute_connected_first_order_chain(),
     )

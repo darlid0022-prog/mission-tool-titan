@@ -152,7 +152,7 @@ class TestMissionSetupPage(unittest.TestCase):
 
         self.assertFalse(app.exception)
         metrics = {metric.label: metric.value for metric in app.metric}
-        self.assertEqual(metrics["Sum of budgeted delta-v values"], "9903 m/s")
+        self.assertEqual(metrics["Sum of budgeted delta-v values"], "12163 m/s")
         for label in (
             "Simplified dry mass",
             "Simplified propellant mass",
@@ -189,11 +189,11 @@ class TestMissionSetupPage(unittest.TestCase):
 
         self.assertFalse(app.exception)
         metrics = {metric.label: metric.value for metric in app.metric}
-        self.assertEqual(metrics["Connected delta-v"], "9,903 m/s")
-        self.assertEqual(metrics["Wet mass (simplified)"], "5,253 kg")
-        self.assertEqual(metrics["Duration to Titan"], "2,862.3 days")
-        self.assertEqual(metrics["Single-stage exceedance"], "2.58×")
-        self.assertEqual(metrics["Flyby gain coverage"], "161.7%")
+        self.assertEqual(metrics["Connected delta-v"], "12,163 m/s")
+        self.assertEqual(metrics["Wet mass (simplified)"], "10,797 kg")
+        self.assertEqual(metrics["Duration to Titan"], "2,211.8 days")
+        self.assertEqual(metrics["Single-stage exceedance"], "3.17×")
+        self.assertEqual(metrics["Flyby gain coverage"], "117.8%")
 
     def test_summary_exposes_share_and_pdf_actions(self):
         app = run_app()
@@ -259,12 +259,14 @@ class TestMissionSetupPage(unittest.TestCase):
         self.assertEqual(instruments.iloc[0]["Instrument"], "Science payload (aggregate)")
         self.assertEqual(instruments.iloc[0]["Masse (kg)"], 143.5)
         self.assertEqual(instruments.iloc[0]["Puissance (W)"], 323.0)
-        expected_total = 1_000.0 + 6_782.353909 + 2_120.301028
+        expected_total = 12_163.278277912983
         self.assertAlmostEqual(mass_mock.call_args.args[0], expected_total, delta=1e-3)
         self.assertNotEqual(mass_mock.call_args.args[0], 1_000.0 + 999_999.0)
 
     def test_displayed_earth_departure_injection_equals_physics_output_exactly(self):
-        v_inf_m_s = earth_saturn_leg().trajectory.v_inf_depart
+        from mission.connected_physics import compute_earth_saturn_hohmann
+
+        v_inf_m_s = compute_earth_saturn_hohmann().departure_v_infinity_m_s
         leo_altitude_m = 250_000.0
         earth = resolve_body("Earth")
         expected_injection_m_s = physics.delta_v_injection(
@@ -470,7 +472,7 @@ class TestSaturnSystemStudiesPage(unittest.TestCase):
             any(heading.value == "Saturn → Titan — preliminary model" for heading in app.header)
         )
         metrics = {metric.label: metric.value for metric in app.metric}
-        self.assertEqual(metrics["Departure delta-v from staging orbit"], "1,257.6 m/s")
+        self.assertEqual(metrics["Departure delta-v from staging orbit"], "1,257.5 m/s")
         self.assertEqual(metrics["Titan-relative v∞ (non-propulsive)"], "1,049.8 m/s")
         self.assertEqual(metrics["Titan capture delta-v"], "862.7 m/s")
         self.assertEqual(metrics["Saturn → Titan modeled delta-v"], "2,120.3 m/s")
@@ -511,9 +513,9 @@ class TestFeasibilityPage(unittest.TestCase):
             )
         )
         metrics = {metric.label: metric.value for metric in app.metric}
-        self.assertEqual(metrics["Required connected delta-v"], "9,902.655 m/s")
+        self.assertEqual(metrics["Required connected delta-v"], "12,163.278 m/s")
         self.assertEqual(metrics["Maximum feasible single-stage delta-v"], "3,833.463 m/s")
-        self.assertEqual(metrics["Required / feasible threshold"], "2.583×")
+        self.assertEqual(metrics["Required / feasible threshold"], "3.173×")
         self.assertTrue(
             any(
                 "This is a model finding, not an application error" in info.value
@@ -541,7 +543,7 @@ class TestOptimizationPage(unittest.TestCase):
                 "Departure MJD2000",
             ],
         )
-        self.assertEqual(len(table), 39)
+        self.assertEqual(len(table), 35)
 
     def test_pareto_chart_renders_38_front_points_and_highlights_references(self):
         pareto_result = compute_connected_pareto_front()
@@ -581,7 +583,7 @@ class TestOptimizationPage(unittest.TestCase):
         traces = {trace.meta["role"]: trace for trace in figure.data}
         self.assertEqual(
             len(traces["pareto_front"].x) + len(traces["Minimum connected delta-v"].x),
-            38,
+            34,
         )
         self.assertEqual(len(traces["Current mission baseline"].x), 1)
         self.assertAlmostEqual(
@@ -591,7 +593,7 @@ class TestOptimizationPage(unittest.TestCase):
         )
         self.assertAlmostEqual(
             traces["Minimum connected delta-v"].customdata[0][1],
-            2_826.0,
+            2_856.0,
             delta=1e-9,
         )
 

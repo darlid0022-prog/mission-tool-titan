@@ -62,9 +62,9 @@ class TestCompleteMissionVisualization(unittest.TestCase):
         curves = {curve.name: curve for curve in self.scene.saturn_curves}
         expected = {
             "Saturn staging orbit": (600_000.0, 600_000.0),
-            "Titan orbit": (1_221_900.0, 1_221_900.0),
+            "Titan orbit": (1_221_870.0, 1_221_870.0),
             "Saturn arrival ellipse": (62_330.0, 600_000.0),
-            "Saturn → Titan transfer": (600_000.0, 1_221_900.0),
+            "Saturn → Titan transfer": (600_000.0, 1_221_870.0),
         }
         for name, (minimum, maximum) in expected.items():
             with self.subTest(curve=name):

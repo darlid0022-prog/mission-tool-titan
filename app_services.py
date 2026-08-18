@@ -15,6 +15,7 @@ import streamlit as st
 from mission import physics
 from mission.bodies import resolve_body
 from mission.capabilities import MOON_DESTINATIONS, PLANET_DESTINATIONS
+from mission.connected_physics import ConnectedFirstOrderResult
 from mission.dv_budget import MissionDeltaVBudget, compose_complete_dv_budget
 from mission.feasibility_check import (
     SingleStageFeasibilityResult,
@@ -363,6 +364,7 @@ class MissionBundle:
     # Cassini VVEJGA legs this bundle's delta-v/duration were computed from.
     # None for every other trajectory type/destination.
     cassini_tour: tuple[MissionSegment, ...] | None
+    connected_first_order: ConnectedFirstOrderResult | None
 
 
 def compute_mission_bundle(inputs: MissionSetupInputs) -> MissionBundle:
@@ -395,6 +397,7 @@ def compute_mission_bundle(inputs: MissionSetupInputs) -> MissionBundle:
     # budget and leaving Saturn/Titan-specific terms as zero.
     earth_leg = traj["earth_saturn_leg"]
     cassini_tour: tuple[MissionSegment, ...] | None = None
+    connected_first_order: ConnectedFirstOrderResult | None = None
     if inputs.destination == "Saturn" and inputs.trajectory_type == TRAJECTORY_TYPE_CASSINI_HISTORICAL:
         # The whole point of a gravity-assist tour is that its flybys are
         # unpowered: only the real Earth-departure injection and the real
@@ -516,11 +519,22 @@ def compute_mission_bundle(inputs: MissionSetupInputs) -> MissionBundle:
             titan_transfer.v_infinity_titan_m_s,
             titan_transfer.capture_delta_v_m_s,
         )
+        earth = resolve_body("Earth")
+        assert earth.pykep_body is not None
         complete_dv_budget = compose_complete_dv_budget(
-            traj["dv_budget"],
+            {
+                **traj["dv_budget"],
+                "dV from LEO": physics.delta_v_injection(
+                    complete_mission.connected_first_order.heliocentric.departure_v_infinity_m_s,
+                    earth.get_mu_self(),
+                    earth.pykep_body.get_radius() + float(inputs.leo_altitude_km) * 1_000.0,
+                ),
+            },
             staging_result,
             titan_transfer,
+            connected_result=complete_mission.connected_first_order,
         )
+        connected_first_order = complete_mission.connected_first_order
         dv_total = complete_dv_budget.total_m_s
         mass = compute_mass_budget(dv_total, inputs.isp_s, inputs.instruments_df)
         mass_ratio = mass["wet_mass_kg"] / mass["dry_mass_kg"] if mass["dry_mass_kg"] > 0 else 1.0
@@ -549,6 +563,11 @@ def compute_mission_bundle(inputs: MissionSetupInputs) -> MissionBundle:
         + (staging_result.time_of_flight_days if staging_result is not None else 0.0)
         + (titan_transfer.time_of_flight_days if titan_transfer is not None else 0.0)
     )
+    if connected_first_order is not None:
+        mission_duration_days = (
+            connected_first_order.heliocentric.time_of_flight_days
+            + connected_first_order.saturn_capture.time_of_flight_days
+        )
     flyby_demonstrations = (
         compute_venus_flyby_demonstration(),
         compute_earth_flyby_demonstration(),
@@ -586,6 +605,7 @@ def compute_mission_bundle(inputs: MissionSetupInputs) -> MissionBundle:
         single_stage_deficit_m_s=single_stage_deficit_m_s,
         flyby_deficit_coverage=flyby_deficit_coverage,
         cassini_tour=cassini_tour,
+        connected_first_order=connected_first_order,
     )
 
 
