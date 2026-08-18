@@ -8,7 +8,12 @@ import streamlit as st
 
 import app_services
 from mission import colors
-from mission.trajectory_plot import build_complete_mission_figure, build_complete_mission_table
+from mission.gravity_assist import compute_cassini_historical_tour
+from mission.trajectory_plot import (
+    build_cassini_historical_figure,
+    build_complete_mission_figure,
+    build_complete_mission_table,
+)
 from mission.trajectory_visualization import (
     CompleteMissionScene3D,
     MissionAnimationTimeline3D,
@@ -139,6 +144,23 @@ def render_trajectory_animation(
 
 bundle = app_services.require_mission_bundle()
 if bundle is None:
+    st.stop()
+
+mission_inputs = app_services.load_mission_setup_inputs()
+if (
+    mission_inputs is not None
+    and mission_inputs.trajectory_type == app_services.TRAJECTORY_TYPE_CASSINI_HISTORICAL
+):
+    st.header(UI_TEXT["trajectory_3d_header"])
+    st.caption("Cassini historical VVEJGA tour — exact documented encounter states.")
+    historical_figure = build_cassini_historical_figure(compute_cassini_historical_tour())
+    st.plotly_chart(
+        historical_figure,
+        width="stretch",
+        height=720,
+        key="cassini_historical_trajectory_3d",
+        config={"displaylogo": False, "scrollZoom": True},
+    )
     st.stop()
 
 # Only connected Saturn->Titan missions include staging and Titan-transfer studies

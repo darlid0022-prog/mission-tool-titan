@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import pandas as pd
 import plotly.graph_objects as go
+import pykep as pk
 from plotly.subplots import make_subplots
 
 from . import colors
+from .gravity_assist import GravityAssistResult, MissionSegment, OrbitInsertionResult
 from .trajectory_visualization import (
     CompleteMissionScene3D,
     SpacecraftPosition3D,
@@ -40,6 +44,93 @@ ROLE_STYLE: dict[str, tuple[str, int, str]] = {
 CURVE_NAME_STYLE_OVERRIDE: dict[str, tuple[str, int, str]] = {
     "Saturn → Titan transfer": (colors.LUNAR_TRANSFER.dark, 7, "solid"),
 }
+
+CASSINI_LEG_NAMES = (
+    "Venus 1",
+    "Venus 2",
+    "Earth",
+    "Jupiter",
+    "Saturn insertion",
+)
+CASSINI_LEG_DASHES = ("solid", "dot", "dash", "longdash", "dashdot")
+
+
+def _format_mjd2000(epoch_mjd2000: float) -> str:
+    """Format a supplied MJD2000 epoch without recomputing an ephemeris."""
+    epoch = datetime(2000, 1, 1, tzinfo=timezone.utc) + timedelta(days=epoch_mjd2000)
+    return epoch.strftime("%Y-%m-%d %H:%M UTC")
+
+
+def build_cassini_historical_figure(
+    tour: tuple[MissionSegment, ...],
+) -> go.Figure:
+    """Render the exact positions, dates, and encounters supplied by the tour.
+
+    Each leg is deliberately a two-point trace: the historical tour is the
+    authoritative source of states, and this renderer does not introduce
+    independently propagated or interpolated positions between them.
+    """
+    if len(tour) != len(CASSINI_LEG_NAMES) or not all(
+        isinstance(segment, MissionSegment) for segment in tour
+    ):
+        raise ValueError("tour must contain the five Cassini historical MissionSegments.")
+
+    figure = go.Figure()
+    for index, (segment, display_name, dash) in enumerate(
+        zip(tour, CASSINI_LEG_NAMES, CASSINI_LEG_DASHES, strict=True)
+    ):
+        is_insertion = isinstance(segment.result, OrbitInsertionResult)
+        if not is_insertion and not isinstance(segment.result, GravityAssistResult):
+            raise TypeError("Each historical leg must end in a flyby or orbit insertion.")
+        event = "insertion" if is_insertion else segment.arrival_body
+        altitude_km = segment.result.periapsis_altitude_m / 1_000.0
+        positions = (segment.departure_position_m, segment.arrival_position_m)
+        dates = (
+            _format_mjd2000(segment.departure_epoch_mjd2000),
+            _format_mjd2000(segment.arrival_epoch_mjd2000),
+        )
+        customdata = tuple((date, event, altitude_km) for date in dates)
+        phase_color = colors.ARRIVAL if is_insertion else colors.INTERPLANETARY_TRANSFER
+        figure.add_trace(
+            go.Scatter3d(
+                x=[position[0] / pk.AU for position in positions],
+                y=[position[1] / pk.AU for position in positions],
+                z=[position[2] / pk.AU for position in positions],
+                mode="lines+markers",
+                name=display_name,
+                line={"color": phase_color.dark, "width": 7, "dash": dash},
+                marker={
+                    "color": (
+                        colors.LAUNCH.dark if index == 0 else colors.ARRIVAL.dark,
+                        colors.ARRIVAL.dark,
+                    ),
+                    "size": (5, 7),
+                },
+                customdata=customdata,
+                hovertemplate=(
+                    "<b>%{fullData.name}</b><br>"
+                    "Date: %{customdata[0]}<br>"
+                    "Flyby body / event: %{customdata[1]}<br>"
+                    "Flyby altitude: %{customdata[2]:,.0f} km"
+                    "<extra></extra>"
+                ),
+            )
+        )
+
+    figure.update_layout(
+        height=720,
+        margin={"l": 0, "r": 0, "t": 40, "b": 0},
+        showlegend=len(figure.data) > 1,
+        legend={"orientation": "h", "y": -0.08, "x": 0.5, "xanchor": "center"},
+        scene={
+            "xaxis": _axis("x (AU)"),
+            "yaxis": _axis("y (AU)"),
+            "zaxis": _axis("z (AU)"),
+            "aspectmode": "data",
+        },
+        uirevision="cassini-historical-tour-v1",
+    )
+    return figure
 
 
 def _add_curve(figure: go.Figure, curve: TrajectoryCurve3D, scene_index: int) -> None:

@@ -309,6 +309,36 @@ class TestMissionSetupPage(unittest.TestCase):
 
 
 class TestTrajectory3DPage(unittest.TestCase):
+    def test_direct_mode_keeps_existing_animated_3d_rendering(self):
+        app = run_app(page_path="pages/trajectory_3d.py")
+
+        self.assertFalse(app.exception)
+        self.assertEqual(len(app.get("plotly_chart")), 1)
+        self.assertTrue(app.segmented_control)
+        self.assertTrue(app.slider)
+        self.assertIn("trajectory_scene", app.session_state)
+
+    def test_historical_mode_renders_five_leg_tour_without_direct_animation_controls(self):
+        app = AppTest.from_file(APP_PATH)
+        with patch("app_services.compute_cached_trajectory", return_value=earth_saturn_result()):
+            app.run(timeout=30)
+            trajectory_type = next(
+                radio for radio in app.radio if radio.label == "Trajectory type"
+            )
+            trajectory_type.set_value("Cassini historical gravity assist")
+            next(button for button in app.button if "Calculate" in button.label).click().run(
+                timeout=30
+            )
+            app.switch_page("pages/trajectory_3d.py").run(timeout=30)
+
+        self.assertFalse(app.exception)
+        self.assertEqual(len(app.get("plotly_chart")), 1)
+        self.assertTrue(
+            any("Cassini historical VVEJGA tour" in caption.value for caption in app.caption)
+        )
+        self.assertFalse(app.segmented_control)
+        self.assertFalse(app.slider)
+
     def test_current_phase_badge_matches_the_default_selected_phase(self):
         app = run_app(page_path="pages/trajectory_3d.py")
 
