@@ -848,6 +848,7 @@ class TestGravityAssistsPage(unittest.TestCase):
 class TestNavigationAcrossAllPages(unittest.TestCase):
     def test_every_page_renders_without_exception(self):
         for page_path in (
+            "pages/launch_windows.py",
             "pages/trajectory_3d.py",
             "pages/saturn_system_studies.py",
             "pages/feasibility.py",
