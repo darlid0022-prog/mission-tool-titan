@@ -1,6 +1,7 @@
-name: mission-tool-dev
+name: mission-tool-production
 channels:
   - conda-forge
+  - nodefaults
 dependencies:
   - python=3.13
   - pykep=3.0.0
@@ -9,6 +10,3 @@ dependencies:
   - numpy=2.5.2
   - plotly=6.9.0
   - fpdf2=2.8.7
-  - pip
-  - pip:
-      - -r requirements-dev.txt

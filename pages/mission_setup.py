@@ -8,6 +8,8 @@ app_services.require_mission_bundle() without recomputing or duplicating any
 business logic here.
 """
 
+from datetime import datetime, timedelta, timezone
+
 import pandas as pd
 import streamlit as st
 
@@ -29,6 +31,21 @@ from mission.payload_catalog import catalog_by_label, catalog_row
 from mission.pdf_report import MissionPdfReport, generate_mission_summary_pdf
 from mission.sizing import compute_mass_budget
 from mission.ui_text import UI_TEXT
+
+# Phases the connected delta-v budget (mission.dv_budget.MissionDeltaVBudget)
+# structurally contributes to - Lunar transfer and Landing have no field in
+# that budget at all (see its as_dict()), for either trajectory type offered
+# on this page, so they are never silently implied to contribute below.
+_CONNECTED_BUDGET_PHASES = (colors.LAUNCH, colors.INTERPLANETARY_TRANSFER, colors.ARRIVAL)
+
+
+def _format_mjd2000_as_utc_date(epoch_mjd2000: float) -> str:
+    """Pure formatting, same MJD2000 epoch/conversion already used across this
+    app (e.g. mission/trajectory_plot.py's _format_mjd2000) - not a new or
+    re-derived date, just a calendar-date rendering of the existing epoch."""
+    epoch = datetime(2000, 1, 1, tzinfo=timezone.utc) + timedelta(days=epoch_mjd2000)
+    return epoch.date().isoformat()
+
 
 scorecard_slot = st.empty()
 stored_inputs = app_services.load_mission_setup_inputs()
@@ -149,13 +166,21 @@ with st.form("orbital_inputs"):
 
 st.info(UI_TEXT["titan_scope"])
 
-with st.expander(UI_TEXT["planned_capabilities"]):
-    st.write(UI_TEXT["connected_destinations"] + ", ".join(MOON_DESTINATIONS.keys()))
-    st.write(UI_TEXT["planned_destinations"] + ", ".join(PLANNED_DESTINATIONS))
-    # One cohesive markdown list instead of one isolated bullet per st.write call.
-    planned_features = tuple(feature for feature in PLANNED_MISSION_FEATURES if feature.strip())
-    if planned_features:
-        st.markdown("\n".join(f"- {feature}" for feature in planned_features))
+connected_destination_names = ", ".join(MOON_DESTINATIONS.keys())
+planned_destination_names = ", ".join(PLANNED_DESTINATIONS)
+# One cohesive markdown list instead of one isolated bullet per st.write call.
+planned_features = tuple(feature for feature in PLANNED_MISSION_FEATURES if feature.strip())
+# Each of the three sources renders only if it actually has content, and the
+# whole expander renders only if at least one of them does - an empty
+# collection must never leave behind a bare "-", "*", or empty placeholder.
+if connected_destination_names or planned_destination_names or planned_features:
+    with st.expander(UI_TEXT["planned_capabilities"]):
+        if connected_destination_names:
+            st.write(UI_TEXT["connected_destinations"] + connected_destination_names)
+        if planned_destination_names:
+            st.write(UI_TEXT["planned_destinations"] + planned_destination_names)
+        if planned_features:
+            st.markdown("\n".join(f"- {feature}" for feature in planned_features))
 
 st.header(UI_TEXT["propulsion_header"])
 isp_s = st.number_input(
@@ -381,15 +406,35 @@ with scorecard_slot.container(border=True):
         else lw.MISSION_SCENARIO_BASELINE_LABEL
     )
     st.caption(f"Active scenario: {active_label}.")
+    if active_label == lw.MISSION_SCENARIO_BASELINE_LABEL:
+        st.page_link(
+            "pages/launch_windows.py",
+            label="Find an optimized launch window",
+            icon=":material/search:",
+            help=(
+                "Opens Launch windows to search for a candidate departure date. "
+                "Does not change the active scenario above by itself."
+            ),
+        )
     if trajectory_type == app_services.TRAJECTORY_TYPE_CASSINI_HISTORICAL:
         st.caption("Date source: historical Cassini VVEJGA encounter dates.")
         st.metric("Connected Saturn periapsis", "Historical SOI geometry", border=True)
         st.metric("Final Saturn-centred radius", "Historical post-SOI orbit", border=True)
     elif bundle.connected_first_order is not None:
+        departure_date_str = _format_mjd2000_as_utc_date(
+            bundle.earth_saturn_trajectory.departure_mjd2000
+        )
+        arrival_date_str = _format_mjd2000_as_utc_date(
+            bundle.earth_saturn_trajectory.arrival_mjd2000
+        )
         st.caption(
             "Date source: Mission setup Earth → Saturn trajectory solution "
-            f"({bundle.earth_saturn_trajectory.departure_mjd2000:.3f} → "
-            f"{bundle.earth_saturn_trajectory.arrival_mjd2000:.3f} MJD2000)."
+            f"({departure_date_str} → {arrival_date_str} UTC)."
+        )
+        st.caption(
+            "MJD2000 epoch reference (technical): "
+            f"{bundle.earth_saturn_trajectory.departure_mjd2000:.3f} → "
+            f"{bundle.earth_saturn_trajectory.arrival_mjd2000:.3f}."
         )
         with st.container(horizontal=True):
             st.metric(
@@ -481,7 +526,16 @@ st.caption(UI_TEXT["budget_caption"])
 st.caption("Mission-phase key — the same colors used on every page and chart below:")
 with st.container(horizontal=True):
     for phase in colors.PHASE_ORDER:
-        st.badge(phase.label, color=colors.BADGE_COLOR[phase.label])
+        label = (
+            phase.label
+            if phase in _CONNECTED_BUDGET_PHASES
+            else f"{phase.label} (not included)"
+        )
+        st.badge(label, color=colors.BADGE_COLOR[phase.label])
+st.caption(
+    "Lunar transfer and Landing are not modeled in this connected budget and do not "
+    "contribute to the delta-v total above."
+)
 dv_table = pd.DataFrame(
     displayed_dv_rows,
     columns=[UI_TEXT["maneuver"], UI_TEXT["value_m_s"]],

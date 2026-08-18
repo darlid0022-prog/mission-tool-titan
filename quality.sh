@@ -53,13 +53,21 @@ echo ""
 echo ">>> Secret scan"
 python -m detect_secrets scan \
     app.py \
+    app_services.py \
     trajectory.py \
+    launch_window_plot.py \
+    launch_window_service.py \
     mission \
+    pages \
     tests \
+    scripts \
+    docs \
+    .streamlit \
+    .gitignore \
     Makefile \
     check.sh \
     quality.sh \
-    requirements.txt \
+    environment.yml \
     requirements-dev.txt \
     pyproject.toml
 
