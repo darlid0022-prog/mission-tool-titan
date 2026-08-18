@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
 import pykep as pk
 
@@ -14,6 +15,43 @@ def _norm(v):
 
 def _sub(a, b):
     return [a[i] - b[i] for i in range(3)]
+
+
+@dataclass(frozen=True)
+class _LambertState:
+    v_inf_depart_m_s: float
+    v_inf_arrival_m_s: float
+    departure_position_m: tuple[float, float, float]
+    arrival_position_m: tuple[float, float, float]
+    transfer_departure_velocity_m_s: tuple[float, float, float]
+
+
+def _vector3(values) -> tuple[float, float, float]:
+    return (float(values[0]), float(values[1]), float(values[2]))
+
+
+def _solve_lambert_state(
+    r0,
+    r1,
+    tof_seconds: float,
+    mu_central_body: float,
+    v_origin,
+    v_destination,
+) -> _LambertState | None:
+    """Return the solved state once so callers can retain it for visualization."""
+    try:
+        lp = pk.lambert_problem(r0, r1, tof_seconds, mu_central_body, multi_revs=0)
+    except Exception:
+        return None
+    if len(lp.v0) == 0:
+        return None
+    return _LambertState(
+        v_inf_depart_m_s=_norm(_sub(lp.v0[0], v_origin)),
+        v_inf_arrival_m_s=_norm(_sub(lp.v1[0], v_destination)),
+        departure_position_m=_vector3(r0),
+        arrival_position_m=_vector3(r1),
+        transfer_departure_velocity_m_s=_vector3(lp.v0[0]),
+    )
 
 
 def _resolve_body(body_name: str) -> CelestialBody:
@@ -41,16 +79,17 @@ def solve_lambert_v_infinities(
     or degenerate transfer) - callers should skip/mark that pair rather than
     treat it as an error.
     """
-    try:
-        lp = pk.lambert_problem(r0, r1, tof_seconds, mu_central_body, multi_revs=0)
-    except Exception:
+    solved = _solve_lambert_state(
+        r0,
+        r1,
+        tof_seconds,
+        mu_central_body,
+        v_origin,
+        v_destination,
+    )
+    if solved is None:
         return None
-    if len(lp.v0) == 0:
-        return None
-
-    v_inf_depart = _norm(_sub(lp.v0[0], v_origin))
-    v_inf_arrival = _norm(_sub(lp.v1[0], v_destination))
-    return v_inf_depart, v_inf_arrival
+    return solved.v_inf_depart_m_s, solved.v_inf_arrival_m_s
 
 
 def compute_lambert_leg(
@@ -124,7 +163,7 @@ def compute_lambert_leg(
 
             r1, v_destination = destination_body.eph(arrival_mjd2000)
 
-            solved = solve_lambert_v_infinities(
+            solved = _solve_lambert_state(
                 r0,
                 r1,
                 tof_seconds,
@@ -134,21 +173,23 @@ def compute_lambert_leg(
             )
             if solved is None:
                 continue
-            v_inf_depart, v_inf_arrival = solved
-
             results.append(
                 TrajectoryResult(
                     departure_mjd2000=departure_mjd2000,
                     arrival_mjd2000=arrival_mjd2000,
                     tof_years=tof_years,
-                    v_inf_depart=v_inf_depart,
-                    v_inf_arrival=v_inf_arrival,
+                    v_inf_depart=solved.v_inf_depart_m_s,
+                    v_inf_arrival=solved.v_inf_arrival_m_s,
                     delta_v=None,
                     method="lambert",
                     notes=(
                         "Generic Lambert Leg solver; v-infinity values are relative heliocentric "
                         "velocities and not propulsive delta-v."
                     ),
+                    departure_position_m=solved.departure_position_m,
+                    arrival_position_m=solved.arrival_position_m,
+                    transfer_departure_velocity_m_s=(solved.transfer_departure_velocity_m_s),
+                    central_mu_m3_s2=float(origin_body.get_mu_central_body()),
                 )
             )
 

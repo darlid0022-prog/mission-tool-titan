@@ -5,14 +5,15 @@ from __future__ import annotations
 import hashlib
 import math
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pykep as pk
 
 from .bodies import resolve_body
 from .connected_physics import SECONDS_PER_DAY, compute_connected_first_order_chain
 from .constants import NOMINAL_SATURN_PERIAPSIS_RADIUS_M, TITAN_MEAN_ORBIT_RADIUS_M
-from .launch_search_ephemeris import heliocentric_state, solve_earth_saturn_lambert
+from .direct_trajectory_animation import build_connected_capture_segment
+from .launch_search_ephemeris import solve_earth_saturn_lambert
 from .launch_search_models import (
     LaunchScenario,
     LaunchSearchConfig,
@@ -33,7 +34,7 @@ def _date_to_mjd2000(value) -> float:
 
 
 def _iso_date(epoch_mjd2000: float) -> str:
-    instant = datetime(2000, 1, 1, tzinfo=timezone.utc) + timedelta(days=epoch_mjd2000)
+    instant = datetime(2000, 1, 1, tzinfo=UTC) + timedelta(days=epoch_mjd2000)
     return instant.date().isoformat()
 
 
@@ -48,40 +49,6 @@ def _grid(start: float, stop: float, step: float) -> tuple[float, ...]:
 def _scenario_id(departure: float, arrival: float) -> str:
     payload = f"earth-saturn-titan:{departure:.9f}:{arrival:.9f}".encode()
     return f"est-{hashlib.sha256(payload).hexdigest()[:16]}"
-
-
-def _capture_segment(
-    departure_mjd2000: float,
-    arrival_mjd2000: float,
-    periapsis_radius_m: float,
-    apoapsis_radius_m: float,
-    sample_count: int,
-) -> SearchTrajectorySegment:
-    axis = (periapsis_radius_m + apoapsis_radius_m) / 2.0
-    eccentricity = (apoapsis_radius_m - periapsis_radius_m) / (
-        apoapsis_radius_m + periapsis_radius_m
-    )
-    points = []
-    for index in range(sample_count):
-        anomaly = math.pi * index / (sample_count - 1)
-        points.append(
-            (
-                axis * (math.cos(anomaly) - eccentricity) / 1_000.0,
-                axis * math.sqrt(1.0 - eccentricity**2) * math.sin(anomaly) / 1_000.0,
-                0.0,
-            )
-        )
-    return SearchTrajectorySegment(
-        id="saturn-capture-ellipse",
-        name="Saturn capture ellipse to Titan orbital radius",
-        frame="saturn_centred",
-        unit="km",
-        x=tuple(point[0] for point in points),
-        y=tuple(point[1] for point in points),
-        z=tuple(point[2] for point in points),
-        departure_mjd2000=departure_mjd2000,
-        arrival_mjd2000=arrival_mjd2000,
-    )
 
 
 def evaluate_launch_scenario(
@@ -131,7 +98,7 @@ def evaluate_launch_scenario(
             departure_mjd2000=departure_mjd2000,
             arrival_mjd2000=arrival_mjd2000,
         ),
-        _capture_segment(
+        build_connected_capture_segment(
             arrival_mjd2000,
             phase_end,
             capture.periapsis_radius_m,
@@ -191,7 +158,9 @@ def rank_scenarios(
             + (scenario.total_duration_days - min(duration_values)) / (duration_span or 1.0)
             for scenario in scenarios
         ]
-    scored = tuple(replace(scenario, objective_score=score) for scenario, score in zip(scenarios, scores))
+    scored = tuple(
+        replace(scenario, objective_score=score) for scenario, score in zip(scenarios, scores)
+    )
     return tuple(
         sorted(
             scored,
@@ -233,7 +202,9 @@ def _evaluate_pairs(
     rejected = []
     for departure, arrival in pairs:
         try:
-            scenarios.append(evaluate_launch_scenario(departure, arrival, sample_count=sample_count))
+            scenarios.append(
+                evaluate_launch_scenario(departure, arrival, sample_count=sample_count)
+            )
         except (RuntimeError, TypeError, ValueError) as exc:
             rejected.append((departure, arrival, str(exc)))
     return tuple(scenarios), tuple(rejected)
@@ -251,7 +222,11 @@ def search_direct_earth_saturn_titan(config: LaunchSearchConfig) -> LaunchSearch
         config.max_time_of_flight_days,
         config.arrival_step_days,
     )
-    coarse_pairs = tuple((departure, departure + flight_time) for departure in departures for flight_time in flight_times)
+    coarse_pairs = tuple(
+        (departure, departure + flight_time)
+        for departure in departures
+        for flight_time in flight_times
+    )
     sample_count = FAST_ARC_SAMPLE_COUNT if config.fast_mode else COARSE_ARC_SAMPLE_COUNT
     coarse, rejected = _evaluate_pairs(coarse_pairs, sample_count)
     if not coarse:

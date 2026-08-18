@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -38,6 +39,10 @@ class TrajectoryResult:
     delta_v: float | None = None
     method: str = ""
     notes: str = ""
+    departure_position_m: tuple[float, float, float] | None = None
+    arrival_position_m: tuple[float, float, float] | None = None
+    transfer_departure_velocity_m_s: tuple[float, float, float] | None = None
+    central_mu_m3_s2: float | None = None
 
     def __post_init__(self) -> None:
         if self.v_inf_depart is not None and self.v_inf_depart < 0:
@@ -46,6 +51,20 @@ class TrajectoryResult:
             raise ValueError("v_inf_arrival must be non-negative.")
         if self.delta_v is not None and self.delta_v < 0:
             raise ValueError("delta_v must be non-negative.")
+        vectors = (
+            self.departure_position_m,
+            self.arrival_position_m,
+            self.transfer_departure_velocity_m_s,
+        )
+        for vector in vectors:
+            if vector is not None and (
+                len(vector) != 3 or not all(math.isfinite(float(value)) for value in vector)
+            ):
+                raise ValueError("Trajectory state vectors must contain three finite values.")
+        if self.central_mu_m3_s2 is not None and (
+            not math.isfinite(self.central_mu_m3_s2) or self.central_mu_m3_s2 <= 0.0
+        ):
+            raise ValueError("central_mu_m3_s2 must be finite and positive.")
 
 
 @dataclass
