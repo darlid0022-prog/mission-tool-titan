@@ -21,6 +21,38 @@ def _resolve_body(body_name: str) -> CelestialBody:
     return resolve_body(body_name)
 
 
+def solve_lambert_v_infinities(
+    r0,
+    r1,
+    tof_seconds: float,
+    mu_central_body: float,
+    v_origin,
+    v_destination,
+) -> tuple[float, float] | None:
+    """Solve one zero-revolution Lambert transfer between two given states.
+
+    The single-pair primitive behind every Lambert grid in this codebase
+    (compute_lambert_leg below, and mission/porkchop.py's departure x arrival
+    date grid): takes already-sampled ephemeris state vectors so callers can
+    reuse one body's state across many pairs instead of re-fetching it.
+
+    Returns `(v_inf_depart, v_inf_arrival)` in m/s, or None if the solver does
+    not converge for this geometry/time-of-flight (a geometrically impossible
+    or degenerate transfer) - callers should skip/mark that pair rather than
+    treat it as an error.
+    """
+    try:
+        lp = pk.lambert_problem(r0, r1, tof_seconds, mu_central_body, multi_revs=0)
+    except Exception:
+        return None
+    if len(lp.v0) == 0:
+        return None
+
+    v_inf_depart = _norm(_sub(lp.v0[0], v_origin))
+    v_inf_arrival = _norm(_sub(lp.v1[0], v_destination))
+    return v_inf_depart, v_inf_arrival
+
+
 def compute_lambert_leg(
     origin: str,
     destination: str,
@@ -92,25 +124,17 @@ def compute_lambert_leg(
 
             r1, v_destination = destination_body.eph(arrival_mjd2000)
 
-            try:
-                lp = pk.lambert_problem(
-                    r0,
-                    r1,
-                    tof_seconds,
-                    origin_body.get_mu_central_body(),
-                    multi_revs=0,
-                )
-            except Exception:
+            solved = solve_lambert_v_infinities(
+                r0,
+                r1,
+                tof_seconds,
+                origin_body.get_mu_central_body(),
+                v_origin,
+                v_destination,
+            )
+            if solved is None:
                 continue
-
-            if len(lp.v0) == 0:
-                continue
-
-            v_transfer_depart = lp.v0[0]
-            v_transfer_arrival = lp.v1[0]
-
-            v_inf_depart = _norm(_sub(v_transfer_depart, v_origin))
-            v_inf_arrival = _norm(_sub(v_transfer_arrival, v_destination))
+            v_inf_depart, v_inf_arrival = solved
 
             results.append(
                 TrajectoryResult(
