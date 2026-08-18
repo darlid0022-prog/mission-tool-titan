@@ -10,10 +10,16 @@ import app_services
 from mission import colors
 from mission.gravity_assist import compute_cassini_historical_tour
 from mission.trajectory_plot import (
+    CAMERA_PRESETS,
+    DEFAULT_VIEW_PRESET,
     build_cassini_historical_figure,
     build_complete_mission_figure,
     build_complete_mission_table,
+    build_scene_figure,
+    build_scene_table,
+    scene_figure_to_standalone_html,
 )
+from mission.trajectory_scene import TrajectorySegment, segments_from_cassini_tour, segments_from_saturn_system_scene
 from mission.trajectory_visualization import (
     CompleteMissionScene3D,
     MissionAnimationTimeline3D,
@@ -22,6 +28,73 @@ from mission.trajectory_visualization import (
     interpolate_spacecraft_position,
 )
 from mission.ui_text import UI_TEXT
+
+# Camera presets scoped to Saturn-centred geometry (Rings/Periapsis/Titan) are
+# only offered once the segments themselves are Saturn-centred; a heliocentric
+# tour only ever gets the frame-agnostic "Global" default.
+SATURN_CENTRED_VIEW_PRESETS = tuple(CAMERA_PRESETS)
+HELIOCENTRIC_VIEW_PRESETS = (DEFAULT_VIEW_PRESET,)
+
+
+def render_generic_scene_section(
+    segments: tuple[TrajectorySegment, ...],
+    *,
+    unit_label: str,
+    key_prefix: str,
+    available_presets: tuple[str, ...],
+    file_name: str,
+) -> None:
+    """Render one generic-segment 3D scene: view preset, scale toggle, chart,
+    accessible table, and a standalone HTML export - identical code path for
+    a direct Saturn-system scene or a gravity-assist tour, since both are
+    already the same TrajectorySegment shape by the time they reach here.
+    """
+    with st.container(border=True):
+        control_columns = st.columns(2)
+        view_preset = control_columns[0].selectbox(
+            "Camera view",
+            available_presets,
+            key=f"{key_prefix}_view_preset",
+            help="Global is a wide default view; Rings/Periapsis/Titan are close-in "
+            "presets on the Saturn-centred geometry.",
+        )
+        scale_choice = control_columns[1].radio(
+            "Body marker scale",
+            ("Enlarged (readable)", "Real scale"),
+            key=f"{key_prefix}_scale_choice",
+            horizontal=True,
+            help="Real scale sizes body landmark markers proportionally to their actual "
+            "radius (relative to the largest body shown) - small bodies may become hard "
+            "to see, which is expected, honest behavior, not a rendering bug.",
+        )
+        real_scale = scale_choice == "Real scale"
+
+        figure = build_scene_figure(
+            segments,
+            unit_label=unit_label,
+            view_preset=view_preset,
+            real_scale=real_scale,
+        )
+        st.plotly_chart(
+            figure,
+            width="stretch",
+            height=720,
+            key=f"{key_prefix}_plotly_chart",
+            config={"displaylogo": False, "scrollZoom": True},
+        )
+
+        with st.expander("View segment data as a table"):
+            st.dataframe(build_scene_table(segments), width="stretch")
+
+        st.download_button(
+            "Download standalone HTML (offline-capable)",
+            data=scene_figure_to_standalone_html(figure),
+            file_name=file_name,
+            mime="text/html",
+            icon=":material/download:",
+            key=f"{key_prefix}_html_download",
+            on_click="ignore",
+        )
 
 ANIMATION_PHASE_OPTIONS = (
     "Earth → Saturn cruise",
@@ -161,6 +234,20 @@ if (
         key="cassini_historical_trajectory_3d",
         config={"displaylogo": False, "scrollZoom": True},
     )
+
+    st.subheader("Generic segment view (gravity-assist tour)")
+    st.caption(
+        "Same VVEJGA tour, rendered through the generic segment schema shared with "
+        "direct-transfer missions - a preview of what will later host either a direct "
+        "trajectory or a gravity-assist trajectory through one code path."
+    )
+    render_generic_scene_section(
+        segments_from_cassini_tour(compute_cassini_historical_tour()),
+        unit_label="m",
+        key_prefix="cassini_tour_scene",
+        available_presets=HELIOCENTRIC_VIEW_PRESETS,
+        file_name="cassini_historical_tour_scene.html",
+    )
     st.stop()
 
 # Only connected Saturn->Titan missions include staging and Titan-transfer studies
@@ -207,3 +294,17 @@ with st.container(border=True):
         st.session_state["trajectory_scene"],
         st.session_state["trajectory_timeline"],
     )
+
+st.subheader("Generic segment view (Saturn system)")
+st.caption(
+    "Same Saturn arrival/staging/Titan-transfer geometry, rendered through the generic "
+    "segment schema shared with gravity-assist tours - a preview of what will later host "
+    "either a direct trajectory or a gravity-assist trajectory through one code path."
+)
+render_generic_scene_section(
+    segments_from_saturn_system_scene(st.session_state["trajectory_scene"]),
+    unit_label=st.session_state["trajectory_scene"].saturn_curves[0].unit,
+    key_prefix="saturn_system_scene",
+    available_presets=SATURN_CENTRED_VIEW_PRESETS,
+    file_name="saturn_system_scene.html",
+)

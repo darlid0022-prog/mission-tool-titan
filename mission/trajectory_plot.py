@@ -11,6 +11,7 @@ from plotly.subplots import make_subplots
 
 from . import colors
 from .gravity_assist import GravityAssistResult, MissionSegment, OrbitInsertionResult
+from .trajectory_scene import TrajectorySegment
 from .trajectory_visualization import (
     CompleteMissionScene3D,
     SpacecraftPosition3D,
@@ -348,3 +349,225 @@ def build_complete_mission_table(figure: go.Figure) -> pd.DataFrame:
         rows,
         columns=["Element", "Type", "Panel", "Point index", "x", "y", "z", "Unit"],
     )
+
+
+# --------------------------------------------------------------------------
+# Generic scene figure - the only builder that consumes
+# mission.trajectory_scene.TrajectorySegment instead of a specific mission's
+# domain result type, so the same function renders a direct Lambert-based
+# mission or a gravity-assist tour without knowing which one it is.
+# --------------------------------------------------------------------------
+
+# Named camera angles for the 3D scene. Values are Plotly `scene.camera.eye`
+# vectors in the figure's own data units (so they compose with `aspectmode:
+# "data"`); "Global" is a wide default view, the others are close-in on the
+# Saturn-centred geometry these presets were named for (rings/periapsis/
+# Titan's orbit). Display-only constants - not physical data.
+CAMERA_PRESETS: dict[str, dict[str, object]] = {
+    "Global": {"eye": {"x": 1.6, "y": 1.6, "z": 1.1}},
+    "Rings": {"eye": {"x": 0.35, "y": 0.35, "z": 0.18}},
+    "Periapsis": {"eye": {"x": 0.06, "y": 0.06, "z": 0.03}},
+    "Titan": {"eye": {"x": 1.5, "y": 0.05, "z": 0.35}},
+}
+DEFAULT_VIEW_PRESET = "Global"
+
+_REAL_SCALE_MAX_MARKER_PX = 26
+_REAL_SCALE_MIN_MARKER_PX = 2
+
+
+def _real_scale_reference_radius_m(segments: tuple[TrajectorySegment, ...]) -> float | None:
+    """Largest sourced `true_radius_m` among the given segments, or None if none carry one."""
+    radii = [
+        radius
+        for segment in segments
+        for radius in (segment.metadata.get("true_radius_m") if segment.metadata else None,)
+        if radius is not None
+    ]
+    return max(radii) if radii else None
+
+
+def _marker_size_px(
+    segment: TrajectorySegment,
+    *,
+    real_scale: bool,
+    reference_radius_m: float | None,
+) -> int:
+    """Landmark marker pixel size.
+
+    Not a true volumetric scale - Plotly Scatter3d marker `size` is a
+    screen-pixel value, not a data-unit radius - so `real_scale=True` only
+    makes marker sizes *linearly proportional to each other's real radius*
+    within the legible pixel range below, anchored to the largest body in
+    this figure. Smaller bodies shrinking toward illegibility (or a body
+    with no sourced radius falling back to its default size) is expected,
+    honest behavior for this toggle, not a bug.
+    """
+    if not real_scale:
+        return segment.style.marker_size
+    radius_m = segment.metadata.get("true_radius_m") if segment.metadata else None
+    if radius_m is None or not reference_radius_m:
+        return segment.style.marker_size
+    scaled = _REAL_SCALE_MAX_MARKER_PX * (radius_m / reference_radius_m)
+    return max(_REAL_SCALE_MIN_MARKER_PX, round(scaled))
+
+
+def _segment_hover_template(segment: TrajectorySegment) -> str:
+    """Hover text built only from fields this segment actually carries.
+
+    Optional fields (dates, duration, delta-v) are omitted rather than
+    padded with a placeholder when the segment does not provide them.
+    """
+    lines = [f"<b>{segment.name}</b>", f"{segment.origin_body} → {segment.destination_body}"]
+    if segment.departure_date:
+        lines.append(f"Departs: {segment.departure_date}")
+    if segment.arrival_date:
+        lines.append(f"Arrives: {segment.arrival_date}")
+    if segment.duration_days is not None:
+        lines.append(f"Duration: {segment.duration_days:,.3f} days")
+    if segment.delta_v_m_s is not None:
+        lines.append(f"Delta-v: {segment.delta_v_m_s:,.1f} m/s")
+    return "<br>".join(lines) + "<extra></extra>"
+
+
+def build_scene_figure(
+    segments: tuple[TrajectorySegment, ...],
+    *,
+    unit_label: str,
+    view_preset: str = DEFAULT_VIEW_PRESET,
+    real_scale: bool = False,
+) -> go.Figure:
+    """Render a generic list of TrajectorySegment as one 3D Plotly scene.
+
+    Pure figure construction from already-computed, generic data: this
+    function knows nothing about Mission/Leg/GravityAssistResult or any
+    other domain type, only the `TrajectorySegment` shape - see
+    `mission/trajectory_scene.py` for the adapters that produce that shape
+    from an existing mission result (a direct Earth->Saturn->Titan chain or
+    the Cassini historical gravity-assist tour alike). No Lambert solve,
+    ephemeris sampling, or flyby geometry happens here.
+    """
+    if not isinstance(segments, tuple) or not segments:
+        raise ValueError("segments must be a non-empty tuple of TrajectorySegment.")
+    if not all(isinstance(segment, TrajectorySegment) for segment in segments):
+        raise TypeError("segments must contain only TrajectorySegment instances.")
+    if view_preset not in CAMERA_PRESETS:
+        raise ValueError(f"view_preset must be one of {tuple(CAMERA_PRESETS)}.")
+
+    reference_radius_m = _real_scale_reference_radius_m(segments) if real_scale else None
+
+    figure = go.Figure()
+    for segment in segments:
+        if segment.is_point:
+            figure.add_trace(
+                go.Scatter3d(
+                    x=list(segment.x),
+                    y=list(segment.y),
+                    z=list(segment.z),
+                    mode="markers+text",
+                    name=segment.name,
+                    text=[segment.name],
+                    textposition="top center",
+                    legendgroup=segment.style.legend_group,
+                    marker={
+                        "color": segment.style.color,
+                        "size": _marker_size_px(
+                            segment, real_scale=real_scale, reference_radius_m=reference_radius_m
+                        ),
+                    },
+                    hovertemplate=_segment_hover_template(segment),
+                )
+            )
+        else:
+            figure.add_trace(
+                go.Scatter3d(
+                    x=list(segment.x),
+                    y=list(segment.y),
+                    z=list(segment.z),
+                    mode="lines",
+                    name=segment.name,
+                    legendgroup=segment.style.legend_group,
+                    line={
+                        "color": segment.style.color,
+                        "width": segment.style.width,
+                        "dash": segment.style.dash,
+                    },
+                    hovertemplate=_segment_hover_template(segment),
+                )
+            )
+
+    figure.update_layout(
+        height=720,
+        margin={"l": 0, "r": 0, "t": 40, "b": 0},
+        showlegend=True,
+        legend={"orientation": "h", "y": -0.08, "x": 0.5, "xanchor": "center"},
+        scene={
+            "xaxis": _axis(f"x ({unit_label})"),
+            "yaxis": _axis(f"y ({unit_label})"),
+            "zaxis": _axis(f"z ({unit_label})"),
+            "aspectmode": "data",
+            "camera": CAMERA_PRESETS[view_preset],
+        },
+        uirevision=f"generic-scene-{view_preset}-{real_scale}",
+    )
+    return figure
+
+
+def build_scene_table(segments: tuple[TrajectorySegment, ...]) -> pd.DataFrame:
+    """Flatten a generic segment list into one data table - the accessible
+    alternative to `build_scene_figure`'s chart, built from the same segments
+    rather than re-parsed off the Figure, so it can never drift from what
+    was requested to be plotted.
+    """
+    if not isinstance(segments, tuple) or not all(
+        isinstance(segment, TrajectorySegment) for segment in segments
+    ):
+        raise TypeError("segments must be a tuple of TrajectorySegment.")
+
+    rows: list[dict[str, object]] = []
+    for segment in segments:
+        for index, (x, y, z) in enumerate(zip(segment.x, segment.y, segment.z, strict=True)):
+            rows.append(
+                {
+                    "Segment": segment.name,
+                    "Type": segment.type,
+                    "Origin": segment.origin_body,
+                    "Destination": segment.destination_body,
+                    "Point index": index,
+                    "x": x,
+                    "y": y,
+                    "z": z,
+                    "Departure date": segment.departure_date,
+                    "Arrival date": segment.arrival_date,
+                    "Duration (days)": segment.duration_days,
+                    "Delta-v (m/s)": segment.delta_v_m_s,
+                }
+            )
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "Segment",
+            "Type",
+            "Origin",
+            "Destination",
+            "Point index",
+            "x",
+            "y",
+            "z",
+            "Departure date",
+            "Arrival date",
+            "Duration (days)",
+            "Delta-v (m/s)",
+        ],
+    )
+
+
+def scene_figure_to_standalone_html(figure: go.Figure) -> str:
+    """Serialize a built figure to one self-contained, offline-capable HTML string.
+
+    Embeds the full Plotly JS library (`include_plotlyjs=True`) rather than
+    linking a CDN, so the exported file opens and stays interactive without
+    a network connection.
+    """
+    if not isinstance(figure, go.Figure):
+        raise TypeError("figure must be a plotly.graph_objects.Figure.")
+    return figure.to_html(full_html=True, include_plotlyjs=True)

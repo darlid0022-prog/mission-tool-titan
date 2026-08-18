@@ -1,3 +1,4 @@
+import json
 import unittest
 from datetime import date
 from pathlib import Path
@@ -82,6 +83,18 @@ def badge_values(app: AppTest) -> list[str]:
     so this reads it back off the plain markdown elements instead.
     """
     return [markdown.value for markdown in app.markdown if "-badge[" in markdown.value]
+
+
+def _plotly_marker_sizes(chart_element) -> dict[str, object]:
+    """Read {trace name: marker size} off a rendered plotly_chart AppTest element.
+
+    AppTest exposes no typed Plotly wrapper (it falls back to UnknownElement,
+    whose .value tries the widget-state path and fails for a display-only
+    chart), so this reads the figure straight out of the underlying proto's
+    JSON spec instead.
+    """
+    spec = json.loads(chart_element.proto.spec)
+    return {trace["name"]: trace["marker"]["size"] for trace in spec["data"] if "marker" in trace}
 
 
 class TestMissionSetupPage(unittest.TestCase):
@@ -317,7 +330,8 @@ class TestTrajectory3DPage(unittest.TestCase):
         app = run_app(page_path="pages/trajectory_3d.py")
 
         self.assertFalse(app.exception)
-        self.assertEqual(len(app.get("plotly_chart")), 1)
+        # The legacy animated chart plus the new generic-segment scene chart.
+        self.assertEqual(len(app.get("plotly_chart")), 2)
         self.assertTrue(app.segmented_control)
         self.assertTrue(app.slider)
         self.assertIn("trajectory_scene", app.session_state)
@@ -347,7 +361,8 @@ class TestTrajectory3DPage(unittest.TestCase):
             app.switch_page("pages/trajectory_3d.py").run(timeout=30)
 
         self.assertFalse(app.exception)
-        self.assertEqual(len(app.get("plotly_chart")), 1)
+        # The static historical chart plus the new generic-segment scene chart.
+        self.assertEqual(len(app.get("plotly_chart")), 2)
         self.assertTrue(
             any("Cassini historical VVEJGA tour" in caption.value for caption in app.caption)
         )
@@ -388,10 +403,11 @@ class TestTrajectory3DPage(unittest.TestCase):
                 for heading in app.header
             )
         )
-        # Only this page's own chart is present now: other pages (e.g. the
+        # Only this page's own charts are present now: other pages (e.g. the
         # Pareto front on Optimization) are separate script runs and no
-        # longer share this run's element tree the way tabs used to.
-        self.assertEqual(len(app.get("plotly_chart")), 1)
+        # longer share this run's element tree the way tabs used to. Two
+        # charts: the legacy animated scene and the new generic-segment scene.
+        self.assertEqual(len(app.get("plotly_chart")), 2)
         self.assertTrue(
             any(
                 control.label == "Mission phase" and control.value == "Earth → Saturn cruise"
@@ -493,6 +509,90 @@ class TestTrajectory3DPage(unittest.TestCase):
             app.session_state["trajectory_timeline"],
             MissionAnimationTimeline3D,
         )
+
+    def test_generic_scene_section_offers_all_four_camera_presets_in_direct_mode(self):
+        app = run_app(page_path="pages/trajectory_3d.py")
+
+        self.assertFalse(app.exception)
+        self.assertTrue(
+            any(sub.value == "Generic segment view (Saturn system)" for sub in app.subheader)
+        )
+        view_preset = next(
+            select for select in app.selectbox if select.label == "Camera view"
+        )
+        self.assertEqual(list(view_preset.options), ["Global", "Rings", "Periapsis", "Titan"])
+        self.assertEqual(view_preset.value, "Global")
+
+    def test_generic_scene_section_real_scale_toggle_changes_marker_sizes(self):
+        app = run_app(page_path="pages/trajectory_3d.py")
+        self.assertFalse(app.exception)
+
+        scale_radio = next(
+            radio for radio in app.radio if radio.label == "Body marker scale"
+        )
+        self.assertEqual(scale_radio.value, "Enlarged (readable)")
+        readable_sizes = _plotly_marker_sizes(app.get("plotly_chart")[-1])
+
+        scale_radio.set_value("Real scale").run(timeout=30)
+        self.assertFalse(app.exception)
+        scaled_sizes = _plotly_marker_sizes(app.get("plotly_chart")[-1])
+        self.assertNotEqual(readable_sizes, scaled_sizes)
+
+    def test_generic_scene_section_offers_a_table_and_html_download(self):
+        app = run_app(page_path="pages/trajectory_3d.py")
+
+        self.assertFalse(app.exception)
+        expander = next(e for e in app.expander if e.label == "View segment data as a table")
+        table = expander.dataframe[0].value
+        self.assertEqual(
+            list(table.columns),
+            [
+                "Segment",
+                "Type",
+                "Origin",
+                "Destination",
+                "Point index",
+                "x",
+                "y",
+                "z",
+                "Departure date",
+                "Arrival date",
+                "Duration (days)",
+                "Delta-v (m/s)",
+            ],
+        )
+        self.assertGreater(len(table), 0)
+        self.assertTrue(
+            any(
+                button.label == "Download standalone HTML (offline-capable)"
+                for button in app.download_button
+            )
+        )
+
+    def test_generic_scene_section_offers_only_global_preset_in_historical_mode(self):
+        app = AppTest.from_file(APP_PATH)
+        with patch("app_services.compute_cached_trajectory", return_value=earth_saturn_result()):
+            app.run(timeout=30)
+            trajectory_type = next(
+                radio for radio in app.radio if radio.label == "Trajectory type"
+            )
+            trajectory_type.set_value("Cassini historical gravity assist")
+            next(button for button in app.button if "Calculate" in button.label).click().run(
+                timeout=30
+            )
+            app.switch_page("pages/trajectory_3d.py").run(timeout=30)
+
+        self.assertFalse(app.exception)
+        self.assertTrue(
+            any(
+                sub.value == "Generic segment view (gravity-assist tour)"
+                for sub in app.subheader
+            )
+        )
+        view_preset = next(
+            select for select in app.selectbox if select.label == "Camera view"
+        )
+        self.assertEqual(list(view_preset.options), ["Global"])
 
 
 class TestSaturnSystemStudiesPage(unittest.TestCase):
