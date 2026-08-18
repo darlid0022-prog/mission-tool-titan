@@ -22,6 +22,7 @@ from mission.capabilities import (
 )
 from mission.payload_catalog import catalog_by_label, catalog_row
 from mission.pdf_report import MissionPdfReport, generate_mission_summary_pdf
+from mission.sizing import compute_mass_budget
 from mission.ui_text import UI_TEXT
 
 scorecard_slot = st.empty()
@@ -226,6 +227,60 @@ if submitted:
         submitted_query,
     )
 
+active_launch_candidate = st.session_state.get(
+    lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY
+)
+if isinstance(active_launch_candidate, lw.LaunchWindowCandidate):
+    candidate_id = active_launch_candidate.scenario_id or (
+        f"candidate #{active_launch_candidate.rank}"
+    )
+    candidate_mass = compute_mass_budget(
+        active_launch_candidate.delta_v_total_m_s,
+        mission_inputs.isp_s,
+        mission_inputs.instruments_df,
+    )
+    with scorecard_slot.container(border=True):
+        st.subheader(":material/dashboard: Mission scorecard")
+        st.caption(
+            f"Active scenario: {lw.MISSION_SCENARIO_LAUNCH_WINDOW_LABEL} — {candidate_id}."
+        )
+        st.metric(
+            "Connected delta-v",
+            f"{active_launch_candidate.delta_v_total_m_s:,.1f} m/s",
+            border=True,
+        )
+        st.metric(
+            "Wet mass (simplified — selected candidate budget)",
+            f"{candidate_mass['wet_mass_kg']:,.0f} kg",
+            border=True,
+        )
+        st.caption(
+            "Simplified wet mass applies the selected candidate's unchanged delta-v "
+            "budget to the current Mission setup Isp and payload mass model; it is not "
+            "an additional trajectory or delta-v calculation."
+        )
+        st.metric(
+            "Earth → Saturn flight time",
+            f"{active_launch_candidate.time_of_flight_days:,.1f} days",
+            border=True,
+        )
+        st.metric(
+            "Total reference-scenario duration",
+            f"{active_launch_candidate.total_duration_days:,.2f} days",
+            border=True,
+        )
+        st.caption(
+            "Delta-v and durations above are copied directly from the selected "
+            "Launch windows candidate. No Mission setup trajectory or connected "
+            "budget is recomputed while this scenario is active."
+        )
+        if st.button("Return to mission baseline", icon=":material/undo:"):
+            st.session_state.pop(
+                lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, None
+            )
+            st.rerun()
+    st.stop()
+
 bundle = app_services.require_mission_bundle()
 if bundle is None:
     st.stop()
@@ -278,14 +333,26 @@ pdf_bytes = generate_mission_summary_pdf(pdf_report)
 
 with scorecard_slot.container(border=True):
     st.subheader(":material/dashboard: Mission scorecard")
+    active_label = (
+        lw.MISSION_SCENARIO_CASSINI_LABEL
+        if trajectory_type == app_services.TRAJECTORY_TYPE_CASSINI_HISTORICAL
+        else lw.MISSION_SCENARIO_BASELINE_LABEL
+    )
+    st.caption(f"Active scenario: {active_label}.")
     st.metric("Connected delta-v", f"{bundle.dv_total:,.0f} m/s", border=True)
     st.metric("Wet mass (simplified)", f"{bundle.mass['wet_mass_kg']:,.0f} kg", border=True)
+    duration_label = (
+        "Earth → Saturn VVEJGA flight time"
+        if trajectory_type == app_services.TRAJECTORY_TYPE_CASSINI_HISTORICAL
+        else "Earth → Saturn transfer plus Saturn capture-to-apoapsis time"
+    )
     st.metric(
-        "Mission duration (Earth departure → Saturn capture)",
+        duration_label,
         f"{bundle.mission_duration_days:,.1f} days",
         help=(
-            "Ends at Saturn orbit insertion/capture. This connected chain does not model "
-            "a Titan encounter or capture, even when a moon-transfer study is selected below."
+            "For the direct baseline this spans the heliocentric transfer and the "
+            "Saturn-centred coast from periapsis to the reference apoapsis. It is "
+            "not a phased Titan encounter or Titan capture."
         ),
         border=True,
     )
@@ -294,26 +361,12 @@ with scorecard_slot.container(border=True):
         f"{bundle.single_stage_feasibility.threshold_exceedance_factor:.2f}×",
         border=True,
     )
-    st.caption("Live connected-budget values.")
+    st.caption("Live connected-budget values for the active baseline scenario.")
     st.caption(
         "Gravity-assist delta-v savings are not included above and are not available "
         "without a connected multi-leg trajectory (see Gravity assists for isolated, "
         "unpowered flyby demonstrators only)."
     )
-    selected_launch_candidate = st.session_state.get(
-        lw.SELECTED_LAUNCH_WINDOW_CANDIDATE_STATE_KEY
-    )
-    if (
-        isinstance(selected_launch_candidate, lw.LaunchWindowCandidate)
-        and selected_launch_candidate.departure_datetime.date() == mission_inputs.launch_window_start
-    ):
-        st.caption(
-            f"Active scenario: launch window narrowed to "
-            f"{selected_launch_candidate.departure_datetime.date().isoformat()} by a Launch "
-            "windows selection. This scorecard recomputes its own budget independently and "
-            "may not match that page's numbers exactly — see Launch windows for the "
-            "candidate's own delta-v/duration breakdown."
-        )
 
 with st.container(horizontal=True):
     if st.button("Copy share link", icon=":material/link:"):

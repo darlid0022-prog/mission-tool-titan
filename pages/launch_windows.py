@@ -39,6 +39,7 @@ def _clear_stale_results() -> None:
     st.session_state.pop(RESULT_STATE_KEY, None)
     st.session_state.pop(SELECTED_RANK_KEY, None)
     st.session_state.pop(lw.SELECTED_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, None)
+    st.session_state.pop(lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, None)
 
 
 st.header(":material/search: Launch window search")
@@ -316,6 +317,44 @@ else:
         st.caption(f"Engine: {result.engine_name}")
 
     st.divider()
+    active_candidate = st.session_state.get(
+        lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY
+    )
+    with st.container(horizontal=True):
+        if st.button(
+            "Use selected candidate as active scenario",
+            icon=":material/check_circle:",
+            help=(
+                "Makes this exact engine result the source of truth for the Mission "
+                "scorecard. It does not rerun either trajectory engine."
+            ),
+        ):
+            st.session_state[lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY] = (
+                selected_candidate
+            )
+            active_candidate = selected_candidate
+            st.success(
+                f"Active scenario set to candidate "
+                f"{selected_candidate.scenario_id or f'#{selected_candidate.rank}'}."
+            )
+        if isinstance(active_candidate, lw.LaunchWindowCandidate) and st.button(
+            "Return to mission baseline",
+            icon=":material/undo:",
+        ):
+            st.session_state.pop(
+                lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, None
+            )
+            active_candidate = None
+            st.success("Mission setup baseline restored as the active scenario.")
+
+    if isinstance(active_candidate, lw.LaunchWindowCandidate):
+        st.caption(
+            f"Active scenario: {lw.MISSION_SCENARIO_LAUNCH_WINDOW_LABEL} — "
+            f"{active_candidate.scenario_id or f'candidate #{active_candidate.rank}'}."
+        )
+    else:
+        st.caption(f"Active scenario: {lw.MISSION_SCENARIO_BASELINE_LABEL}.")
+
     mission_setup_inputs = app_services.load_mission_setup_inputs()
     if mission_setup_inputs is None:
         st.info(

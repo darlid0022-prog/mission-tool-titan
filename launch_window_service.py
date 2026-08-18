@@ -63,6 +63,11 @@ LAUNCH_WINDOW_RESOLUTION_LABELS: dict[str, str] = {
 }
 
 SELECTED_LAUNCH_WINDOW_CANDIDATE_STATE_KEY = "selected_launch_window_candidate"
+ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY = "active_launch_window_candidate"
+
+MISSION_SCENARIO_BASELINE_LABEL = "Mission setup baseline"
+MISSION_SCENARIO_LAUNCH_WINDOW_LABEL = "Selected launch-window candidate"
+MISSION_SCENARIO_CASSINI_LABEL = "Cassini VVEJGA"
 
 
 @dataclass(frozen=True)

@@ -209,9 +209,16 @@ class TestMissionSetupPage(unittest.TestCase):
         self.assertEqual(metrics["Connected delta-v"], "12,163 m/s")
         self.assertEqual(metrics["Wet mass (simplified)"], "10,797 kg")
         self.assertEqual(
-            metrics["Mission duration (Earth departure → Saturn capture)"], "2,211.8 days"
+            metrics["Earth → Saturn transfer plus Saturn capture-to-apoapsis time"],
+            "2,211.8 days",
         )
         self.assertEqual(metrics["Single-stage exceedance"], "3.17×")
+        self.assertTrue(
+            any(
+                "Active scenario: Mission setup baseline" in caption.value
+                for caption in app.caption
+            )
+        )
         # Removed from the scorecard: the isolated flyby demonstrators are not
         # directly additive as delta-v savings (see pages/gravity_assists.py).
         self.assertNotIn("Flyby gain coverage", metrics)

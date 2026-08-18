@@ -17,6 +17,7 @@ import pandas as pd
 from streamlit.testing.v1 import AppTest
 
 import app_services
+import launch_window_service as lw
 from launch_window_engine_adapter import scenario_to_candidate
 from launch_window_service import (
     LaunchWindowCandidate,
@@ -72,6 +73,7 @@ def _make_candidate(rank: int, **overrides: object) -> LaunchWindowCandidate:
         delta_v_capture_m_s=2_280.8,
         delta_v_titan_circularization_m_s=862.7,
         delta_v_total_m_s=6_763.6 - rank * 10.0,
+        scenario_id=f"launch-fixture-{rank}",
     )
     kwargs.update(overrides)
     return LaunchWindowCandidate(**kwargs)
@@ -375,7 +377,7 @@ class TestSendSelectionTo3D(unittest.TestCase):
             )
         )
 
-    def test_mission_setup_scorecard_names_the_active_launch_window_scenario(self):
+    def test_activated_candidate_is_the_scorecard_source_of_truth_across_navigation(self):
         with (
             patch(
                 "launch_window_service.get_launch_window_service",
@@ -387,28 +389,90 @@ class TestSendSelectionTo3D(unittest.TestCase):
             app.run(timeout=30)
             app = app.switch_page("pages/launch_windows.py").run(timeout=30)
             app = _submit_search(app)
-            send_button = next(
-                b for b in app.button if b.label == "Send selected candidate to 3D view"
+            activate_button = next(
+                b
+                for b in app.button
+                if b.label == "Use selected candidate as active scenario"
             )
-            app = send_button.click().run(timeout=30)
+            app = activate_button.click().run(timeout=30)
+            # A page switch/rerun must preserve the active immutable candidate.
             app = app.switch_page("pages/mission_setup.py").run(timeout=30)
 
         self.assertFalse(app.exception)
+        candidate = app.session_state[lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY]
+        metrics = {metric.label: metric.value for metric in app.metric}
+        self.assertEqual(metrics["Connected delta-v"], "6,753.6 m/s")
+        self.assertEqual(
+            metrics["Earth → Saturn flight time"],
+            f"{candidate.time_of_flight_days:,.1f} days",
+        )
+        self.assertEqual(
+            metrics["Total reference-scenario duration"],
+            f"{candidate.total_duration_days:,.2f} days",
+        )
+        self.assertIn("Wet mass (simplified — selected candidate budget)", metrics)
+        self.assertNotIn("Single-stage exceedance", metrics)
         self.assertTrue(
             any(
-                "Active scenario: launch window narrowed to 2026-07-01 by a Launch "
-                "windows selection" in c.value
+                "Active scenario: Selected launch-window candidate — launch-fixture-1"
+                in c.value
                 for c in app.caption
             )
         )
 
-    def test_scorecard_stays_silent_when_no_launch_window_candidate_is_active(self):
+    def test_scorecard_explicitly_names_baseline_without_an_active_candidate(self):
         with patch("app_services.compute_cached_trajectory", return_value=_earth_saturn_result()):
             app = AppTest.from_file(APP_PATH)
             app.run(timeout=30)
 
         self.assertFalse(app.exception)
-        self.assertFalse(any("Active scenario: launch window narrowed to" in c.value for c in app.caption))
+        self.assertTrue(
+            any("Active scenario: Mission setup baseline" in c.value for c in app.caption)
+        )
+
+    def test_return_action_restores_the_unchanged_mission_baseline(self):
+        with (
+            patch(
+                "launch_window_service.get_launch_window_service",
+                return_value=_FixtureLaunchWindowService(candidate_count=1),
+            ),
+            patch("app_services.compute_cached_trajectory", return_value=_earth_saturn_result()),
+        ):
+            app = _run_to_launch_windows(AppTest.from_file(APP_PATH))
+            app = _submit_search(app)
+            activate = next(
+                b for b in app.button if b.label == "Use selected candidate as active scenario"
+            )
+            app = activate.click().run(timeout=30)
+            app = app.switch_page("pages/mission_setup.py").run(timeout=30)
+            return_button = next(
+                b for b in app.button if b.label == "Return to mission baseline"
+            )
+            app = return_button.click().run(timeout=30)
+
+        self.assertFalse(app.exception)
+        self.assertNotIn(
+            lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, app.session_state
+        )
+        metrics = {metric.label: metric.value for metric in app.metric}
+        self.assertEqual(metrics["Connected delta-v"], "12,163 m/s")
+        self.assertIn("Wet mass (simplified)", metrics)
+
+    def test_active_candidate_does_not_recompute_the_baseline_bundle(self):
+        app = AppTest.from_file(APP_PATH)
+        app.session_state[lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY] = (
+            _make_candidate(1)
+        )
+
+        with patch(
+            "app_services.require_mission_bundle",
+            side_effect=AssertionError("baseline bundle must not be requested"),
+        ):
+            app.run(timeout=30)
+
+        self.assertFalse(app.exception)
+        metrics = {metric.label: metric.value for metric in app.metric}
+        self.assertEqual(metrics["Connected delta-v"], "6,753.6 m/s")
 
 
 class TestStaleResultsClearOnScenarioChange(unittest.TestCase):
@@ -444,6 +508,27 @@ class TestStaleResultsClearOnScenarioChange(unittest.TestCase):
         second_metrics = {m.label: m.value for m in app.metric}
         self.assertEqual(second_metrics["Delta-v total"], "1,234.5 m/s")
         self.assertNotEqual(second_metrics["Delta-v total"], first_metrics["Delta-v total"])
+
+    def test_a_new_search_invalidates_the_previously_active_candidate(self):
+        with patch(
+            "launch_window_service.get_launch_window_service",
+            return_value=_FixtureLaunchWindowService(candidate_count=1),
+        ):
+            app = _run_to_launch_windows(AppTest.from_file(APP_PATH))
+            app = _submit_search(app)
+            activate = next(
+                b for b in app.button if b.label == "Use selected candidate as active scenario"
+            )
+            app = activate.click().run(timeout=30)
+            self.assertIn(
+                lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, app.session_state
+            )
+            app = _submit_search(app)
+
+        self.assertFalse(app.exception)
+        self.assertNotIn(
+            lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, app.session_state
+        )
 
 
 class TestUnitsAndLabels(unittest.TestCase):
