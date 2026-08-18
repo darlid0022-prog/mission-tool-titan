@@ -185,12 +185,10 @@ class TestLaunchWindowSearchResultValidation(unittest.TestCase):
             )
 
 
-class TestNoEngineConnectedByDefault(unittest.TestCase):
-    def test_get_launch_window_service_returns_none_until_wired_in(self):
-        # The application must never display fabricated results: this stub
-        # is the explicit "not connected" signal pages/launch_windows.py
-        # checks for.
-        self.assertIsNone(get_launch_window_service())
+class TestEngineConnectedByDefault(unittest.TestCase):
+    def test_get_launch_window_service_returns_the_real_adapter(self):
+        service = get_launch_window_service()
+        self.assertTrue(callable(service.search))
 
 
 class TestApplyCandidateToMissionSetup(unittest.TestCase):

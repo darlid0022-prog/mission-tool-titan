@@ -7,6 +7,7 @@ import math
 import streamlit as st
 
 import app_services
+import launch_window_service as lw
 from mission import colors
 from mission.gravity_assist import compute_cassini_historical_tour
 from mission.trajectory_plot import (
@@ -19,7 +20,12 @@ from mission.trajectory_plot import (
     build_scene_table,
     scene_figure_to_standalone_html,
 )
-from mission.trajectory_scene import TrajectorySegment, segments_from_cassini_tour, segments_from_saturn_system_scene
+from mission.trajectory_scene import (
+    TrajectorySegment,
+    segments_from_cassini_tour,
+    segments_from_launch_search,
+    segments_from_saturn_system_scene,
+)
 from mission.trajectory_visualization import (
     CompleteMissionScene3D,
     MissionAnimationTimeline3D,
@@ -220,6 +226,53 @@ if bundle is None:
     st.stop()
 
 mission_inputs = app_services.load_mission_setup_inputs()
+selected_launch_candidate = st.session_state.get(
+    lw.SELECTED_LAUNCH_WINDOW_CANDIDATE_STATE_KEY
+)
+if (
+    isinstance(selected_launch_candidate, lw.LaunchWindowCandidate)
+    and selected_launch_candidate.segments
+    and mission_inputs is not None
+    and mission_inputs.trajectory_type == app_services.TRAJECTORY_TYPE_DIRECT
+):
+    heliocentric_source = selected_launch_candidate.segments_for_scene(
+        reference_frame="heliocentric",
+        distance_unit="AU",
+    )
+    saturn_source = selected_launch_candidate.segments_for_scene(
+        reference_frame="saturn_centred",
+        distance_unit="km",
+    )
+    st.header(UI_TEXT["trajectory_3d_header"])
+    st.caption("Selected direct launch-window candidate — scientific engine segments.")
+    if heliocentric_source:
+        st.subheader("Earth → Saturn (heliocentric)")
+        render_generic_scene_section(
+            segments_from_launch_search(
+                heliocentric_source,
+                reference_frame="heliocentric",
+                distance_unit="AU",
+            ),
+            unit_label="AU",
+            key_prefix="launch_window_heliocentric_scene",
+            available_presets=HELIOCENTRIC_VIEW_PRESETS,
+            file_name="launch_window_heliocentric_scene.html",
+        )
+    if saturn_source:
+        st.subheader("Saturn capture (Saturn-centred)")
+        render_generic_scene_section(
+            segments_from_launch_search(
+                saturn_source,
+                reference_frame="saturn_centred",
+                distance_unit="km",
+            ),
+            unit_label="km",
+            key_prefix="launch_window_saturn_scene",
+            available_presets=SATURN_CENTRED_VIEW_PRESETS,
+            file_name="launch_window_saturn_scene.html",
+        )
+    st.stop()
+
 if (
     mission_inputs is not None
     and mission_inputs.trajectory_type == app_services.TRAJECTORY_TYPE_CASSINI_HISTORICAL

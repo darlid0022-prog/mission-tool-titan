@@ -1,32 +1,11 @@
-"""Launch-window search: the data contract and injection seam for the engine.
+"""Launch-window UI contract and adapter seam for the scientific engine.
 
-This module defines *only* the shape of a launch-window search - the request
-a user submits, the candidate result an engine returns, and the Protocol a
-concrete engine must implement - plus one function, `get_launch_window_service`,
-that is the single seam a real engine is wired into. No Lambert solve, no
-ephemeris sampling, no delta-v/mass optimization happens here: those live in
-mission/ (physics, ephemerides, Lambert, optimization, budget) and are
-Codex's responsibility on a separate branch (`sprint/launch-engine`), not
-this one.
-
-Why an abstract contract instead of calling into an existing engine: Codex is
-actively building the real launch-window search engine in parallel. Its exact
-Python interface does not exist on this branch yet, and importing anything
-speculative from an unmerged branch would create a dependency this branch
-cannot honor. `pages/launch_windows.py` is therefore built entirely against
-the `LaunchWindowSearchService` Protocol below, never against a concrete
-engine. Once Codex's branch merges, wiring the real engine in is a one-line
-change: replace `get_launch_window_service`'s body (or monkeypatch it) with
-an adapter that satisfies the Protocol - no other file in this module or in
-`pages/launch_windows.py` needs to change.
-
-Until that happens, `get_launch_window_service()` returns None and the page
-renders an explicit "engine not connected" state - it never fabricates or
-displays example/placeholder search results in the running application.
-Tests are the only place a fixture implementation of the Protocol is used,
-and every such fixture is named/commented as a TEST FIXTURE (see
-tests/test_launch_window_service.py and tests/test_launch_windows_ui.py) so
-it is never mistaken for real engine output.
+The authoritative dates, ephemerides, Lambert solution, capture physics,
+ranking, Pareto front, assumptions, and drawable coordinates remain in
+``mission.launch_search_*``. The concrete adapter returned here changes only
+representations: UI names to engine enums, resolution names to documented grid
+steps, MJD2000 to UTC datetimes, and C3 from m²/s² to km²/s². Delta-v values and
+trajectory coordinates are copied without recomputation.
 """
 
 from __future__ import annotations
@@ -36,6 +15,8 @@ import math
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+from mission.launch_search_models import SearchTrajectorySegment
 
 if TYPE_CHECKING:
     from app_services import MissionSetupInputs
@@ -79,6 +60,8 @@ LAUNCH_WINDOW_RESOLUTION_LABELS: dict[str, str] = {
     LAUNCH_WINDOW_RESOLUTION_FAST: "Fast (coarse grid)",
     LAUNCH_WINDOW_RESOLUTION_DETAILED: "Detailed (fine grid)",
 }
+
+SELECTED_LAUNCH_WINDOW_CANDIDATE_STATE_KEY = "selected_launch_window_candidate"
 
 
 @dataclass(frozen=True)
@@ -146,7 +129,9 @@ class LaunchWindowCandidate:
     delta_v_capture_m_s: float
     delta_v_titan_circularization_m_s: float
     delta_v_total_m_s: float
+    scenario_id: str = ""
     notes: tuple[str, ...] = ()
+    segments: tuple[SearchTrajectorySegment, ...] = ()
 
     def __post_init__(self) -> None:
         if self.rank < 1:
@@ -175,11 +160,35 @@ class LaunchWindowCandidate:
             value = getattr(self, field_name)
             if not math.isfinite(value) or value < 0.0:
                 raise ValueError(f"{field_name} must be a finite, non-negative number.")
+        if not all(isinstance(segment, SearchTrajectorySegment) for segment in self.segments):
+            raise TypeError("segments must contain only SearchTrajectorySegment values.")
 
     @property
     def time_of_flight_years(self) -> float:
         """Derived purely from `time_of_flight_days` - never re-requested from the engine."""
         return self.time_of_flight_days / DAYS_PER_YEAR
+
+    def segments_for_scene(
+        self,
+        *,
+        reference_frame: str,
+        distance_unit: str,
+    ) -> tuple[SearchTrajectorySegment, ...]:
+        """Select one physically homogeneous scene without converting coordinates."""
+        if not reference_frame or not distance_unit:
+            raise ValueError("reference_frame and distance_unit must not be empty.")
+        matching_frame = tuple(
+            segment for segment in self.segments if segment.frame == reference_frame
+        )
+        mismatched_units = tuple(
+            segment for segment in matching_frame if segment.unit != distance_unit
+        )
+        if mismatched_units:
+            raise ValueError(
+                f"Scene {reference_frame!r} contains segments in a unit other than "
+                f"{distance_unit!r}; refusing to mix coordinate scales."
+            )
+        return tuple(segment for segment in matching_frame if segment.unit == distance_unit)
 
 
 @dataclass(frozen=True)
@@ -193,10 +202,9 @@ class LaunchWindowSearchResult:
     # panel (grid resolution, ephemeris source, revolution count, etc.) -
     # never fabricated by this module.
     assumptions: tuple[str, ...] = ()
-    # Placeholder for a future Pareto-front highlight over these same
-    # candidates (see WEEKEND_PLAN/ROADMAP's trade-off objective): None until
-    # an engine actually marks a subset as non-dominated, so the page can
-    # render "not yet available" instead of a fabricated front.
+    # Ranks of retained candidates that the scientific engine marked as
+    # non-dominated. None remains supported for test/third-party services that
+    # do not provide Pareto membership.
     pareto_candidate_ranks: tuple[int, ...] | None = None
 
     def __post_init__(self) -> None:
@@ -235,20 +243,11 @@ class LaunchWindowSearchService(Protocol):
     def search(self, request: LaunchWindowSearchRequest) -> LaunchWindowSearchResult: ...
 
 
-def get_launch_window_service() -> LaunchWindowSearchService | None:
-    """Return the connected launch-window search engine, or None if unconnected.
+def get_launch_window_service() -> LaunchWindowSearchService:
+    """Return the adapter backed by the authoritative mission search engine."""
+    from launch_window_engine_adapter import MissionLaunchWindowSearchAdapter
 
-    This is the one seam a real engine is wired into once Codex's branch
-    merges: replace this function's body with an adapter satisfying
-    `LaunchWindowSearchService` (or monkeypatch this function where the app
-    is composed). Every other line in this module and in
-    pages/launch_windows.py is written against the Protocol, not this
-    function's current stub body, so that swap never requires rewriting
-    either. Returning None (rather than a fixture/example engine) is
-    deliberate: the running application must never display fabricated
-    search results.
-    """
-    return None
+    return MissionLaunchWindowSearchAdapter()
 
 
 def apply_candidate_to_mission_setup(

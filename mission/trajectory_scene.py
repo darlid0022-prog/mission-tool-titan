@@ -28,6 +28,7 @@ from . import colors
 from .bodies import resolve_body
 from .constants import TITAN_MEAN_RADIUS_M
 from .gravity_assist import GravityAssistResult, MissionSegment, OrbitInsertionResult
+from .launch_search_models import SearchTrajectorySegment
 from .trajectory_visualization import CompleteMissionScene3D, TrajectoryCurve3D
 
 # --------------------------------------------------------------------------
@@ -49,6 +50,58 @@ SEGMENT_TYPES = (
     SEGMENT_TYPE_INSERTION,
     SEGMENT_TYPE_LANDMARK,
 )
+
+
+def segments_from_launch_search(
+    segments: tuple[SearchTrajectorySegment, ...],
+    *,
+    reference_frame: str,
+    distance_unit: str,
+) -> tuple[TrajectorySegment, ...]:
+    """Adapt one already-filtered launch-search scene without unit conversion."""
+    if not segments:
+        return ()
+    if any(
+        segment.frame != reference_frame or segment.unit != distance_unit
+        for segment in segments
+    ):
+        raise ValueError(
+            "Launch-search segments must share the requested reference frame and unit."
+        )
+    phase_color = (
+        colors.INTERPLANETARY_TRANSFER.dark
+        if reference_frame == "heliocentric"
+        else colors.ARRIVAL.dark
+    )
+    segment_type = (
+        SEGMENT_TYPE_TRANSFER
+        if reference_frame == "heliocentric"
+        else SEGMENT_TYPE_INSERTION
+    )
+    return tuple(
+        TrajectorySegment(
+            id=segment.id,
+            name=segment.name,
+            type=segment_type,
+            origin_body="Earth" if reference_frame == "heliocentric" else "Saturn",
+            destination_body="Saturn",
+            x=segment.x,
+            y=segment.y,
+            z=segment.z,
+            departure_date=_format_mjd2000(segment.departure_mjd2000),
+            arrival_date=_format_mjd2000(segment.arrival_mjd2000),
+            duration_days=segment.arrival_mjd2000 - segment.departure_mjd2000,
+            style=SegmentStyle(
+                color=phase_color,
+                legend_group=reference_frame,
+            ),
+            metadata={
+                "reference_frame": reference_frame,
+                "distance_unit": distance_unit,
+            },
+        )
+        for segment in segments
+    )
 
 
 @dataclass(frozen=True)

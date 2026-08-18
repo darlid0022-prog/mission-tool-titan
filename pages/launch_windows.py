@@ -38,6 +38,7 @@ def _clear_stale_results() -> None:
     """
     st.session_state.pop(RESULT_STATE_KEY, None)
     st.session_state.pop(SELECTED_RANK_KEY, None)
+    st.session_state.pop(lw.SELECTED_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, None)
 
 
 st.header(":material/search: Launch window search")
@@ -304,6 +305,9 @@ else:
                 "page already uses, not a second one."
             ),
         ):
+            st.session_state[lw.SELECTED_LAUNCH_WINDOW_CANDIDATE_STATE_KEY] = (
+                selected_candidate
+            )
             updated_inputs = lw.apply_candidate_to_mission_setup(
                 selected_candidate, mission_setup_inputs
             )

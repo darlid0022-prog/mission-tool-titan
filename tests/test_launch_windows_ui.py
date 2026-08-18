@@ -17,11 +17,13 @@ import pandas as pd
 from streamlit.testing.v1 import AppTest
 
 import app_services
+from launch_window_engine_adapter import scenario_to_candidate
 from launch_window_service import (
     LaunchWindowCandidate,
     LaunchWindowSearchError,
     LaunchWindowSearchResult,
 )
+from mission.launch_search import evaluate_launch_scenario
 from mission.models import Leg, TrajectoryResult
 
 APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
@@ -121,7 +123,8 @@ def _submit_search(app: AppTest) -> AppTest:
 
 class TestEngineNotConnectedState(unittest.TestCase):
     def test_page_shows_an_explicit_not_connected_notice_with_no_service_patched(self):
-        app = _run_to_launch_windows(AppTest.from_file(APP_PATH))
+        with patch("launch_window_service.get_launch_window_service", return_value=None):
+            app = _run_to_launch_windows(AppTest.from_file(APP_PATH))
 
         self.assertFalse(app.exception)
         self.assertTrue(
@@ -129,8 +132,9 @@ class TestEngineNotConnectedState(unittest.TestCase):
         )
 
     def test_clicking_find_while_disconnected_does_not_crash_and_stays_explicit(self):
-        app = _run_to_launch_windows(AppTest.from_file(APP_PATH))
-        app = _submit_search(app)
+        with patch("launch_window_service.get_launch_window_service", return_value=None):
+            app = _run_to_launch_windows(AppTest.from_file(APP_PATH))
+            app = _submit_search(app)
 
         self.assertFalse(app.exception)
         self.assertTrue(
@@ -322,6 +326,52 @@ class TestSendSelectionTo3D(unittest.TestCase):
             any(
                 h.value == "Complete mission trajectory — interactive 3D view"
                 for h in app.header
+            )
+        )
+
+    def test_selected_engine_segments_render_as_two_separate_3d_scenes(self):
+        scenario = evaluate_launch_scenario(10_407.0, 12_427.0, sample_count=8)
+        candidate = scenario_to_candidate(scenario, rank=1)
+
+        class _ScientificFixtureService:
+            def search(self, request):
+                return LaunchWindowSearchResult(
+                    request=request,
+                    candidates=(candidate,),
+                    engine_name="scientific-adapter-fixture",
+                    pareto_candidate_ranks=(1,),
+                )
+
+        with (
+            patch(
+                "launch_window_service.get_launch_window_service",
+                return_value=_ScientificFixtureService(),
+            ),
+            patch("app_services.compute_cached_trajectory", return_value=_earth_saturn_result()),
+        ):
+            app = AppTest.from_file(APP_PATH)
+            app.run(timeout=30)
+            app = app.switch_page("pages/launch_windows.py").run(timeout=30)
+            app = _submit_search(app)
+            send_button = next(
+                button
+                for button in app.button
+                if button.label == "Send selected candidate to 3D view"
+            )
+            app = send_button.click().run(timeout=30)
+
+        self.assertFalse(app.exception)
+        self.assertEqual(len(app.get("plotly_chart")), 2)
+        self.assertTrue(
+            any(
+                header.value == "Earth → Saturn (heliocentric)"
+                for header in app.subheader
+            )
+        )
+        self.assertTrue(
+            any(
+                header.value == "Saturn capture (Saturn-centred)"
+                for header in app.subheader
             )
         )
 
