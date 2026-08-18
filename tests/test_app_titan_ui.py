@@ -169,7 +169,7 @@ class TestMissionSetupPage(unittest.TestCase):
 
         self.assertFalse(app.exception)
         metrics = {metric.label: metric.value for metric in app.metric}
-        self.assertEqual(metrics["Sum of budgeted delta-v values"], "12163 m/s")
+        self.assertEqual(metrics["Sum of budgeted delta-v values"], "12531 m/s")
         for label in (
             "Simplified dry mass",
             "Simplified propellant mass",
@@ -179,6 +179,11 @@ class TestMissionSetupPage(unittest.TestCase):
         self.assertFalse(
             any(widget.label == "Saturn capture altitude (km)" for widget in app.number_input)
         )
+        number_input_labels = {widget.label for widget in app.number_input}
+        self.assertIn("Connected Saturn capture periapsis radius (km)", number_input_labels)
+        self.assertIn("Connected capture-ellipse apoapsis (km)", number_input_labels)
+        self.assertNotIn("Saturn staging-orbit radius (km)", number_input_labels)
+        self.assertNotIn("Titan capture altitude (km)", number_input_labels)
         self.assertTrue(
             any(
                 "does not couple propulsion hardware mass to propellant mass" in warning.value
@@ -206,13 +211,15 @@ class TestMissionSetupPage(unittest.TestCase):
 
         self.assertFalse(app.exception)
         metrics = {metric.label: metric.value for metric in app.metric}
-        self.assertEqual(metrics["Connected delta-v"], "12,163 m/s")
-        self.assertEqual(metrics["Wet mass (simplified)"], "10,797 kg")
+        self.assertEqual(metrics["Connected delta-v"], "12,531 m/s")
+        self.assertEqual(metrics["Wet mass (simplified)"], "12,138 kg")
         self.assertEqual(
-            metrics["Earth → Saturn transfer plus Saturn capture-to-apoapsis time"],
-            "2,211.8 days",
+            metrics["Earth → Saturn flight time"], "2,856.0 days"
         )
-        self.assertEqual(metrics["Single-stage exceedance"], "3.17×")
+        self.assertEqual(metrics["Total reference-scenario duration"], "2,859.4 days")
+        self.assertEqual(metrics["Connected Saturn periapsis"], "150,000 km")
+        self.assertEqual(metrics["Final Saturn-centred radius"], "1,221,870 km")
+        self.assertEqual(metrics["Single-stage exceedance"], "3.27×")
         self.assertTrue(
             any(
                 "Active scenario: Mission setup baseline" in caption.value
@@ -287,14 +294,12 @@ class TestMissionSetupPage(unittest.TestCase):
         self.assertEqual(instruments.iloc[0]["Instrument"], "Science payload (aggregate)")
         self.assertEqual(instruments.iloc[0]["Masse (kg)"], 143.5)
         self.assertEqual(instruments.iloc[0]["Puissance (W)"], 323.0)
-        expected_total = 12_163.278277912983
+        expected_total = 12_530.653004975673
         self.assertAlmostEqual(mass_mock.call_args.args[0], expected_total, delta=1e-3)
         self.assertNotEqual(mass_mock.call_args.args[0], 1_000.0 + 999_999.0)
 
     def test_displayed_earth_departure_injection_equals_physics_output_exactly(self):
-        from mission.connected_physics import compute_earth_saturn_hohmann
-
-        v_inf_m_s = compute_earth_saturn_hohmann().departure_v_infinity_m_s
+        v_inf_m_s = earth_saturn_leg().trajectory.v_inf_depart
         leo_altitude_m = 250_000.0
         earth = resolve_body("Earth")
         expected_injection_m_s = physics.delta_v_injection(
@@ -640,12 +645,12 @@ class TestSaturnSystemStudiesPage(unittest.TestCase):
         self.assertIn("Circularization at Titan's orbital radius", subheaders)
 
         metrics = {metric.label: metric.value for metric in app.metric}
-        self.assertEqual(metrics["Saturn arrival v∞"], "5,442.8 m/s")
+        self.assertEqual(metrics["Saturn arrival v∞"], "6,490.7 m/s")
         self.assertEqual(metrics["Hyperbola periapsis radius"], "150,000 km")
-        self.assertEqual(metrics["Hyperbola eccentricity"], "1.117")
-        self.assertEqual(metrics["Hyperbola deflection angle"], "127.1°")
+        self.assertEqual(metrics["Hyperbola eccentricity"], "1.167")
+        self.assertEqual(metrics["Hyperbola deflection angle"], "118.0°")
         self.assertEqual(metrics["Margin outside F ring"], "9,820 km")
-        self.assertEqual(metrics["Insertion delta-v"], "1,914.3 m/s")
+        self.assertEqual(metrics["Insertion delta-v"], "2,183.0 m/s")
         self.assertEqual(metrics["Ellipse periapsis radius"], "150,000 km")
         self.assertEqual(metrics["Ellipse apoapsis radius"], "1,221,870 km")
         self.assertEqual(metrics["Ellipse eccentricity"], "0.781")
@@ -676,7 +681,7 @@ class TestSaturnSystemStudiesPage(unittest.TestCase):
         self.assertFalse(app.exception)
         self.assertTrue(
             any(
-                heading.value == "Saturn arrival → staging orbit — preliminary model"
+                heading.value == "Legacy internal ring-corridor arrival → staging study"
                 for heading in app.header
             )
         )
@@ -745,9 +750,9 @@ class TestFeasibilityPage(unittest.TestCase):
             )
         )
         metrics = {metric.label: metric.value for metric in app.metric}
-        self.assertEqual(metrics["Required connected delta-v"], "12,163.278 m/s")
+        self.assertEqual(metrics["Required connected delta-v"], "12,530.653 m/s")
         self.assertEqual(metrics["Maximum feasible single-stage delta-v"], "3,833.463 m/s")
-        self.assertEqual(metrics["Required / feasible threshold"], "3.173×")
+        self.assertEqual(metrics["Required / feasible threshold"], "3.269×")
         self.assertTrue(
             any(
                 "This is a model finding, not an application error" in info.value

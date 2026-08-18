@@ -54,7 +54,7 @@ else:
         with st.container(horizontal=True):
             st.metric(
                 UI_TEXT["arrival_v_infinity_new"],
-                f"{connected.heliocentric.arrival_v_infinity_m_s:,.1f} m/s",
+                f"{connected.arrival_v_infinity_m_s:,.1f} m/s",
                 help=UI_TEXT["hyperbolic_arrival_help"],
                 border=True,
             )

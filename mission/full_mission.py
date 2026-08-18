@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .connected_physics import ConnectedFirstOrderResult, compute_connected_first_order_chain
+from .constants import NOMINAL_SATURN_PERIAPSIS_RADIUS_M, TITAN_MEAN_ORBIT_RADIUS_M
 from .arrival_staging import (
     ArrivalStagingResult,
     StagingRadiusGuard,
@@ -206,6 +207,8 @@ def compute_earth_saturn_titan_mission(
     saturn_periapsis_radius_provenance: str,
     saturn_staging_radius_m: float = DEFAULT_SATURN_STAGING_RADIUS_M,
     titan_capture_altitude_m: float = DEFAULT_TITAN_CAPTURE_ALTITUDE_M,
+    connected_periapsis_radius_m: float = NOMINAL_SATURN_PERIAPSIS_RADIUS_M,
+    connected_apoapsis_radius_m: float = TITAN_MEAN_ORBIT_RADIUS_M,
 ) -> EarthSaturnTitanMissionResult:
     """Legacy Earth -> Saturn -> Titan facade, thin around compute_earth_destination_mission.
 
@@ -253,5 +256,9 @@ def compute_earth_saturn_titan_mission(
         mission=mission,
         saturn_arrival_staging=staging_study,
         saturn_titan_transfer=titan_study,
-        connected_first_order=compute_connected_first_order_chain(),
+        connected_first_order=compute_connected_first_order_chain(
+            arrival_v_infinity_m_s=arrival_v_infinity,
+            periapsis_radius_m=connected_periapsis_radius_m,
+            apoapsis_radius_m=connected_apoapsis_radius_m,
+        ),
     )

@@ -76,16 +76,27 @@ class TestDirectTrajectoryTypeIsUnchanged(unittest.TestCase):
         self.assertIsNone(implicit_bundle.cassini_tour)
         self.assertIsNone(explicit_bundle.cassini_tour)
 
-    def test_direct_mode_matches_the_consolidated_first_order_reference(self):
-        """Pin the new non-redundant analytical chain and its duration."""
+    def test_direct_mode_uses_the_lambert_states_with_shared_saturn_capture(self):
         bundle = app_services.compute_mission_bundle(_connected_titan_inputs())
 
-        self.assertAlmostEqual(bundle.dv_total, 12_163.278277912983, delta=1e-3)
-        self.assertAlmostEqual(bundle.mission_duration_days, 2_211.759761484366, delta=1e-3)
+        self.assertAlmostEqual(bundle.dv_total, 12_530.653004975673, delta=1e-3)
+        self.assertAlmostEqual(bundle.mission_duration_days, 2_859.353993746092, delta=1e-3)
         self.assertIsNotNone(bundle.staging_result)
         self.assertIsNotNone(bundle.titan_transfer)
         self.assertIsNotNone(bundle.connected_first_order)
         self.assertIsNone(bundle.cassini_tour)
+
+    def test_legacy_staging_and_titan_altitude_do_not_change_connected_budget(self):
+        nominal = app_services.compute_mission_bundle(_connected_titan_inputs())
+        altered_legacy = app_services.compute_mission_bundle(
+            _connected_titan_inputs(
+                saturn_staging_radius_km=700_000.0,
+                titan_capture_altitude_km=3_000.0,
+            )
+        )
+
+        self.assertEqual(nominal.complete_dv_budget, altered_legacy.complete_dv_budget)
+        self.assertEqual(nominal.dv_total, altered_legacy.dv_total)
 
 
 class TestCassiniHistoricalBundle(unittest.TestCase):

@@ -20,6 +20,11 @@ from mission.capabilities import (
     PLANNED_DESTINATIONS,
     PLANNED_MISSION_FEATURES,
 )
+from mission.constants import (
+    F_RING_REFERENCE_RADIUS_M,
+    NOMINAL_SATURN_PERIAPSIS_RADIUS_M,
+    TITAN_MEAN_ORBIT_RADIUS_M,
+)
 from mission.payload_catalog import catalog_by_label, catalog_row
 from mission.pdf_report import MissionPdfReport, generate_mission_summary_pdf
 from mission.sizing import compute_mass_budget
@@ -88,29 +93,40 @@ with st.form("orbital_inputs"):
         value=int(stored_inputs.leo_altitude_km) if stored_inputs else 250,
         help=UI_TEXT["leo_help"],
     )
-    saturn_periapsis_radius_km = st.number_input(
-        UI_TEXT["periapsis_radius"],
-        min_value=60_269,
-        max_value=66_899,
-        value=int(stored_inputs.saturn_periapsis_radius_km) if stored_inputs else 62_330,
+    connected_saturn_periapsis_radius_km = st.number_input(
+        "Connected Saturn capture periapsis radius (km)",
+        min_value=int(F_RING_REFERENCE_RADIUS_M / 1_000) + 1,
+        max_value=int(TITAN_MEAN_ORBIT_RADIUS_M / 1_000) - 1,
+        value=(
+            int(stored_inputs.connected_saturn_periapsis_radius_km)
+            if stored_inputs
+            else int(NOMINAL_SATURN_PERIAPSIS_RADIUS_M / 1_000)
+        ),
         step=100,
-        help=UI_TEXT["periapsis_radius_help"],
+        help=(
+            "Saturn-centred radius used by the connected capture burn. It must lie "
+            "strictly outside the approximately 140,180 km F-ring reference radius."
+        ),
     )
-    saturn_staging_radius_km = st.number_input(
-        UI_TEXT["staging_radius"],
-        min_value=480_001,
-        max_value=1_221_899,
-        value=int(stored_inputs.saturn_staging_radius_km) if stored_inputs else 600_000,
-        step=1_000,
-        help=UI_TEXT["staging_radius_help"],
+    connected_capture_apoapsis_radius_km = st.number_input(
+        "Connected capture-ellipse apoapsis (km)",
+        value=int(TITAN_MEAN_ORBIT_RADIUS_M / 1_000),
+        disabled=True,
+        help=(
+            "Fixed Saturn-centred endpoint at Titan's 1,221,870 km mean orbital radius. "
+            "This is not a phased Titan encounter or Titan capture."
+        ),
     )
-    titan_capture_altitude_km = st.number_input(
-        UI_TEXT["titan_capture_altitude"],
-        min_value=1_000,
-        value=int(stored_inputs.titan_capture_altitude_km) if stored_inputs else 1_500,
-        step=100,
-        help=UI_TEXT["titan_capture_help"],
+    st.warning(
+        "The connected periapsis must remain outside the F-ring reference radius. "
+        "The 62,330 km internal ring-corridor geometry is available only as an "
+        "explicitly isolated legacy study on Saturn & Titan studies."
     )
+    # Legacy studies remain inspectable on Saturn & Titan studies, but are no
+    # longer editable mission inputs and never feed the connected budget.
+    saturn_periapsis_radius_km = 62_330.0
+    saturn_staging_radius_km = 600_000.0
+    titan_capture_altitude_km = 1_500.0
 
     st.header(UI_TEXT["launch_window_header"])
     launch_window_start = st.date_input(
@@ -137,7 +153,9 @@ with st.expander(UI_TEXT["planned_capabilities"]):
     st.write(UI_TEXT["connected_destinations"] + ", ".join(MOON_DESTINATIONS.keys()))
     st.write(UI_TEXT["planned_destinations"] + ", ".join(PLANNED_DESTINATIONS))
     # One cohesive markdown list instead of one isolated bullet per st.write call.
-    st.markdown("\n".join(f"- {feature}" for feature in PLANNED_MISSION_FEATURES))
+    planned_features = tuple(feature for feature in PLANNED_MISSION_FEATURES if feature.strip())
+    if planned_features:
+        st.markdown("\n".join(f"- {feature}" for feature in planned_features))
 
 st.header(UI_TEXT["propulsion_header"])
 isp_s = st.number_input(
@@ -201,6 +219,12 @@ instruments_df = st.data_editor(
 if launch_window_end < launch_window_start:
     st.error(UI_TEXT["invalid_dates"])
     st.stop()
+if connected_saturn_periapsis_radius_km * 1_000.0 <= F_RING_REFERENCE_RADIUS_M:
+    st.error("Connected Saturn periapsis must lie strictly outside the reference F ring.")
+    st.stop()
+if connected_capture_apoapsis_radius_km <= connected_saturn_periapsis_radius_km:
+    st.error("Connected capture-ellipse apoapsis must exceed its periapsis.")
+    st.stop()
 
 mission_inputs = app_services.MissionSetupInputs(
     destination=destination,
@@ -215,6 +239,8 @@ mission_inputs = app_services.MissionSetupInputs(
     isp_s=isp_s,
     instruments_df=instruments_df,
     trajectory_type=trajectory_type,
+    connected_saturn_periapsis_radius_km=connected_saturn_periapsis_radius_km,
+    connected_capture_apoapsis_radius_km=connected_capture_apoapsis_radius_km,
 )
 app_services.store_mission_setup_inputs(mission_inputs)
 if submitted:
@@ -244,6 +270,22 @@ if isinstance(active_launch_candidate, lw.LaunchWindowCandidate):
         st.caption(
             f"Active scenario: {lw.MISSION_SCENARIO_LAUNCH_WINDOW_LABEL} — {candidate_id}."
         )
+        st.caption(
+            "Date source: selected Launch windows Lambert solution "
+            f"({active_launch_candidate.departure_datetime.date().isoformat()} → "
+            f"{active_launch_candidate.saturn_arrival_datetime.date().isoformat()})."
+        )
+        with st.container(horizontal=True):
+            st.metric(
+                "Connected Saturn periapsis",
+                f"{NOMINAL_SATURN_PERIAPSIS_RADIUS_M / 1_000:,.0f} km",
+                border=True,
+            )
+            st.metric(
+                "Final Saturn-centred radius",
+                f"{TITAN_MEAN_ORBIT_RADIUS_M / 1_000:,.0f} km",
+                border=True,
+            )
         st.metric(
             "Connected delta-v",
             f"{active_launch_candidate.delta_v_total_m_s:,.1f} m/s",
@@ -339,15 +381,44 @@ with scorecard_slot.container(border=True):
         else lw.MISSION_SCENARIO_BASELINE_LABEL
     )
     st.caption(f"Active scenario: {active_label}.")
+    if trajectory_type == app_services.TRAJECTORY_TYPE_CASSINI_HISTORICAL:
+        st.caption("Date source: historical Cassini VVEJGA encounter dates.")
+        st.metric("Connected Saturn periapsis", "Historical SOI geometry", border=True)
+        st.metric("Final Saturn-centred radius", "Historical post-SOI orbit", border=True)
+    elif bundle.connected_first_order is not None:
+        st.caption(
+            "Date source: Mission setup Earth → Saturn trajectory solution "
+            f"({bundle.earth_saturn_trajectory.departure_mjd2000:.3f} → "
+            f"{bundle.earth_saturn_trajectory.arrival_mjd2000:.3f} MJD2000)."
+        )
+        with st.container(horizontal=True):
+            st.metric(
+                "Connected Saturn periapsis",
+                f"{bundle.connected_first_order.saturn_capture.periapsis_radius_m / 1_000:,.0f} km",
+                border=True,
+            )
+            st.metric(
+                "Final Saturn-centred radius",
+                f"{bundle.connected_first_order.saturn_capture.apoapsis_radius_m / 1_000:,.0f} km",
+                border=True,
+            )
+    else:
+        st.caption("Date source: Mission setup trajectory solution.")
+        st.metric("Connected Saturn periapsis", "Not applicable", border=True)
+        st.metric("Final Saturn-centred radius", "Not applicable", border=True)
     st.metric("Connected delta-v", f"{bundle.dv_total:,.0f} m/s", border=True)
     st.metric("Wet mass (simplified)", f"{bundle.mass['wet_mass_kg']:,.0f} kg", border=True)
-    duration_label = (
-        "Earth → Saturn VVEJGA flight time"
-        if trajectory_type == app_services.TRAJECTORY_TYPE_CASSINI_HISTORICAL
-        else "Earth → Saturn transfer plus Saturn capture-to-apoapsis time"
+    earth_saturn_flight_days = (
+        float(bundle.earth_saturn_trajectory.arrival_mjd2000)
+        - float(bundle.earth_saturn_trajectory.departure_mjd2000)
     )
     st.metric(
-        duration_label,
+        "Earth → Saturn flight time",
+        f"{earth_saturn_flight_days:,.1f} days",
+        border=True,
+    )
+    st.metric(
+        "Total reference-scenario duration",
         f"{bundle.mission_duration_days:,.1f} days",
         help=(
             "For the direct baseline this spans the heliocentric transfer and the "
@@ -388,6 +459,10 @@ with st.container(horizontal=True):
     )
 if share_url := st.session_state.get("mission_share_url"):
     st.caption("Use the copy control in the code block to share this exact mission setup.")
+    if "localhost" in share_url or "127.0.0.1" in share_url:
+        st.warning(
+            "This localhost link is usable only on this machine while the app is not deployed."
+        )
     st.code(share_url, language=None)
 
 st.header(UI_TEXT["results_header"])

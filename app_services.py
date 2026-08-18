@@ -7,7 +7,7 @@ import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 import pandas as pd
 import streamlit as st
@@ -16,6 +16,11 @@ from mission import physics
 from mission.bodies import resolve_body
 from mission.capabilities import MOON_DESTINATIONS, PLANET_DESTINATIONS
 from mission.connected_physics import ConnectedFirstOrderResult
+from mission.constants import (
+    F_RING_REFERENCE_RADIUS_M,
+    NOMINAL_SATURN_PERIAPSIS_RADIUS_M,
+    TITAN_MEAN_ORBIT_RADIUS_M,
+)
 from mission.dv_budget import MissionDeltaVBudget, compose_complete_dv_budget
 from mission.feasibility_check import (
     SingleStageFeasibilityResult,
@@ -54,8 +59,10 @@ DEFAULT_LAUNCH_WINDOW_END = date(2027, 6, 1)
 
 MISSION_SETUP_STATE_KEY = "mission_setup_inputs"
 MISSION_QUERY_PARAM = "mission"
-MISSION_QUERY_VERSION = 1
+MISSION_QUERY_VERSION = 2
+LEGACY_MISSION_QUERY_VERSION = 1
 MISSION_QUERY_RESTORED_KEY = "mission_query_restored"
+MISSION_QUERY_MIGRATION_WARNING_KEY = "mission_query_migration_warning"
 MISSION_SETUP_REQUIRED_MESSAGE = (
     "Configure and calculate a mission on the Mission setup page first."
 )
@@ -130,6 +137,26 @@ class MissionSetupInputs:
     # decoded pre-this-feature share link) keeps computing the same Lambert-
     # solve mission it always did.
     trajectory_type: str = TRAJECTORY_TYPE_DIRECT
+    connected_saturn_periapsis_radius_km: float = (
+        NOMINAL_SATURN_PERIAPSIS_RADIUS_M / 1_000.0
+    )
+    connected_capture_apoapsis_radius_km: float = (
+        TITAN_MEAN_ORBIT_RADIUS_M / 1_000.0
+    )
+
+    def __post_init__(self) -> None:
+        periapsis_m = float(self.connected_saturn_periapsis_radius_km) * 1_000.0
+        apoapsis_m = float(self.connected_capture_apoapsis_radius_km) * 1_000.0
+        if not math.isfinite(periapsis_m) or periapsis_m <= F_RING_REFERENCE_RADIUS_M:
+            raise ValueError(
+                "Connected Saturn periapsis must lie strictly outside the reference F ring."
+            )
+        if apoapsis_m != TITAN_MEAN_ORBIT_RADIUS_M:
+            raise ValueError(
+                "Connected capture-ellipse apoapsis must equal Titan's mean orbital radius."
+            )
+        if apoapsis_m <= periapsis_m:
+            raise ValueError("Connected capture-ellipse apoapsis must exceed periapsis.")
 
 
 INSTRUMENT_COLUMNS = (
@@ -175,9 +202,12 @@ def encode_mission_setup_query(inputs: MissionSetupInputs) -> dict[str, str]:
         "selected_moon": inputs.selected_moon,
         "departure_type": inputs.departure_type,
         "leo_altitude_km": inputs.leo_altitude_km,
-        "saturn_periapsis_radius_km": inputs.saturn_periapsis_radius_km,
-        "saturn_staging_radius_km": inputs.saturn_staging_radius_km,
-        "titan_capture_altitude_km": inputs.titan_capture_altitude_km,
+        "connected_saturn_periapsis_radius_km": (
+            inputs.connected_saturn_periapsis_radius_km
+        ),
+        "connected_capture_apoapsis_radius_km": (
+            inputs.connected_capture_apoapsis_radius_km
+        ),
         "launch_window_start": inputs.launch_window_start.isoformat(),
         "launch_window_end": inputs.launch_window_end.isoformat(),
         "isp_s": inputs.isp_s,
@@ -210,8 +240,12 @@ def decode_mission_setup_query(
         payload = json.loads(raw.decode("utf-8"))
     except (binascii.Error, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ValueError("The mission share parameter is malformed.") from exc
-    if not isinstance(payload, dict) or payload.get("version") != MISSION_QUERY_VERSION:
+    if not isinstance(payload, dict) or payload.get("version") not in {
+        LEGACY_MISSION_QUERY_VERSION,
+        MISSION_QUERY_VERSION,
+    }:
         raise ValueError("The mission share parameter uses an unsupported version.")
+    query_version = payload["version"]
 
     destination = payload.get("destination")
     if destination not in PLANET_DESTINATIONS:
@@ -266,6 +300,46 @@ def decode_mission_setup_query(
         )
     instruments_df = pd.DataFrame(normalized_records, columns=INSTRUMENT_COLUMNS)
 
+    if query_version == LEGACY_MISSION_QUERY_VERSION:
+        # Validate the old values, but never reinterpret their inner-ring and
+        # staging/Titan-study meanings as the new connected architecture.
+        legacy_periapsis_radius_km = _validated_number(
+            "Legacy Saturn periapsis radius",
+            payload.get("saturn_periapsis_radius_km"),
+            minimum=60_269.0,
+            maximum=66_899.0,
+        )
+        legacy_staging_radius_km = _validated_number(
+            "Legacy Saturn staging radius",
+            payload.get("saturn_staging_radius_km"),
+            minimum=480_001.0,
+            maximum=1_221_899.0,
+        )
+        legacy_titan_capture_altitude_km = _validated_number(
+            "Legacy Titan capture altitude",
+            payload.get("titan_capture_altitude_km"),
+            minimum=1_000.0,
+            maximum=100_000.0,
+        )
+        connected_periapsis_radius_km = NOMINAL_SATURN_PERIAPSIS_RADIUS_M / 1_000.0
+        connected_apoapsis_radius_km = TITAN_MEAN_ORBIT_RADIUS_M / 1_000.0
+    else:
+        legacy_periapsis_radius_km = 62_330.0
+        legacy_staging_radius_km = 600_000.0
+        legacy_titan_capture_altitude_km = 1_500.0
+        connected_periapsis_radius_km = _validated_number(
+            "Connected Saturn periapsis radius",
+            payload.get("connected_saturn_periapsis_radius_km"),
+            minimum=F_RING_REFERENCE_RADIUS_M / 1_000.0 + 1.0,
+            maximum=TITAN_MEAN_ORBIT_RADIUS_M / 1_000.0 - 1.0,
+        )
+        connected_apoapsis_radius_km = _validated_number(
+            "Connected capture-ellipse apoapsis",
+            payload.get("connected_capture_apoapsis_radius_km"),
+            minimum=connected_periapsis_radius_km + 1.0,
+            maximum=TITAN_MEAN_ORBIT_RADIUS_M / 1_000.0,
+        )
+
     return MissionSetupInputs(
         destination=destination,
         selected_moon=selected_moon,
@@ -273,35 +347,27 @@ def decode_mission_setup_query(
         leo_altitude_km=_validated_number(
             "LEO altitude", payload.get("leo_altitude_km"), minimum=100.0, maximum=100_000.0
         ),
-        saturn_periapsis_radius_km=_validated_number(
-            "Saturn periapsis radius",
-            payload.get("saturn_periapsis_radius_km"),
-            minimum=60_269.0,
-            maximum=66_899.0,
-        ),
-        saturn_staging_radius_km=_validated_number(
-            "Saturn staging radius",
-            payload.get("saturn_staging_radius_km"),
-            minimum=480_001.0,
-            maximum=1_221_899.0,
-        ),
-        titan_capture_altitude_km=_validated_number(
-            "Titan capture altitude",
-            payload.get("titan_capture_altitude_km"),
-            minimum=1_000.0,
-            maximum=100_000.0,
-        ),
+        saturn_periapsis_radius_km=legacy_periapsis_radius_km,
+        saturn_staging_radius_km=legacy_staging_radius_km,
+        titan_capture_altitude_km=legacy_titan_capture_altitude_km,
         launch_window_start=launch_window_start,
         launch_window_end=launch_window_end,
         isp_s=_validated_number("Isp", payload.get("isp_s"), minimum=100.0, maximum=100_000.0),
         instruments_df=instruments_df,
         trajectory_type=trajectory_type,
+        connected_saturn_periapsis_radius_km=connected_periapsis_radius_km,
+        connected_capture_apoapsis_radius_km=connected_apoapsis_radius_km,
     )
 
 
 def build_mission_share_url(base_url: str, query_params: Mapping[str, str]) -> str:
     """Return a stable absolute URL containing the encoded mission inputs."""
-    return f"{base_url.split('?', 1)[0]}?{urlencode(dict(query_params))}"
+    parsed = urlsplit(base_url)
+    if parsed.scheme and parsed.netloc:
+        current_location = f"{parsed.scheme}://{parsed.netloc}{parsed.path or '/'}"
+    else:
+        current_location = base_url.split("?", 1)[0]
+    return f"{current_location}?{urlencode(dict(query_params))}"
 
 
 def restore_mission_setup_from_query_params(
@@ -313,7 +379,20 @@ def restore_mission_setup_from_query_params(
     st.session_state[MISSION_QUERY_RESTORED_KEY] = True
     if MISSION_QUERY_PARAM not in query_params:
         return False
+    token = query_params[MISSION_QUERY_PARAM]
+    if isinstance(token, list):
+        token = token[-1]
+    padding = "=" * (-len(token) % 4)
+    raw_payload = json.loads(
+        base64.b64decode(token + padding, altchars=b"-_", validate=True).decode("utf-8")
+    )
     st.session_state[MISSION_SETUP_STATE_KEY] = decode_mission_setup_query(query_params)
+    if raw_payload.get("version") == LEGACY_MISSION_QUERY_VERSION:
+        st.session_state[MISSION_QUERY_MIGRATION_WARNING_KEY] = (
+            "This version 1 link used the legacy 62,330/600,000 km Saturn studies. "
+            "It was explicitly migrated to the version 2 connected architecture: "
+            "150,000 km periapsis and 1,221,870 km final Saturn-centred radius."
+        )
     return True
 
 
@@ -516,6 +595,12 @@ def compute_mission_bundle(inputs: MissionSetupInputs) -> MissionBundle:
             ),
             saturn_staging_radius_m=float(inputs.saturn_staging_radius_km) * 1_000.0,
             titan_capture_altitude_m=float(inputs.titan_capture_altitude_km) * 1_000.0,
+            connected_periapsis_radius_m=(
+                float(inputs.connected_saturn_periapsis_radius_km) * 1_000.0
+            ),
+            connected_apoapsis_radius_m=(
+                float(inputs.connected_capture_apoapsis_radius_km) * 1_000.0
+            ),
         )
 
         staging_result = complete_mission.saturn_arrival_staging
@@ -526,11 +611,14 @@ def compute_mission_bundle(inputs: MissionSetupInputs) -> MissionBundle:
         )
         earth = resolve_body("Earth")
         assert earth.pykep_body is not None
+        earth_trajectory = earth_leg.trajectory
+        assert earth_trajectory is not None
+        assert earth_trajectory.v_inf_depart is not None
         complete_dv_budget = compose_complete_dv_budget(
             {
                 **traj["dv_budget"],
                 "dV from LEO": physics.delta_v_injection(
-                    complete_mission.connected_first_order.heliocentric.departure_v_infinity_m_s,
+                    earth_trajectory.v_inf_depart,
                     earth.get_mu_self(),
                     earth.pykep_body.get_radius() + float(inputs.leo_altitude_km) * 1_000.0,
                 ),
@@ -570,7 +658,8 @@ def compute_mission_bundle(inputs: MissionSetupInputs) -> MissionBundle:
     )
     if connected_first_order is not None:
         mission_duration_days = (
-            connected_first_order.heliocentric.time_of_flight_days
+            float(earth_saturn_trajectory.arrival_mjd2000)
+            - float(earth_saturn_trajectory.departure_mjd2000)
             + connected_first_order.saturn_capture.time_of_flight_days
         )
     flyby_demonstrations = (

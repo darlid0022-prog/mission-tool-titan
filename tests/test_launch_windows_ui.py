@@ -402,6 +402,8 @@ class TestSendSelectionTo3D(unittest.TestCase):
         candidate = app.session_state[lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY]
         metrics = {metric.label: metric.value for metric in app.metric}
         self.assertEqual(metrics["Connected delta-v"], "6,753.6 m/s")
+        self.assertEqual(metrics["Connected Saturn periapsis"], "150,000 km")
+        self.assertEqual(metrics["Final Saturn-centred radius"], "1,221,870 km")
         self.assertEqual(
             metrics["Earth → Saturn flight time"],
             f"{candidate.time_of_flight_days:,.1f} days",
@@ -455,7 +457,7 @@ class TestSendSelectionTo3D(unittest.TestCase):
             lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, app.session_state
         )
         metrics = {metric.label: metric.value for metric in app.metric}
-        self.assertEqual(metrics["Connected delta-v"], "12,163 m/s")
+        self.assertEqual(metrics["Connected delta-v"], "12,531 m/s")
         self.assertIn("Wet mass (simplified)", metrics)
 
     def test_active_candidate_does_not_recompute_the_baseline_bundle(self):

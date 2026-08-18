@@ -37,10 +37,12 @@ Primary references:
 
 ## Analytical architecture
 
-1. Circular, coplanar heliocentric Hohmann transfer from 1 au to Saturn's J2000
-   semimajor-axis radius.
-2. Saturn-relative hyperbolic arrival derived from the difference between
-   Saturn's circular speed and the transfer arrival speed.
+1. An interplanetary leg supplies Earth-departure and Saturn-arrival
+   hyperbolic-excess velocities. Mission setup and Launch windows use their
+   dated Lambert leg; the deterministic reference calculation uses a circular,
+   coplanar heliocentric Hohmann transfer.
+2. The supplied Saturn-relative hyperbolic arrival state feeds the common
+   capture function without substitution by another transfer model.
 3. Tangential impulsive burn at `150,000 km` into a Saturn-centred ellipse with
    apoapsis `1,221,870 km`.
 4. Tangential impulsive circularisation at apoapsis.
@@ -59,7 +61,7 @@ The captured ellipse uses vis-viva at the same burn points. Each delta-v is
 the scalar speed difference at one common radius; no velocities from different
 points are subtracted.
 
-## Nominal deterministic values
+## Nominal deterministic Hohmann-reference values
 
 | Quantity | Value |
 | --- | ---: |
@@ -89,8 +91,10 @@ a periapsis at or below Saturn's equatorial radius, a periapsis at or inside the
 reference F-ring radius, and an apoapsis at or below periapsis. These scalar
 guards do not establish three-dimensional clearance from ring material.
 
-Excluded effects include launch-window phasing, real planetary eccentricity and
-inclination, Lambert geometry, gravity assists, Saturn oblateness, finite burns,
+The standalone Hohmann reference excludes launch-window phasing and real
+planetary eccentricity and inclination. The application and launch-window
+engine instead supply their Lambert states to the same Saturn equations.
+All modes exclude gravity assists, Saturn oblateness, finite burns,
 ring-plane crossing geometry, perturbations, navigation corrections, Titan
 encounter phasing, and Titan-centred capture. Consequently this is an energy
 model for preliminary comparison, not a flyable mission trajectory.

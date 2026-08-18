@@ -103,6 +103,24 @@ class TestSaturnHyperbolaAndCapture(unittest.TestCase):
                 apoapsis_radius_m=NOMINAL_SATURN_PERIAPSIS_RADIUS_M,
             )
 
+    def test_lambert_and_baseline_paths_share_identical_saturn_burns(self):
+        arrival_v_infinity_m_s = 5_740.9001396773365
+        shared = compute_connected_first_order_chain(
+            arrival_v_infinity_m_s=arrival_v_infinity_m_s,
+            periapsis_radius_m=NOMINAL_SATURN_PERIAPSIS_RADIUS_M,
+            apoapsis_radius_m=TITAN_MEAN_ORBIT_RADIUS_M,
+        )
+        direct_hyperbola, direct_capture = compute_saturn_capture_to_titan_orbit(
+            arrival_v_infinity_m_s,
+            periapsis_radius_m=NOMINAL_SATURN_PERIAPSIS_RADIUS_M,
+            apoapsis_radius_m=TITAN_MEAN_ORBIT_RADIUS_M,
+        )
+
+        self.assertEqual(shared.saturn_hyperbola, direct_hyperbola)
+        self.assertEqual(shared.saturn_capture, direct_capture)
+        self.assertEqual(shared.saturn_capture.periapsis_radius_m, 150_000_000.0)
+        self.assertEqual(shared.saturn_capture.apoapsis_radius_m, 1_221_870_000.0)
+
 
 class TestConnectedBudget(unittest.TestCase):
     def test_total_is_exact_sum_and_excludes_redundant_terms(self):

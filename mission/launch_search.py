@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 import pykep as pk
 
 from .bodies import resolve_body
-from .connected_physics import SECONDS_PER_DAY, compute_saturn_capture_to_titan_orbit
+from .connected_physics import SECONDS_PER_DAY, compute_connected_first_order_chain
 from .constants import NOMINAL_SATURN_PERIAPSIS_RADIUS_M, TITAN_MEAN_ORBIT_RADIUS_M
 from .launch_search_ephemeris import heliocentric_state, solve_earth_saturn_lambert
 from .launch_search_models import (
@@ -96,7 +96,12 @@ def evaluate_launch_scenario(
         arrival_mjd2000,
         sample_count,
     )
-    _, capture = compute_saturn_capture_to_titan_orbit(transfer.saturn_v_infinity_m_s)
+    connected = compute_connected_first_order_chain(
+        arrival_v_infinity_m_s=transfer.saturn_v_infinity_m_s,
+        periapsis_radius_m=NOMINAL_SATURN_PERIAPSIS_RADIUS_M,
+        apoapsis_radius_m=TITAN_MEAN_ORBIT_RADIUS_M,
+    )
+    capture = connected.saturn_capture
     earth = resolve_body("Earth")
     parking_radius = float(earth.pykep_body.get_radius()) + EARTH_PARKING_ALTITUDE_M
     departure_delta_v = delta_v_injection(

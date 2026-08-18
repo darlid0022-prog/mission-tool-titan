@@ -203,7 +203,7 @@ UI_TEXT: Final[dict[str, str]] = {
         "surface (or cloud tops for a giant planet). The two differ by the body's own "
         "radius, so they are not interchangeable."
     ),
-    "staging_header": "Saturn arrival → staging orbit — preliminary model",
+    "staging_header": "Legacy internal ring-corridor arrival → staging study",
     "staging_warning": (
         "Legacy reference model, kept for comparison: it no longer feeds the connected "
         "delta-v budget above, which uses the authoritative hyperbolic-arrival-and-capture "
@@ -213,7 +213,7 @@ UI_TEXT: Final[dict[str, str]] = {
     "arrival_v_infinity_help": (
         "Saturn-relative hyperbolic excess speed supplied by the Earth → Saturn leg."
     ),
-    "periapsis_radius": "Capture periapsis radius (km)",
+    "periapsis_radius": "Legacy internal-corridor periapsis radius (km)",
     "periapsis_radius_help": (
         "Saturn-centered radius. The nominal value preserves the current PyKEP "
         "60,330 km radius plus a 2,000 km capture altitude. Feeds only the legacy "
@@ -235,7 +235,7 @@ UI_TEXT: Final[dict[str, str]] = {
         "the exclusions listed below."
     ),
     "study_parameters": "Study parameters",
-    "staging_radius": "Saturn staging-orbit radius (km)",
+    "staging_radius": "Legacy staging-study radius (km)",
     "staging_radius_help": (
         "Radius measured from Saturn's center. The lower bound is beyond the "
         "preliminary ring guard. Feeds only the legacy Saturn → Titan study on Saturn "
@@ -245,7 +245,7 @@ UI_TEXT: Final[dict[str, str]] = {
         "This study uses the same Saturn staging-orbit radius selected in the "
         "arrival-to-staging section above."
     ),
-    "titan_capture_altitude": "Titan capture altitude (km)",
+    "titan_capture_altitude": "Isolated Titan capture-study altitude (km)",
     "titan_capture_help": (
         "Altitude above Titan's mean radius. The model applies a preliminary "
         "1,000 km non-atmospheric guard."

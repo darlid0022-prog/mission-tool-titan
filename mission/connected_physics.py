@@ -24,6 +24,7 @@ from .constants import (
 
 SECONDS_PER_DAY = 86_400.0
 METHOD = "hohmann_heliocentric_then_saturn_capture_to_titan_orbit"
+DATED_ARRIVAL_METHOD = "supplied_interplanetary_state_then_saturn_capture_to_titan_orbit"
 
 
 @dataclass(frozen=True)
@@ -79,6 +80,7 @@ class SaturnCaptureEllipseResult:
 class ConnectedFirstOrderResult:
     method: str
     heliocentric: EarthSaturnHohmannResult
+    arrival_v_infinity_m_s: float
     saturn_hyperbola: SaturnHyperbolaResult
     saturn_capture: SaturnCaptureEllipseResult
     assumptions: tuple[str, ...]
@@ -196,19 +198,41 @@ def compute_saturn_capture_to_titan_orbit(
     )
 
 
-def compute_connected_first_order_chain() -> ConnectedFirstOrderResult:
-    """Compute the complete deterministic analytical chain without ephemerides."""
+def compute_connected_first_order_chain(
+    *,
+    arrival_v_infinity_m_s: float | None = None,
+    periapsis_radius_m: float = NOMINAL_SATURN_PERIAPSIS_RADIUS_M,
+    apoapsis_radius_m: float = TITAN_MEAN_ORBIT_RADIUS_M,
+) -> ConnectedFirstOrderResult:
+    """Compute the connected Saturn capture using one shared architecture.
+
+    When ``arrival_v_infinity_m_s`` is omitted, the analytical Hohmann arrival
+    state is used. Supplying it lets a dated Lambert leg reuse the exact same
+    capture, ellipse, circularisation, validation, and coast-time functions.
+    """
     heliocentric = compute_earth_saturn_hohmann()
-    hyperbola, capture = compute_saturn_capture_to_titan_orbit(
+    arrival_v_infinity = (
         heliocentric.arrival_v_infinity_m_s
+        if arrival_v_infinity_m_s is None
+        else arrival_v_infinity_m_s
+    )
+    hyperbola, capture = compute_saturn_capture_to_titan_orbit(
+        arrival_v_infinity,
+        periapsis_radius_m=periapsis_radius_m,
+        apoapsis_radius_m=apoapsis_radius_m,
     )
     return ConnectedFirstOrderResult(
-        method=METHOD,
+        method=METHOD if arrival_v_infinity_m_s is None else DATED_ARRIVAL_METHOD,
         heliocentric=heliocentric,
+        arrival_v_infinity_m_s=arrival_v_infinity,
         saturn_hyperbola=hyperbola,
         saturn_capture=capture,
         assumptions=(
-            "Circular coplanar Earth and Saturn heliocentric orbits.",
+            (
+                "Saturn arrival v-infinity supplied by the connected interplanetary leg."
+                if arrival_v_infinity_m_s is not None
+                else "Circular coplanar Earth and Saturn heliocentric Hohmann arrival state."
+            ),
             "Two-body point-mass dynamics and tangential impulsive burns.",
             "All radii are measured from the relevant body's centre.",
         ),

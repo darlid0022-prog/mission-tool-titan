@@ -26,6 +26,10 @@ try:
     app_services.restore_mission_setup_from_query_params(st.query_params)
 except ValueError as exc:
     st.warning(f"The shared mission link could not be restored: {exc}")
+if migration_warning := st.session_state.get(
+    app_services.MISSION_QUERY_MIGRATION_WARNING_KEY
+):
+    st.warning(migration_warning)
 
 pages = [
     st.Page(

@@ -43,6 +43,18 @@ class TestEarthSaturnTitanMission(unittest.TestCase):
         )
         self.assertEqual(result.saturn_arrival_staging.origin_state, "Saturn hyperbolic arrival")
         self.assertEqual(result.saturn_titan_transfer.destination, "Titan")
+        self.assertEqual(
+            result.connected_first_order.saturn_hyperbola.specific_energy_j_kg,
+            SATURN_ARRIVAL_V_INFINITY_M_S**2 / 2.0,
+        )
+        self.assertEqual(
+            result.connected_first_order.saturn_capture.periapsis_radius_m,
+            150_000_000.0,
+        )
+        self.assertEqual(
+            result.connected_first_order.saturn_capture.apoapsis_radius_m,
+            1_221_870_000.0,
+        )
 
     def test_phases_share_arrival_speed_staging_radius_and_epochs(self):
         source_leg = earth_saturn_leg()
