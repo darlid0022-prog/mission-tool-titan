@@ -4,6 +4,8 @@ import math
 
 import pandas as pd
 
+from .constants import G0_M_S2
+
 
 def compute_mass_budget(
     dv_total: float,
@@ -14,7 +16,6 @@ def compute_mass_budget(
     margin_frac: float = 0.20,
 ) -> dict[str, float]:
     """Estimate dry, propellant, and wet mass from the current inputs."""
-    g0 = 9.80665
     if not math.isfinite(float(dv_total)) or dv_total < 0:
         raise ValueError("dv_total must be finite and non-negative.")
     if not math.isfinite(float(isp_s)) or isp_s <= 0:
@@ -27,7 +28,7 @@ def compute_mass_budget(
     dry_mass = dry_mass_before_margin * (1 + margin_frac)
 
     if dv_total > 0 and isp_s > 0:
-        exponent = dv_total / (isp_s * g0)
+        exponent = dv_total / (isp_s * G0_M_S2)
         try:
             mass_ratio = math.exp(exponent)
         except OverflowError as error:

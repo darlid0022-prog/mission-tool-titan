@@ -1,6 +1,7 @@
 import math
 import unittest
 
+from mission.connected_physics import compute_connected_first_order_chain
 from mission.dv_budget import MissionDeltaVBudget, compose_complete_dv_budget
 from mission.moon_transfer import compute_saturn_titan_transfer
 from mission.saturn_staging import compute_saturn_arrival_to_staging
@@ -21,8 +22,9 @@ def studies():
 
 
 class TestCompleteDeltaVBudget(unittest.TestCase):
-    def test_composes_every_real_burn_and_ignores_legacy_saturn_capture(self):
+    def test_composes_only_the_two_authoritative_saturn_burns(self):
         staging, titan = studies()
+        chain = compute_connected_first_order_chain()
         earth_budget = {
             "dV from LEO": 4_000.0,
             "dV DSM/Fly-By": 125.0,
@@ -36,14 +38,14 @@ class TestCompleteDeltaVBudget(unittest.TestCase):
         self.assertEqual(budget.dsm_flyby_m_s, 125.0)
         self.assertEqual(
             budget.saturn_capture_to_ellipse_m_s,
-            staging.capture_to_ellipse_delta_v_m_s,
+            chain.saturn_capture.capture_delta_v_m_s,
         )
         self.assertEqual(
             budget.saturn_staging_circularisation_m_s,
-            staging.staging_circularisation_delta_v_m_s,
+            chain.saturn_capture.circularisation_delta_v_m_s,
         )
-        self.assertEqual(budget.saturn_titan_departure_m_s, titan.departure_delta_v_m_s)
-        self.assertEqual(budget.titan_capture_m_s, titan.capture_delta_v_m_s)
+        self.assertEqual(budget.saturn_titan_departure_m_s, 0.0)
+        self.assertEqual(budget.titan_capture_m_s, 0.0)
         self.assertNotIn(999_999.0, budget.as_dict().values())
         self.assertEqual(budget.total_m_s, sum(budget.as_dict().values()))
 
@@ -56,7 +58,8 @@ class TestCompleteDeltaVBudget(unittest.TestCase):
         }
 
         budget = compose_complete_dv_budget(earth_budget, staging, titan)
-        expected = 4_000.0 + staging.total_delta_v_m_s + titan.total_delta_v_m_s
+        chain = compute_connected_first_order_chain()
+        expected = 4_000.0 + chain.saturn_capture.total_delta_v_m_s
 
         self.assertAlmostEqual(budget.total_m_s, expected, delta=1e-12)
 

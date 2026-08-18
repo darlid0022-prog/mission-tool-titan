@@ -48,7 +48,7 @@ class TestConnectedParetoSearch(unittest.TestCase):
 
     def test_front_is_non_empty_and_search_is_deterministic(self):
         self.assertEqual(self.first.evaluated_count, 1_176)
-        self.assertEqual(self.first.pareto_count, 38)
+        self.assertEqual(self.first.pareto_count, 34)
         self.assertEqual(self.first, self.second)
 
     def test_default_mass_objective_uses_real_aggregate_payload(self):
@@ -66,7 +66,7 @@ class TestConnectedParetoSearch(unittest.TestCase):
         )
         self.assertEqual(baseline.wet_mass_kg, expected["wet_mass_kg"])
 
-    def test_locked_departure_v_infinity_optimum_is_evaluated_and_near_front(self):
+    def test_locked_departure_v_infinity_optimum_is_the_new_front_minimum(self):
         matches = tuple(
             point
             for point in self.first.evaluated_points
@@ -76,28 +76,12 @@ class TestConnectedParetoSearch(unittest.TestCase):
         )
         self.assertEqual(len(matches), 1)
         locked = matches[0]
-        self.assertNotIn(locked, self.first.pareto_front)
-
-        dominating_front_points = tuple(
-            point
-            for point in self.first.pareto_front
-            if all(a <= b for a, b in zip(point.objectives, locked.objectives, strict=True))
-            and any(a < b for a, b in zip(point.objectives, locked.objectives, strict=True))
-        )
-        self.assertGreater(len(dominating_front_points), 0)
+        self.assertIn(locked, self.first.pareto_front)
         minimum_delta_v = min(
-            dominating_front_points,
+            self.first.evaluated_points,
             key=lambda point: point.total_delta_v_m_s,
         )
-        self.assertAlmostEqual(
-            locked.total_delta_v_m_s - minimum_delta_v.total_delta_v_m_s,
-            3.2536144272344245,
-            delta=1e-12,
-        )
-        self.assertEqual(
-            locked.total_duration_days - minimum_delta_v.total_duration_days,
-            30.0,
-        )
+        self.assertEqual(locked, minimum_delta_v)
 
     def test_every_front_point_is_non_dominated(self):
         for candidate in self.first.pareto_front:

@@ -14,12 +14,15 @@ from .arrival_staging import (
 from .arrival_staging import (
     METHOD as ARRIVAL_STAGING_METHOD,
 )
-from .constants import JPL_SATURN_SYSTEM_SOURCE, SATURN_MU_M3_S2
+from .constants import (
+    F_RING_REFERENCE_RADIUS_M,
+    JPL_SATURN_SYSTEM_SOURCE,
+    SATURN_MU_M3_S2,
+)
 from .models import Event, Leg, TrajectoryResult
 
 DEFAULT_SATURN_STAGING_RADIUS_M = 6.0e8
 MIN_SATURN_STAGING_RADIUS_M = 4.8e8
-F_RING_REFERENCE_RADIUS_M = 1.4018e8
 D_RING_INNER_EDGE_RADIUS_M = 6.69e7
 ALTERNATE_E_RING_OUTER_RADIUS_M = 4.82e8
 METHOD = ARRIVAL_STAGING_METHOD

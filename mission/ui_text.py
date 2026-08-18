@@ -4,8 +4,10 @@ from typing import Final
 
 UI_TEXT: Final[dict[str, str]] = {
     "app_caption": (
-        "Deterministic first-order Earth → Saturn → Titan mission chain with explicit "
-        "propulsive delta-v, simplified mass sizing, and isolated feasibility studies."
+        "Deterministic first-order Earth → Saturn mission chain — ending in a "
+        "Saturn-centered orbit at Titan's orbital radius, not a Titan encounter — with "
+        "explicit propulsive delta-v, simplified mass sizing, and isolated feasibility "
+        "studies."
     ),
     "architecture_header": "1. Mission architecture",
     "destination_label": "Interplanetary solver target",
@@ -41,8 +43,10 @@ UI_TEXT: Final[dict[str, str]] = {
     "launch_end": "Launch date — end",
     "calculate": "Calculate trajectory",
     "titan_scope": (
-        "Titan is connected through the preliminary Saturn staging and moon-transfer "
-        "models. Their assumptions and exclusions remain visible below."
+        "The connected budget reaches a Saturn-centered orbit at Titan's orbital radius, "
+        "not Titan itself. The legacy Saturn staging and moon-transfer studies below model "
+        "a further step toward Titan for reference; their assumptions and exclusions "
+        "remain visible."
     ),
     "planned_capabilities": "Planned capabilities",
     "connected_destinations": "Connected mission destinations: ",
@@ -69,9 +73,10 @@ UI_TEXT: Final[dict[str, str]] = {
     "earth_saturn_spinner": "Calculating the Earth → Saturn trajectory…",
     "results_header": "Results (updated after calculation)",
     "complete_chain_note": (
-        "Connected first-order Earth → Saturn → Titan budget. The legacy circular "
-        "Saturn-capture term is replaced by the modeled capture-to-ellipse and staging "
-        "circularization burns."
+        "Connected first-order Earth → Saturn budget, ending in a Saturn-centered orbit "
+        "at Titan's orbital radius. The legacy circular Saturn-capture term is replaced "
+        "by the modeled capture-to-ellipse and circularization burns; no Titan encounter "
+        "or capture is included."
     ),
     "provisional_budget": "Connected propulsive delta-v budget",
     "budget_caption": (
@@ -149,10 +154,60 @@ UI_TEXT: Final[dict[str, str]] = {
     ),
     "current_elapsed_time": "Current mission-elapsed time",
     "current_mission_phase": "Current mission phase",
+    "connected_first_order_header": "Saturn hyperbolic arrival & capture — authoritative model",
+    "connected_first_order_warning": (
+        "This model feeds the connected delta-v budget and mission duration shown on "
+        "Mission setup. Its endpoint is a Saturn-centered circular orbit at Titan's mean "
+        "orbital radius — it does not model a Titan encounter, flyby, or Titan-centered "
+        "capture."
+    ),
+    "hyperbolic_arrival_subheader": "Hyperbolic arrival",
+    "hyperbolic_arrival_help": (
+        "The incoming, unpowered planetocentric approach before any capture burn. v∞ "
+        "(hyperbolic excess speed) is the Saturn-relative arrival speed."
+    ),
+    "arrival_v_infinity_new": "Saturn arrival v∞",
+    "hyperbola_periapsis_radius": "Hyperbola periapsis radius",
+    "hyperbola_eccentricity": "Hyperbola eccentricity",
+    "hyperbola_turn_angle": "Hyperbola deflection angle",
+    "f_ring_margin": "Margin outside F ring",
+    "f_ring_margin_help": (
+        "Periapsis radius minus the reference F-ring radius, both measured from Saturn's "
+        "center. A positive margin means periapsis stays outside the F ring in this "
+        "scalar, coplanar model — it is not a three-dimensional ring-plane clearance."
+    ),
+    "insertion_delta_v": "Insertion delta-v",
+    "circularization_delta_v": "Circularization delta-v",
+    "propulsive_insertion_subheader": "Propulsive capture-to-ellipse insertion",
+    "propulsive_insertion_help": (
+        "An impulsive engine burn at periapsis. Unlike every flyby demonstrator in this "
+        "app, this maneuver costs real propulsive delta-v — it is not a gravity assist."
+    ),
+    "capture_ellipse_subheader": "Capture ellipse",
+    "capture_ellipse_help": (
+        "The bound orbit reached immediately after the capture burn: periapsis at the "
+        "hyperbola's periapsis, apoapsis at Titan's mean orbital radius."
+    ),
+    "ellipse_periapsis_radius": "Ellipse periapsis radius",
+    "ellipse_apoapsis_radius": "Ellipse apoapsis radius",
+    "ellipse_eccentricity": "Ellipse eccentricity",
+    "periapsis_apoapsis_duration": "Periapsis → apoapsis time",
+    "circularization_subheader": "Circularization at Titan's orbital radius",
+    "circularization_help": (
+        "A second impulsive burn at apoapsis, circularizing into a Saturn-centered orbit "
+        "at Titan's mean orbital radius. This orbit is co-orbital with Titan, not a Titan "
+        "encounter, flyby, or capture — no Titan-centered maneuver is modeled here."
+    ),
+    "radius_vs_altitude_help": (
+        "Radius is measured from the body's center; altitude is measured above its "
+        "surface (or cloud tops for a giant planet). The two differ by the body's own "
+        "radius, so they are not interchangeable."
+    ),
     "staging_header": "Saturn arrival → staging orbit — preliminary model",
     "staging_warning": (
-        "Energy estimate only: ring-plane clearance is unresolved. This phase replaces "
-        "the legacy circular Saturn-capture term in the connected budget."
+        "Legacy reference model, kept for comparison: it no longer feeds the connected "
+        "delta-v budget above, which uses the authoritative hyperbolic-arrival-and-capture "
+        "model instead. Energy estimate only — ring-plane clearance remains unresolved."
     ),
     "arrival_v_infinity": "Saturn arrival v∞ (m/s)",
     "arrival_v_infinity_help": (
@@ -161,7 +216,9 @@ UI_TEXT: Final[dict[str, str]] = {
     "periapsis_radius": "Capture periapsis radius (km)",
     "periapsis_radius_help": (
         "Saturn-centered radius. The nominal value preserves the current PyKEP "
-        "60,330 km radius plus a 2,000 km capture altitude."
+        "60,330 km radius plus a 2,000 km capture altitude. Feeds only the legacy "
+        "arrival-to-staging study on Saturn & Titan studies, not the authoritative "
+        "connected delta-v budget above, which uses a fixed 150,000 km design periapsis."
     ),
     "capture_to_ellipse_dv": "Capture-to-ellipse delta-v",
     "staging_circularisation_dv": "Staging circularization delta-v",
@@ -172,14 +229,17 @@ UI_TEXT: Final[dict[str, str]] = {
     "e_ring_margin": "Staging orbit beyond E-ring edge",
     "titan_header": "Saturn → Titan — preliminary model",
     "titan_warning": (
-        "This phase is included in the connected propulsive and mass budgets. The model "
-        "remains preliminary and retains the exclusions listed below."
+        "Legacy reference model, kept for comparison: this Saturn → Titan Hohmann phase "
+        "is no longer included in the connected propulsive or mass budgets, which use the "
+        "authoritative Saturn-capture model instead. It remains preliminary and retains "
+        "the exclusions listed below."
     ),
     "study_parameters": "Study parameters",
     "staging_radius": "Saturn staging-orbit radius (km)",
     "staging_radius_help": (
         "Radius measured from Saturn's center. The lower bound is beyond the "
-        "preliminary ring guard."
+        "preliminary ring guard. Feeds only the legacy Saturn → Titan study on Saturn "
+        "& Titan studies, not the authoritative connected delta-v budget above."
     ),
     "shared_staging_radius": (
         "This study uses the same Saturn staging-orbit radius selected in the "
@@ -200,9 +260,10 @@ UI_TEXT: Final[dict[str, str]] = {
     "titan_tof": "Saturn → Titan time of flight",
     "titan_edl_header": "Titan EDL — preliminary ballistic-entry model",
     "titan_edl_warning": (
-        "Exploratory alternative only: this direct-entry study is not included in the "
-        "connected delta-v or mass budget and does not replace the connected circular-capture "
-        "reference case."
+        "Exploratory alternative only: this direct-entry study assumes an incoming "
+        "Titan-relative hyperbola that is not produced by any connected model in this app "
+        "(the authoritative Saturn-capture model above never reaches Titan). It is not "
+        "included in the connected delta-v or mass budget."
     ),
     "edl_incoming_v_infinity": "Incoming Titan-relative v∞",
     "edl_interface_altitude": "Atmospheric-interface altitude",
@@ -217,8 +278,9 @@ UI_TEXT: Final[dict[str, str]] = {
     ),
     "edl_capture_savings": "Avoided circular-capture burn",
     "edl_capture_savings_help": (
-        "Propulsive-equivalent saving relative only to the currently budgeted Titan "
-        "circular-capture burn. Terminal descent and landing propulsion are not modeled."
+        "Propulsive-equivalent saving relative only to the legacy Saturn → Titan study's "
+        "Titan circular-capture burn above (not a term in the connected delta-v budget). "
+        "Terminal descent and landing propulsion are not modeled."
     ),
     "edl_sources": "Scientific sources",
     "assumptions_exclusions": "Model assumptions and exclusions",

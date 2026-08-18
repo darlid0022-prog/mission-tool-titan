@@ -23,21 +23,17 @@ class TestParetoFrontFigure(unittest.TestCase):
         )
         self.assertAlmostEqual(
             self.highlights.delta_v_optimum.earth_saturn_tof_years * 365.25,
-            2_826.0,
+            2_856.0,
             delta=1e-9,
         )
-        self.assertEqual(
-            self.highlights.baseline.total_delta_v_m_s
-            - self.highlights.delta_v_optimum.total_delta_v_m_s,
-            3.2536144272344245,
-        )
+        self.assertEqual(self.highlights.baseline, self.highlights.delta_v_optimum)
 
-    def test_figure_contains_38_front_points_plus_the_baseline(self):
+    def test_figure_contains_34_front_points_plus_the_baseline(self):
         traces = {trace.meta["role"]: trace for trace in self.figure.data}
 
         self.assertEqual(
             len(traces["pareto_front"].x) + len(traces["Minimum connected delta-v"].x),
-            38,
+            34,
         )
         self.assertEqual(len(traces["Current mission baseline"].x), 1)
         self.assertEqual(len(self.figure.data), 3)
@@ -64,7 +60,7 @@ class TestParetoTable(unittest.TestCase):
 
     def test_table_row_count_matches_the_chart_exactly(self):
         self.assertEqual(len(self.table), sum(len(trace.x) for trace in self.figure.data))
-        self.assertEqual(len(self.table), 39)
+        self.assertEqual(len(self.table), 35)
 
     def test_table_columns_are_labeled_with_units(self):
         self.assertEqual(

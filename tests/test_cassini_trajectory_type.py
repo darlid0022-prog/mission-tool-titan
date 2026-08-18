@@ -76,17 +76,15 @@ class TestDirectTrajectoryTypeIsUnchanged(unittest.TestCase):
         self.assertIsNone(implicit_bundle.cassini_tour)
         self.assertIsNone(explicit_bundle.cassini_tour)
 
-    def test_direct_mode_still_matches_the_known_reference_values(self):
-        """Pins the exact pre-existing values (see test_app_titan_ui.py's
-        test_scorecard_displays_live_connected_results) so a regression in the
-        Direct path - even one only reachable through the new trajectory_type
-        branch - fails loudly here."""
+    def test_direct_mode_matches_the_consolidated_first_order_reference(self):
+        """Pin the new non-redundant analytical chain and its duration."""
         bundle = app_services.compute_mission_bundle(_connected_titan_inputs())
 
-        self.assertAlmostEqual(bundle.dv_total, 9_902.654937909275, delta=1e-3)
-        self.assertAlmostEqual(bundle.mission_duration_days, 2_862.258233205092, delta=1e-3)
+        self.assertAlmostEqual(bundle.dv_total, 12_163.278277912983, delta=1e-3)
+        self.assertAlmostEqual(bundle.mission_duration_days, 2_211.759761484366, delta=1e-3)
         self.assertIsNotNone(bundle.staging_result)
         self.assertIsNotNone(bundle.titan_transfer)
+        self.assertIsNotNone(bundle.connected_first_order)
         self.assertIsNone(bundle.cassini_tour)
 
 
