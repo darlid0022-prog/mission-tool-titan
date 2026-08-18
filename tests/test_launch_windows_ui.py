@@ -375,6 +375,41 @@ class TestSendSelectionTo3D(unittest.TestCase):
             )
         )
 
+    def test_mission_setup_scorecard_names_the_active_launch_window_scenario(self):
+        with (
+            patch(
+                "launch_window_service.get_launch_window_service",
+                return_value=_FixtureLaunchWindowService(candidate_count=1),
+            ),
+            patch("app_services.compute_cached_trajectory", return_value=_earth_saturn_result()),
+        ):
+            app = AppTest.from_file(APP_PATH)
+            app.run(timeout=30)
+            app = app.switch_page("pages/launch_windows.py").run(timeout=30)
+            app = _submit_search(app)
+            send_button = next(
+                b for b in app.button if b.label == "Send selected candidate to 3D view"
+            )
+            app = send_button.click().run(timeout=30)
+            app = app.switch_page("pages/mission_setup.py").run(timeout=30)
+
+        self.assertFalse(app.exception)
+        self.assertTrue(
+            any(
+                "Active scenario: launch window narrowed to 2026-07-01 by a Launch "
+                "windows selection" in c.value
+                for c in app.caption
+            )
+        )
+
+    def test_scorecard_stays_silent_when_no_launch_window_candidate_is_active(self):
+        with patch("app_services.compute_cached_trajectory", return_value=_earth_saturn_result()):
+            app = AppTest.from_file(APP_PATH)
+            app.run(timeout=30)
+
+        self.assertFalse(app.exception)
+        self.assertFalse(any("Active scenario: launch window narrowed to" in c.value for c in app.caption))
+
 
 class TestStaleResultsClearOnScenarioChange(unittest.TestCase):
     def test_a_new_search_replaces_the_previous_scenarios_values(self):
@@ -427,6 +462,7 @@ class TestUnitsAndLabels(unittest.TestCase):
             [
                 "Rank",
                 "Selected",
+                "Pareto optimal",
                 "Launch date (UTC)",
                 "Launch time (UTC)",
                 "Saturn arrival (UTC)",

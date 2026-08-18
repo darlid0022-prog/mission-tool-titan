@@ -12,6 +12,7 @@ import pandas as pd
 import streamlit as st
 
 import app_services
+import launch_window_service as lw
 from mission import colors
 from mission.capabilities import (
     MOON_DESTINATIONS,
@@ -299,6 +300,20 @@ with scorecard_slot.container(border=True):
         "without a connected multi-leg trajectory (see Gravity assists for isolated, "
         "unpowered flyby demonstrators only)."
     )
+    selected_launch_candidate = st.session_state.get(
+        lw.SELECTED_LAUNCH_WINDOW_CANDIDATE_STATE_KEY
+    )
+    if (
+        isinstance(selected_launch_candidate, lw.LaunchWindowCandidate)
+        and selected_launch_candidate.departure_datetime.date() == mission_inputs.launch_window_start
+    ):
+        st.caption(
+            f"Active scenario: launch window narrowed to "
+            f"{selected_launch_candidate.departure_datetime.date().isoformat()} by a Launch "
+            "windows selection. This scorecard recomputes its own budget independently and "
+            "may not match that page's numbers exactly — see Launch windows for the "
+            "candidate's own delta-v/duration breakdown."
+        )
 
 with st.container(horizontal=True):
     if st.button("Copy share link", icon=":material/link:"):

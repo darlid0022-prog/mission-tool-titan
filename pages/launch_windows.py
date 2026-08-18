@@ -235,6 +235,11 @@ else:
         st.metric(
             "v∞ Saturn", f"{selected_candidate.v_infinity_saturn_m_s:,.1f} m/s", border=True
         )
+    st.caption(
+        "C3 reflects only this trajectory's departure energy. No compatibility with any "
+        "specific launch vehicle's C3-vs-payload-mass performance envelope has been "
+        "checked — a high C3 may exceed what a given rocket can deliver to this energy."
+    )
     with st.container(horizontal=True):
         st.metric(
             "Delta-v departure",
@@ -254,13 +259,18 @@ else:
         )
 
     st.dataframe(
-        launch_window_plot.build_candidates_dataframe(candidates, selected_rank=selected_rank),
+        launch_window_plot.build_candidates_dataframe(
+            candidates,
+            selected_rank=selected_rank,
+            pareto_candidate_ranks=result.pareto_candidate_ranks,
+        ),
         width="stretch",
         hide_index=True,
     )
     st.caption(
         'Click any column header to sort. "Selected" marks the candidate highlighted '
-        "below and on the chart — also the accessible, screen-reader-navigable "
+        'below and on the chart; "Pareto optimal" marks the same candidates as the '
+        "chart's diamond markers — also the accessible, screen-reader-navigable "
         "alternative to the chart, built from the same data."
     )
 

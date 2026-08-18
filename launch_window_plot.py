@@ -23,6 +23,7 @@ from mission import colors
 CANDIDATE_TABLE_COLUMNS = (
     "Rank",
     "Selected",
+    "Pareto optimal",
     "Launch date (UTC)",
     "Launch time (UTC)",
     "Saturn arrival (UTC)",
@@ -50,19 +51,24 @@ def build_candidates_dataframe(
     candidates: tuple[LaunchWindowCandidate, ...],
     *,
     selected_rank: int | None,
+    pareto_candidate_ranks: tuple[int, ...] | None = None,
 ) -> pd.DataFrame:
     """One row per candidate, every field the launch-windows page must show.
 
     Streamlit's st.dataframe sorts by clicking any column header natively -
     this is the "sortable table of top candidates" and also the accessible,
     keyboard/screen-reader-navigable alternative to the chart built from the
-    same data below.
+    same data below, including which candidates the chart marks as
+    Pareto-optimal (mirrors build_candidates_chart's pareto_candidate_ranks
+    so the two never disagree about which ranks are highlighted).
     """
     _validate_candidates(candidates)
+    pareto_ranks = set(pareto_candidate_ranks or ())
     rows = [
         {
             "Rank": candidate.rank,
             "Selected": candidate.rank == selected_rank,
+            "Pareto optimal": candidate.rank in pareto_ranks,
             "Launch date (UTC)": candidate.departure_datetime.astimezone(timezone.utc).date(),
             "Launch time (UTC)": candidate.departure_datetime.astimezone(timezone.utc)
             .time()

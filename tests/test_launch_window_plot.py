@@ -39,6 +39,19 @@ class TestBuildCandidatesDataframe(unittest.TestCase):
         selected_flags = dict(zip(table["Rank"], table["Selected"], strict=True))
         self.assertEqual(selected_flags, {1: False, 2: True, 3: False})
 
+    def test_pareto_optimal_column_matches_the_chart_highlighted_ranks(self):
+        candidates = (_candidate(1), _candidate(2), _candidate(3))
+        table = build_candidates_dataframe(
+            candidates, selected_rank=1, pareto_candidate_ranks=(1, 3)
+        )
+        pareto_flags = dict(zip(table["Rank"], table["Pareto optimal"], strict=True))
+        self.assertEqual(pareto_flags, {1: True, 2: False, 3: True})
+
+    def test_pareto_optimal_column_is_all_false_when_no_ranks_given(self):
+        candidates = (_candidate(1), _candidate(2))
+        table = build_candidates_dataframe(candidates, selected_rank=1)
+        self.assertFalse(table["Pareto optimal"].any())
+
     def test_rejects_non_candidate_input(self):
         with self.assertRaisesRegex(TypeError, "LaunchWindowCandidate"):
             build_candidates_dataframe((object(),), selected_rank=None)
