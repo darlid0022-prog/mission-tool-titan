@@ -8,6 +8,7 @@ app_services.require_mission_bundle). No business logic lives in this file.
 
 import streamlit as st
 
+import app_services
 from mission.ui_text import UI_TEXT
 
 st.set_page_config(
@@ -17,6 +18,14 @@ st.set_page_config(
 )
 st.title(":material/satellite_alt: Mission Design Calculator")
 st.caption(UI_TEXT["app_caption"])
+
+# Shared URLs restore their validated, simple mission inputs before navigation
+# selects and renders any page. Derived physics/results are intentionally rebuilt
+# later by app_services.compute_mission_bundle().
+try:
+    app_services.restore_mission_setup_from_query_params(st.query_params)
+except ValueError as exc:
+    st.warning(f"The shared mission link could not be restored: {exc}")
 
 pages = [
     st.Page(

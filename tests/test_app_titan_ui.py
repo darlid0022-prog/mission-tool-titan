@@ -1,9 +1,17 @@
 import unittest
+from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
+import pandas as pd
 from streamlit.testing.v1 import AppTest
 
+from app_services import (
+    MISSION_SETUP_STATE_KEY,
+    MissionSetupInputs,
+    decode_mission_setup_query,
+    encode_mission_setup_query,
+)
 from mission import physics
 from mission.bodies import resolve_body
 from mission.models import Leg, TrajectoryResult
@@ -73,6 +81,32 @@ def badge_values(app: AppTest) -> list[str]:
 
 
 class TestMissionSetupPage(unittest.TestCase):
+    @staticmethod
+    def shared_inputs() -> MissionSetupInputs:
+        return MissionSetupInputs(
+            destination="Saturn",
+            selected_moon="Titan",
+            departure_type="LEO",
+            leo_altitude_km=300.0,
+            saturn_periapsis_radius_km=62_500.0,
+            saturn_staging_radius_km=610_000.0,
+            titan_capture_altitude_km=1_600.0,
+            launch_window_start=date(2026, 7, 1),
+            launch_window_end=date(2027, 5, 1),
+            isp_s=340.0,
+            instruments_df=pd.DataFrame(
+                [
+                    {
+                        "Instrument": "Shared payload",
+                        "Cible": "Orbiter",
+                        "Masse (kg)": 150.0,
+                        "Puissance (W)": 350.0,
+                        "Débit (bps)": 1_024.0,
+                    }
+                ]
+            ),
+        )
+
     def test_connected_total_and_default_mass_outputs_are_non_zero(self):
         app = run_app()
 
@@ -120,6 +154,45 @@ class TestMissionSetupPage(unittest.TestCase):
         self.assertEqual(metrics["Duration to Titan"], "2,862.3 days")
         self.assertEqual(metrics["Single-stage exceedance"], "2.58×")
         self.assertEqual(metrics["Flyby gain coverage"], "161.7%")
+
+    def test_summary_exposes_share_and_pdf_actions(self):
+        app = run_app()
+
+        self.assertFalse(app.exception)
+        self.assertTrue(any(button.label == "Copy share link" for button in app.button))
+        self.assertTrue(
+            any(button.label == "Download mission summary PDF" for button in app.download_button)
+        )
+
+    def test_shared_query_restores_inputs_before_the_default_page_renders(self):
+        expected = self.shared_inputs()
+        app = AppTest.from_file(APP_PATH)
+        app.query_params.update(encode_mission_setup_query(expected))
+
+        with patch("app_services.compute_cached_trajectory", return_value=earth_saturn_result()):
+            app.run(timeout=30)
+
+        self.assertFalse(app.exception)
+        restored = app.session_state[MISSION_SETUP_STATE_KEY]
+        self.assertEqual(restored.destination, expected.destination)
+        self.assertEqual(restored.leo_altitude_km, expected.leo_altitude_km)
+        self.assertEqual(restored.launch_window_start, expected.launch_window_start)
+        self.assertEqual(restored.isp_s, expected.isp_s)
+        self.assertEqual(restored.instruments_df.iloc[0]["Instrument"], "Shared payload")
+
+    def test_copy_share_link_populates_a_decodable_query_parameter(self):
+        app = AppTest.from_file(APP_PATH)
+        with patch("app_services.compute_cached_trajectory", return_value=earth_saturn_result()):
+            app.run(timeout=30)
+            next(button for button in app.button if button.label == "Copy share link").click().run(
+                timeout=30
+            )
+
+        self.assertFalse(app.exception)
+        restored = decode_mission_setup_query(app.query_params)
+        self.assertEqual(restored.destination, "Saturn")
+        self.assertEqual(restored.selected_moon, "Titan")
+        self.assertTrue(any("?mission=" in code.value for code in app.code))
 
     def test_complete_budget_is_connected_to_mass_sizing_without_legacy_capture(self):
         mass_result = {
@@ -202,9 +275,7 @@ class TestTrajectory3DPage(unittest.TestCase):
         app = run_app(page_path="pages/trajectory_3d.py")
 
         self.assertFalse(app.exception)
-        expander = next(
-            e for e in app.expander if e.label == "View trajectory data as a table"
-        )
+        expander = next(e for e in app.expander if e.label == "View trajectory data as a table")
         # st.expander is a native, keyboard-operable disclosure widget (no
         # mouse-only affordance) and its content, a plain st.dataframe, is
         # present in the tree regardless of the (collapsed-by-default) open
@@ -416,9 +487,7 @@ class TestOptimizationPage(unittest.TestCase):
         app = run_app(page_path="pages/optimization.py")
 
         self.assertFalse(app.exception)
-        expander = next(
-            e for e in app.expander if e.label == "View Pareto front data as a table"
-        )
+        expander = next(e for e in app.expander if e.label == "View Pareto front data as a table")
         table = expander.dataframe[0].value
         self.assertEqual(
             list(table.columns),

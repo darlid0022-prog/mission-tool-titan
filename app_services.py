@@ -1,11 +1,18 @@
 """Cached application services kept separate from the Streamlit page."""
 
+import base64
+import binascii
+import json
+import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
+from urllib.parse import urlencode
 
 import pandas as pd
 import streamlit as st
 
+from mission.capabilities import MOON_DESTINATIONS, PLANET_DESTINATIONS
 from mission.dv_budget import MissionDeltaVBudget, compose_complete_dv_budget
 from mission.feasibility_check import (
     SingleStageFeasibilityResult,
@@ -40,6 +47,9 @@ DEFAULT_LAUNCH_WINDOW_START = date(2026, 6, 1)
 DEFAULT_LAUNCH_WINDOW_END = date(2027, 6, 1)
 
 MISSION_SETUP_STATE_KEY = "mission_setup_inputs"
+MISSION_QUERY_PARAM = "mission"
+MISSION_QUERY_VERSION = 1
+MISSION_QUERY_RESTORED_KEY = "mission_query_restored"
 MISSION_SETUP_REQUIRED_MESSAGE = (
     "Configure and calculate a mission on the Mission setup page first."
 )
@@ -101,6 +111,184 @@ class MissionSetupInputs:
     launch_window_end: date
     isp_s: float
     instruments_df: pd.DataFrame
+
+
+INSTRUMENT_COLUMNS = (
+    "Instrument",
+    "Cible",
+    "Masse (kg)",
+    "Puissance (W)",
+    "Débit (bps)",
+)
+
+
+def _validated_number(
+    name: str,
+    value: object,
+    *,
+    minimum: float,
+    maximum: float,
+) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError(f"{name} must be numeric.")
+    converted = float(value)
+    if not math.isfinite(converted) or not minimum <= converted <= maximum:
+        raise ValueError(f"{name} is outside the supported range.")
+    return converted
+
+
+def _instrument_records(instruments_df: pd.DataFrame) -> list[dict[str, object]]:
+    if tuple(instruments_df.columns) != INSTRUMENT_COLUMNS:
+        raise ValueError("The shared instrument table has an unsupported schema.")
+    # Pandas' JSON conversion normalizes numpy scalar values into plain JSON
+    # scalars while preserving the exact row/column order used by the editor.
+    records = json.loads(instruments_df.to_json(orient="records"))
+    if not isinstance(records, list) or len(records) > 100:
+        raise ValueError("The shared instrument table has too many rows.")
+    return records
+
+
+def encode_mission_setup_query(inputs: MissionSetupInputs) -> dict[str, str]:
+    """Serialize only user inputs into one versioned, URL-safe query parameter."""
+    payload = {
+        "version": MISSION_QUERY_VERSION,
+        "destination": inputs.destination,
+        "selected_moon": inputs.selected_moon,
+        "departure_type": inputs.departure_type,
+        "leo_altitude_km": inputs.leo_altitude_km,
+        "saturn_periapsis_radius_km": inputs.saturn_periapsis_radius_km,
+        "saturn_staging_radius_km": inputs.saturn_staging_radius_km,
+        "titan_capture_altitude_km": inputs.titan_capture_altitude_km,
+        "launch_window_start": inputs.launch_window_start.isoformat(),
+        "launch_window_end": inputs.launch_window_end.isoformat(),
+        "isp_s": inputs.isp_s,
+        "instruments": _instrument_records(inputs.instruments_df),
+    }
+    serialized = json.dumps(
+        payload,
+        ensure_ascii=False,
+        allow_nan=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    token = base64.urlsafe_b64encode(serialized).decode("ascii").rstrip("=")
+    return {MISSION_QUERY_PARAM: token}
+
+
+def decode_mission_setup_query(
+    query_params: Mapping[str, str | list[str]],
+) -> MissionSetupInputs:
+    """Validate and reconstruct mission inputs from a shared URL query mapping."""
+    token = query_params.get(MISSION_QUERY_PARAM)
+    if isinstance(token, list):
+        token = token[-1] if len(token) == 1 else None
+    if not token or not isinstance(token, str) or len(token) > 32_000:
+        raise ValueError("The mission share parameter is missing or invalid.")
+    try:
+        padding = "=" * (-len(token) % 4)
+        raw = base64.b64decode(token + padding, altchars=b"-_", validate=True)
+        payload = json.loads(raw.decode("utf-8"))
+    except (binascii.Error, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("The mission share parameter is malformed.") from exc
+    if not isinstance(payload, dict) or payload.get("version") != MISSION_QUERY_VERSION:
+        raise ValueError("The mission share parameter uses an unsupported version.")
+
+    destination = payload.get("destination")
+    if destination not in PLANET_DESTINATIONS:
+        raise ValueError("The shared destination is not supported.")
+    selected_moon = payload.get("selected_moon")
+    if selected_moon is not None and MOON_DESTINATIONS.get(selected_moon) != destination:
+        raise ValueError("The shared moon is incompatible with its parent planet.")
+    departure_type = payload.get("departure_type")
+    if departure_type not in {"Direct", "LEO"}:
+        raise ValueError("The shared departure type is not supported.")
+
+    try:
+        launch_window_start = date.fromisoformat(payload["launch_window_start"])
+        launch_window_end = date.fromisoformat(payload["launch_window_end"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("The shared launch window is invalid.") from exc
+    if launch_window_end < launch_window_start:
+        raise ValueError("The shared launch window ends before it starts.")
+
+    records = payload.get("instruments")
+    if not isinstance(records, list) or len(records) > 100:
+        raise ValueError("The shared instrument table is invalid.")
+    normalized_records: list[dict[str, object]] = []
+    for index, record in enumerate(records):
+        if not isinstance(record, dict) or set(record) != set(INSTRUMENT_COLUMNS):
+            raise ValueError("The shared instrument table has an unsupported schema.")
+        name = record["Instrument"]
+        target = record["Cible"]
+        if not isinstance(name, str) or not name.strip() or len(name) > 200:
+            raise ValueError(f"Shared instrument row {index + 1} has an invalid name.")
+        if not isinstance(target, str) or not target.strip() or len(target) > 100:
+            raise ValueError(f"Shared instrument row {index + 1} has an invalid target.")
+        normalized_records.append(
+            {
+                "Instrument": name,
+                "Cible": target,
+                "Masse (kg)": _validated_number(
+                    "instrument mass", record["Masse (kg)"], minimum=0.0, maximum=1e9
+                ),
+                "Puissance (W)": _validated_number(
+                    "instrument power", record["Puissance (W)"], minimum=0.0, maximum=1e9
+                ),
+                "Débit (bps)": _validated_number(
+                    "instrument data rate", record["Débit (bps)"], minimum=0.0, maximum=1e15
+                ),
+            }
+        )
+    instruments_df = pd.DataFrame(normalized_records, columns=INSTRUMENT_COLUMNS)
+
+    return MissionSetupInputs(
+        destination=destination,
+        selected_moon=selected_moon,
+        departure_type=departure_type,
+        leo_altitude_km=_validated_number(
+            "LEO altitude", payload.get("leo_altitude_km"), minimum=100.0, maximum=100_000.0
+        ),
+        saturn_periapsis_radius_km=_validated_number(
+            "Saturn periapsis radius",
+            payload.get("saturn_periapsis_radius_km"),
+            minimum=60_269.0,
+            maximum=66_899.0,
+        ),
+        saturn_staging_radius_km=_validated_number(
+            "Saturn staging radius",
+            payload.get("saturn_staging_radius_km"),
+            minimum=480_001.0,
+            maximum=1_221_899.0,
+        ),
+        titan_capture_altitude_km=_validated_number(
+            "Titan capture altitude",
+            payload.get("titan_capture_altitude_km"),
+            minimum=1_000.0,
+            maximum=100_000.0,
+        ),
+        launch_window_start=launch_window_start,
+        launch_window_end=launch_window_end,
+        isp_s=_validated_number("Isp", payload.get("isp_s"), minimum=100.0, maximum=100_000.0),
+        instruments_df=instruments_df,
+    )
+
+
+def build_mission_share_url(base_url: str, query_params: Mapping[str, str]) -> str:
+    """Return a stable absolute URL containing the encoded mission inputs."""
+    return f"{base_url.split('?', 1)[0]}?{urlencode(dict(query_params))}"
+
+
+def restore_mission_setup_from_query_params(
+    query_params: Mapping[str, str | list[str]],
+) -> bool:
+    """Restore a shared mission once, before st.navigation renders any page."""
+    if st.session_state.get(MISSION_QUERY_RESTORED_KEY):
+        return False
+    st.session_state[MISSION_QUERY_RESTORED_KEY] = True
+    if MISSION_QUERY_PARAM not in query_params:
+        return False
+    st.session_state[MISSION_SETUP_STATE_KEY] = decode_mission_setup_query(query_params)
+    return True
 
 
 def store_mission_setup_inputs(inputs: MissionSetupInputs) -> None:

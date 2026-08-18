@@ -3,3 +3,4 @@ pandas
 numpy
 pykep
 plotly==6.9.0
+fpdf2==2.8.7
