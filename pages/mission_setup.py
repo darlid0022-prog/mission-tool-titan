@@ -294,6 +294,11 @@ with scorecard_slot.container(border=True):
         border=True,
     )
     st.caption("Live connected-budget values.")
+    st.caption(
+        "Gravity-assist delta-v savings are not included above and are not available "
+        "without a connected multi-leg trajectory (see Gravity assists for isolated, "
+        "unpowered flyby demonstrators only)."
+    )
 
 with st.container(horizontal=True):
     if st.button("Copy share link", icon=":material/link:"):

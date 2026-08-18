@@ -356,10 +356,15 @@ class MissionBundle:
     single_stage_feasibility: SingleStageFeasibilityResult
     earth_saturn_trajectory: TrajectoryResult
     mission_duration_days: float
+    # Isolated, unpowered demonstrators (see pages/gravity_assists.py) - kept
+    # here only as individual results. Never summed: each flyby's heliocentric
+    # speed gain depends on the incoming state the *previous* leg would have
+    # delivered, which none of these independently-computed demonstrators
+    # supplies to the next, so a Venus+Earth+Jupiter total would overstate
+    # what a real connected multi-leg trajectory could actually bank. Gravity-
+    # assist delta-v savings remain unavailable until a connected multi-leg
+    # trajectory (not these isolated demonstrators) is computed end-to-end.
     flyby_demonstrations: tuple[GravityAssistResult, ...]
-    combined_flyby_gain_m_s: float
-    single_stage_deficit_m_s: float
-    flyby_deficit_coverage: float | None
     # Populated only for TRAJECTORY_TYPE_CASSINI_HISTORICAL - the five real
     # Cassini VVEJGA legs this bundle's delta-v/duration were computed from.
     # None for every other trajectory type/destination.
@@ -573,18 +578,6 @@ def compute_mission_bundle(inputs: MissionSetupInputs) -> MissionBundle:
         compute_earth_flyby_demonstration(),
         compute_jupiter_flyby_demonstration(),
     )
-    combined_flyby_gain_m_s = sum(
-        result.heliocentric_speed_change_m_s for result in flyby_demonstrations
-    )
-    single_stage_deficit_m_s = max(
-        dv_total - single_stage_feasibility.maximum_feasible_delta_v_m_s,
-        0.0,
-    )
-    flyby_deficit_coverage = (
-        combined_flyby_gain_m_s / single_stage_deficit_m_s
-        if single_stage_deficit_m_s > 0.0
-        else None
-    )
 
     return MissionBundle(
         traj=traj,
@@ -601,9 +594,6 @@ def compute_mission_bundle(inputs: MissionSetupInputs) -> MissionBundle:
         earth_saturn_trajectory=earth_saturn_trajectory,
         mission_duration_days=mission_duration_days,
         flyby_demonstrations=flyby_demonstrations,
-        combined_flyby_gain_m_s=combined_flyby_gain_m_s,
-        single_stage_deficit_m_s=single_stage_deficit_m_s,
-        flyby_deficit_coverage=flyby_deficit_coverage,
         cassini_tour=cassini_tour,
         connected_first_order=connected_first_order,
     )
