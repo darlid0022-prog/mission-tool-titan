@@ -39,7 +39,7 @@ demonstrator page shows only one. Confirm whether a second, independent Venus
 flyby demonstrator should be added, or whether one demonstrator per body is
 the intended scope.
 
-## Saturn & Titan studies page shared between two menus
+## Saturn & Titan studies page shared between two menus — resolved
 
 `pages/saturn_system_studies.py` renders all four of its blocks (the
 authoritative connected model plus three legacy/preliminary studies)
@@ -47,5 +47,28 @@ unconditionally, and is linked from both *Technical details* and *Isolated
 studies* with a `section` query parameter that only changes one explanatory
 caption. This is documented as intentional in the file's own header comment,
 not a duplication bug — see the wording-and-scope batch report (§1.4) for the
-full analysis. Left open pending an explicit decision on whether the two
-menu entries should instead show different content.
+full analysis. **Decision (wording-and-scope follow-up batch, §0): accepted
+as-is, no correction.** A single page reachable from two menus is the
+intended behavior.
+
+## Display order when entering via Isolated studies
+
+A narrower question survives the decision above: when arriving via
+*Isolated studies* (`?section=isolated`), the FIRST block rendered on
+`pages/saturn_system_studies.py` is still "Saturn hyperbolic arrival &
+capture — authoritative model" — the block that feeds the connected budget.
+A reader who followed the *Isolated studies* menu specifically to see
+excluded/legacy content sees the connected model first, which cuts against
+that menu's own framing. Should the page reorder its blocks based on the
+`section` query parameter, or should the page be split so each menu entry
+shows only its own content?
+
+## "baseline" naming in the Pareto front
+
+`select_pareto_highlights` (`mission/pareto_plot.py`) names its
+locked-minimum-departure-v-infinity point `baseline`. The name alone does
+not convey that the selection criterion is minimum departure v∞, not
+(for example) minimum delta-v or the literal default scenario. Worth
+clarifying the vocabulary — e.g. `locked_departure_baseline` or a docstring
+callout at the call sites — so a future reader does not assume it means
+"the point currently displayed as the default mission."
