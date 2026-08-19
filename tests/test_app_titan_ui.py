@@ -1108,6 +1108,35 @@ class TestGravityAssistsPage(unittest.TestCase):
         self.assertIn("not directly additive as delta-v savings", captions)
         self.assertIn("Unpowered flyby", captions)
 
+    def test_header_label_clarifies_only_one_venus_flyby_is_modeled(self):
+        # docs/audit_science_budget_v030.md wording-and-scope batch §2.3c:
+        # three demonstrators (Venus/Earth/Jupiter) read as VEJGA even though
+        # the reference architecture is VVEJGA (two Venus flybys). No flyby
+        # was added - only this label.
+        app = run_app(page_path="pages/gravity_assists.py")
+
+        self.assertFalse(app.exception)
+        captions = " ".join(caption.value for caption in app.caption)
+        self.assertIn("Three independent demonstrators, one per body", captions)
+        self.assertIn("two Venus flybys", captions)
+        self.assertIn("not yet modeled", captions)
+
+    def test_each_demonstrator_cites_its_real_cassini_flyby_source(self):
+        # docs/audit_science_budget_v030.md wording-and-scope batch §2.3a: the
+        # periapsis altitudes are Cassini's real flyby altitudes (NASA/JPL
+        # sourced in mission/gravity_assist.py) - a validation argument that
+        # was previously invisible in the interface.
+        app = run_app(page_path="pages/gravity_assists.py")
+
+        self.assertFalse(app.exception)
+        captions = " ".join(caption.value for caption in app.caption)
+        self.assertIn("This is Cassini's real Venus flyby altitude", captions)
+        self.assertIn("This is Cassini's real Earth flyby altitude", captions)
+        self.assertIn("This is Cassini's real Jupiter flyby altitude", captions)
+        self.assertIn("science.nasa.gov/mission/cassini", captions)
+        self.assertIn("jpl.nasa.gov/news/cassini-successfully-completes-flyby-of-earth", captions)
+        self.assertIn("descanso.jpl.nasa.gov", captions)
+
 
 class TestBudgetAndVerdictV030(unittest.TestCase):
     def test_budget_displays_audited_baseline_values_and_scope(self):
