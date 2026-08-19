@@ -208,6 +208,7 @@ isp_s = st.number_input(
 
 st.header(UI_TEXT["instruments_header"])
 st.caption(UI_TEXT["instruments_caption"])
+st.warning(UI_TEXT["instruments_zero_data_rate_warning"])
 
 catalog_options = catalog_by_label()
 selected_catalog_labels = st.multiselect(
@@ -651,6 +652,7 @@ with st.container(key="mass_ratio_metric"):
         ),
         border=True,
     )
+    st.caption(UI_TEXT["g0_convention_note"])
 if bundle.mass_ratio > 20:
     st.warning(
         f"The mass ratio above ({bundle.mass_ratio:,.0f}) indicates that one "

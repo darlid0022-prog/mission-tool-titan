@@ -32,11 +32,11 @@ class TestV030UiFormatting(unittest.TestCase):
     def test_departure_condition_formats_are_distinct_from_delta_v(self):
         self.assertEqual(
             format_approximate_speed_km_s(10_432.306468285753),
-            "approximately 10.432 km/s",
+            "≈10.432 km/s",
         )
         self.assertEqual(
             format_approximate_c3_km2_s2(108_833_018.248),
-            "approximately 108.83 km²/s²",
+            "≈108.83 km²/s²",
         )
         self.assertEqual(format_speed_m_s(10_432.306468285753), "10,432.306 m/s")
         self.assertEqual(format_mass_kg(12_138.4), "12,138 kg")
@@ -88,12 +88,12 @@ class TestDurationBreakdown(unittest.TestCase):
         self.assertEqual(breakdown.synthesis_text, "2,859.4 days complete")
         self.assertEqual(
             breakdown.detail_text,
-            "2,859.354 = 2,856.000 + approximately 3.354 days",
+            "2,859.354 = 2,856.000 + ≈3.354 days",
         )
-        # "approximately" qualifies only the Saturn-phase component, never
-        # the complete total displayed at three decimals.
-        self.assertNotIn("approximately 2,859", breakdown.detail_text)
-        self.assertTrue(breakdown.detail_text.split("+")[1].strip().startswith("approximately"))
+        # "≈" qualifies only the Saturn-phase component, never the complete
+        # total displayed at three decimals.
+        self.assertNotIn("≈2,859", breakdown.detail_text)
+        self.assertTrue(breakdown.detail_text.split("+")[1].strip().startswith("≈"))
 
     def test_total_equals_interplanetary_plus_saturn_phase_for_arbitrary_inputs(self):
         """Non-baseline numbers: proves the relationship is computed, not memorized."""
@@ -105,7 +105,7 @@ class TestDurationBreakdown(unittest.TestCase):
             breakdown.interplanetary_days + breakdown.saturn_phase_days,
             places=9,
         )
-        self.assertEqual(breakdown.detail_text, "100.250 = 97.000 + approximately 3.250 days")
+        self.assertEqual(breakdown.detail_text, "100.250 = 97.000 + ≈3.250 days")
 
     def test_labels_are_distinct(self):
         from mission.ui_text import UI_V030_TEXT
@@ -183,7 +183,7 @@ class TestLambertDeparturePresentation(unittest.TestCase):
         )
         self.assertEqual(
             format_approximate_c3_km2_s2(presentation.c3_m2_s2),
-            "approximately 108.83 km²/s²",
+            "≈108.83 km²/s²",
         )
 
     def test_adapter_rejects_non_lambert_or_missing_departure_state(self):

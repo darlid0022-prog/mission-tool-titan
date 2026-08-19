@@ -1114,8 +1114,8 @@ class TestBudgetAndVerdictV030(unittest.TestCase):
 
         self.assertFalse(app.exception)
         metrics = {metric.label: metric.value for metric in app.metric}
-        self.assertEqual(metrics["Earth C3"], "approximately 108.83 km²/s²")
-        self.assertEqual(metrics["Earth v∞"], "approximately 10.432 km/s")
+        self.assertEqual(metrics["Earth C3"], "≈108.83 km²/s²")
+        self.assertEqual(metrics["Earth v∞"], "≈10.432 km/s")
         self.assertEqual(metrics["Modeled Earth injection"], "7,381.480 m/s")
         self.assertEqual(metrics["Saturn capture"], "2,182.991 m/s")
         self.assertEqual(metrics["Saturn-centered circularization"], "2,966.182 m/s")

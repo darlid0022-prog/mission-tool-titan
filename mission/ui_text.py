@@ -56,7 +56,13 @@ UI_TEXT: Final[dict[str, str]] = {
     "instruments_header": "4. Instruments",
     "instruments_caption": (
         "The default aggregate science payload is 143.5 kg and 323 W. Add or edit rows "
-        "directly; a zero data rate means that no aggregate value is currently available."
+        "directly."
+    ),
+    "instruments_zero_data_rate_warning": (
+        "A zero data rate is recorded and aggregated exactly like a documented zero — "
+        "the application cannot distinguish it from an instrument row where the data "
+        "rate was simply never filled in. Confirm each row's data rate before relying "
+        "on the aggregate."
     ),
     "instrument_catalog_label": "Add named instruments from the catalogue",
     "instrument_catalog_help": (
@@ -97,6 +103,11 @@ UI_TEXT: Final[dict[str, str]] = {
     "direct_warning": (
         "Direct mode still treats departure v∞ as a preliminary equivalent delta-v. "
         "The mass budget is not a launch-vehicle sizing result."
+    ),
+    "g0_convention_note": (
+        "This ratio uses the standard gravity convention g0 = 9.80665 m/s² "
+        "(mission/constants.py), the application's single source of truth for this "
+        "constant."
     ),
     "instrument_mass": "Instrument mass",
     "dry_mass": "Simplified dry mass",

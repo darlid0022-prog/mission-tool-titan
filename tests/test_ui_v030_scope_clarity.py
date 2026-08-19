@@ -171,6 +171,23 @@ class TestMassRatioScopeAndLabel(unittest.TestCase):
             if "ratio" in metric.label.lower() or "exceedance" in metric.label.lower():
                 self.assertNotIn("5.16", metric.value)
 
+    def test_mass_ratio_documents_the_g0_convention(self) -> None:
+        # docs/audit_science_budget_v030.md wording-and-scope batch §2.7a.
+        app = _run_calculated_app()
+        self.assertFalse(app.exception)
+        captions = " ".join(c.value for c in app.caption)
+        self.assertIn("g0 = 9.80665", captions)
+        self.assertIn("mission/constants.py", captions)
+
+
+class TestInstrumentsZeroDataRateWarning(unittest.TestCase):
+    def test_zero_data_rate_is_a_visible_warning_not_only_a_caption(self) -> None:
+        # docs/audit_science_budget_v030.md wording-and-scope batch §2.7c.
+        app = _run_calculated_app()
+        self.assertFalse(app.exception)
+        warnings = " ".join(w.value for w in app.warning)
+        self.assertIn("cannot distinguish it from an instrument row", warnings)
+
 
 class TestDurationBreakdownWiring(unittest.TestCase):
     def test_trajectory_shows_the_exact_required_breakdown_for_the_baseline(self) -> None:
@@ -192,7 +209,7 @@ class TestDurationBreakdownWiring(unittest.TestCase):
             e for e in app.expander if e.label == "Complete reference scenario duration"
         )
         detail_values = [w.value for w in breakdown_expander.markdown]
-        self.assertIn("2,859.354 = 2,856.000 + approximately 3.354 days", detail_values)
+        self.assertIn("2,859.354 = 2,856.000 + ≈3.354 days", detail_values)
 
 
 class TestScenarioMetadataCompaction(unittest.TestCase):

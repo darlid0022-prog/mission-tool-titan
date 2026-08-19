@@ -55,7 +55,7 @@ def format_approximate_speed_km_s(
     """Format an SI speed as an explicitly approximate km/s display value."""
     value = _finite_number(value_m_s, name="value_m_s")
     precision = _decimal_places(decimal_places)
-    return f"approximately {value / 1_000.0:,.{precision}f} {UI_UNITS['kilometres_per_second']}"
+    return f"≈{value / 1_000.0:,.{precision}f} {UI_UNITS['kilometres_per_second']}"
 
 
 def format_approximate_c3_km2_s2(
@@ -67,7 +67,7 @@ def format_approximate_c3_km2_s2(
     value = _finite_number(value_m2_s2, name="value_m2_s2")
     precision = _decimal_places(decimal_places)
     return (
-        f"approximately {value / 1_000_000.0:,.{precision}f} "
+        f"≈{value / 1_000_000.0:,.{precision}f} "
         f"{UI_UNITS['square_kilometres_per_square_second']}"
     )
 
@@ -151,13 +151,13 @@ class DurationBreakdown:
 
     @property
     def detail_text(self) -> str:
-        """Full three-decimal breakdown; "approximately" only qualifies the
-        Saturn capture-ellipse component, never the complete total or the
+        """Full three-decimal breakdown; "≈" only qualifies the Saturn
+        capture-ellipse component, never the complete total or the
         interplanetary leg (both are exact differences of validated epochs).
         """
         return (
             f"{self.total_days:,.3f} = {self.interplanetary_days:,.3f} + "
-            f"approximately {self.saturn_phase_days:,.3f} {UI_UNITS['days']}"
+            f"≈{self.saturn_phase_days:,.3f} {UI_UNITS['days']}"
         )
 
 

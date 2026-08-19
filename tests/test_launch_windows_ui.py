@@ -416,7 +416,7 @@ class TestSendSelectionTo3D(unittest.TestCase):
         app = app.switch_page("pages/budget.py").run(timeout=30)
         self.assertFalse(app.exception)
         budget_metrics = {metric.label: metric.value for metric in app.metric}
-        self.assertEqual(budget_metrics["Earth C3"], "approximately 98.40 km²/s²")
+        self.assertEqual(budget_metrics["Earth C3"], "≈98.40 km²/s²")
         self.assertEqual(budget_metrics["Modeled Earth injection"], "3,620.100 m/s")
         self.assertEqual(budget_metrics["Saturn capture"], "2,280.800 m/s")
         self.assertEqual(
