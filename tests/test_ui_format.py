@@ -7,10 +7,12 @@ from mission.ui_format import (
     build_duration_breakdown,
     format_approximate_c3_km2_s2,
     format_approximate_speed_km_s,
+    format_ballistic_coefficient_kg_m2,
     format_datetime_utc,
     format_delta_v_m_s,
     format_distance_km,
     format_duration_days,
+    format_isp_s,
     format_mass_kg,
     format_short_date_utc,
     format_speed_m_s,
@@ -40,6 +42,16 @@ class TestV030UiFormatting(unittest.TestCase):
         )
         self.assertEqual(format_speed_m_s(10_432.306468285753), "10,432.306 m/s")
         self.assertEqual(format_mass_kg(12_138.4), "12,138 kg")
+
+    def test_isp_and_ballistic_coefficient_get_a_thousands_separator_above_999(self):
+        # docs/audit_science_budget_v030.md wording-and-scope batch, §2.2d:
+        # chemical Isp (320 s) never exceeds 1,000, but electric-propulsion
+        # Isp (1,500-4,000 s) does - this is the case the default reference
+        # scenario cannot exercise on its own.
+        self.assertEqual(format_isp_s(320.0), "320 s")
+        self.assertEqual(format_isp_s(2_500.0), "2,500 s")
+        self.assertEqual(format_ballistic_coefficient_kg_m2(38.0), "38 kg/m²")
+        self.assertEqual(format_ballistic_coefficient_kg_m2(1_234.0), "1,234 kg/m²")
 
     def test_distance_duration_and_utc_formats(self):
         self.assertEqual(format_distance_km(150_000_000.0), "150,000 km")

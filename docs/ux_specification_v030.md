@@ -436,8 +436,8 @@ Required formatted baseline strings in the Budget detail view:
 - `2,966.182 m/s`
 - `5,149.173 m/s`
 - `12,530.653 m/s`
-- `approximately 10.432 km/s`
-- `approximately 108.83 km²/s²`
+- `≈10.432 km/s`
+- `≈108.83 km²/s²`
 
 ### 9.3 Display precision
 
@@ -445,6 +445,15 @@ Required formatted baseline strings in the Budget detail view:
 - A shorter top-level summary is allowed only if the detailed value remains available.
 - Keep consistent precision for quantities compared in the same group.
 - C3 and v∞ may use their separately audited display precision because they are not additive terms in the connected total.
+
+### 9.4 Exemptions from the thousands-separator rule
+
+Thousands separators apply to physical quantities (masses, delta-v,
+distances, elapsed durations). They do not apply to epoch references,
+identifiers, and dimensionless indices, where domain convention takes
+precedence (e.g. MJD2000). The Technical epoch reference caption on Mission
+setup (`pages/mission_setup.py`) is a deliberate exemption under this rule,
+not an oversight.
 - Use `k` or `M` only on constrained chart axes; show the full formatted value on hover.
 
 ## 10. Visual system

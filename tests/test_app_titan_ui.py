@@ -319,7 +319,7 @@ class TestMissionSetupPage(unittest.TestCase):
 
         self.assertFalse(app.exception)
         metrics = {metric.label: metric.value for metric in app.metric}
-        self.assertEqual(metrics["Sum of budgeted delta-v values"], "12531 m/s")
+        self.assertEqual(metrics["Sum of budgeted delta-v values"], "12,531 m/s")
         for label in (
             "Simplified dry mass",
             "Simplified propellant mass",
@@ -403,10 +403,11 @@ class TestMissionSetupPage(unittest.TestCase):
 
         self.assertFalse(app.exception)
         metrics = {metric.label: metric.value for metric in app.metric}
-        # Different formatting (thousands separator), same underlying
-        # bundle.dv_total value in both places.
+        # Same underlying bundle.dv_total value in both places, now with the
+        # same thousands-separator formatting too (docs/audit_science_budget_v030.md
+        # wording-and-scope batch, §2.2b - was "12531 m/s" without a separator).
         self.assertEqual(metrics["Connected delta-v"], "12,531 m/s")
-        self.assertEqual(metrics["Sum of budgeted delta-v values"], "12531 m/s")
+        self.assertEqual(metrics["Sum of budgeted delta-v values"], "12,531 m/s")
 
     def test_planned_capabilities_section_is_absent_when_every_collection_is_empty(self):
         with (

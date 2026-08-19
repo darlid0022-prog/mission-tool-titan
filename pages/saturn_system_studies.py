@@ -10,6 +10,7 @@ import streamlit as st
 import app_services
 from mission import colors
 from mission.constants import F_RING_REFERENCE_RADIUS_M
+from mission.ui_format import format_ballistic_coefficient_kg_m2
 from mission.ui_text import UI_TEXT
 
 
@@ -297,7 +298,7 @@ with st.container(border=True):
         )
         st.metric(
             UI_TEXT["edl_ballistic_coefficient"],
-            f"{titan_edl.ballistic_coefficient_kg_m2:.0f} kg/m²",
+            format_ballistic_coefficient_kg_m2(titan_edl.ballistic_coefficient_kg_m2),
             border=True,
         )
         st.metric(

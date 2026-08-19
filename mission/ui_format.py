@@ -93,6 +93,25 @@ def format_mass_kg(value_kg: float, *, decimal_places: int = 0) -> str:
     return f"{value:,.{precision}f} {UI_UNITS['kilograms']}"
 
 
+def format_isp_s(value_s: float, *, decimal_places: int = 0) -> str:
+    """Format a specific impulse in seconds with a systematic thousands separator.
+
+    Chemical Isp stays well under 1,000 s, but electric-propulsion Isp
+    (1,500-4,000 s) does not - routing every Isp display through this one
+    function means that case is never missed.
+    """
+    value = _finite_number(value_s, name="value_s")
+    precision = _decimal_places(decimal_places)
+    return f"{value:,.{precision}f} s"
+
+
+def format_ballistic_coefficient_kg_m2(value_kg_m2: float, *, decimal_places: int = 0) -> str:
+    """Format a ballistic coefficient in kg/m² with a systematic thousands separator."""
+    value = _finite_number(value_kg_m2, name="value_kg_m2")
+    precision = _decimal_places(decimal_places)
+    return f"{value:,.{precision}f} kg/m²"
+
+
 def format_datetime_utc(value: datetime) -> str:
     """Format an aware datetime as a civil UTC timestamp."""
     if not isinstance(value, datetime):

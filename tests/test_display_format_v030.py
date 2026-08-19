@@ -187,6 +187,29 @@ class TestAuditedDisplayStringsAreCurrent(unittest.TestCase):
             f"Display string(s) no longer found verbatim in the rendered output: {missing}",
         )
 
+    def test_mission_setup_mass_block_matches_budget_precision_and_separator(self) -> None:
+        # docs/audit_science_budget_v030.md wording-and-scope batch, §2.2a.
+        # Before: "223.9 kg" / "11913.6 kg" / "12137.5 kg" (one extra decimal,
+        # no thousands separator - inverted relative to the Budget detail
+        # view). After: matches Budget's own format_mass_kg() output exactly.
+        for wrong in ("223.9 kg", "11913.6 kg", "12137.5 kg"):
+            self.assertNotIn(wrong, self.mission_setup_text)
+        for correct in ("224 kg", "11,914 kg", "12,138 kg"):
+            self.assertIn(correct, self.mission_setup_text)
+
+    def test_mission_setup_dv_sum_matches_connected_delta_v_formatting(self) -> None:
+        # docs/audit_science_budget_v030.md wording-and-scope batch, §2.2b.
+        # Before: "12531 m/s" (no separator, inconsistent with "Connected
+        # delta-v" on the same page). After: "12,531 m/s", same as its
+        # neighbor. Both metrics stay - only the format changed.
+        self.assertNotIn("12531 m/s", self.mission_setup_text)
+        self.assertIn("12,531 m/s", self.mission_setup_text)
+
+    def test_isp_and_ballistic_coefficient_use_the_shared_formatter(self) -> None:
+        # docs/audit_science_budget_v030.md wording-and-scope batch, §2.2d.
+        self.assertIn("320 s", self.mission_setup_text)
+        self.assertIn("38 kg/m²", self.saturn_studies_text)
+
     def test_the_earth_saturn_delta_v_sum_check_is_readable_in_the_interface(self) -> None:
         # This is a display-contract check (the three addend strings and the
         # total string are all on screen) - the actual sum is proved against

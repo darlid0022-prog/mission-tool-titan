@@ -31,6 +31,7 @@ from mission.payload_catalog import catalog_by_label, catalog_row
 from mission.pdf_report import MissionPdfReport, generate_mission_summary_pdf
 from mission.sizing import compute_mass_budget
 from mission.ui_components import render_calculation_status, render_mission_progress
+from mission.ui_format import format_delta_v_m_s, format_isp_s, format_mass_kg
 from mission.ui_keys import LAST_VALID_MISSION_BUNDLE_STATE_KEY
 from mission.ui_session_state import load_ui_state, store_ui_state
 from mission.ui_state import (
@@ -635,7 +636,7 @@ dv_table = pd.DataFrame(
     columns=[UI_TEXT["maneuver"], UI_TEXT["value_m_s"]],
 )
 st.dataframe(dv_table, width="stretch")
-st.metric(UI_TEXT["dv_sum"], f"{bundle.dv_total:.0f} m/s")
+st.metric(UI_TEXT["dv_sum"], format_delta_v_m_s(bundle.dv_total, decimal_places=0))
 
 st.subheader(UI_TEXT["mass_budget"])
 st.warning(UI_TEXT["mass_model_warning"], icon=":material/warning:")
@@ -656,13 +657,13 @@ with st.container(key="mass_ratio_metric"):
 if bundle.mass_ratio > 20:
     st.warning(
         f"The mass ratio above ({bundle.mass_ratio:,.0f}) indicates that one "
-        f"non-discarding chemical stage at {isp_s:.0f} s is unsuitable for the modeled "
+        f"non-discarding chemical stage at {format_isp_s(isp_s)} is unsuitable for the modeled "
         "delta-v; see the isolated calibrated feasibility study below (not included "
         "in the connected budget)."
     )
 with st.container(key="mass_budget_metrics_row"):
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric(UI_TEXT["instrument_mass"], f"{bundle.mass['instrument_mass_kg']:.1f} kg")
-    c2.metric(UI_TEXT["dry_mass"], f"{bundle.mass['dry_mass_kg']:.1f} kg")
-    c3.metric(UI_TEXT["propellant_mass"], f"{bundle.mass['propellant_mass_kg']:.1f} kg")
-    c4.metric(UI_TEXT["wet_mass"], f"{bundle.mass['wet_mass_kg']:.1f} kg")
+    c1.metric(UI_TEXT["instrument_mass"], format_mass_kg(bundle.mass["instrument_mass_kg"]))
+    c2.metric(UI_TEXT["dry_mass"], format_mass_kg(bundle.mass["dry_mass_kg"]))
+    c3.metric(UI_TEXT["propellant_mass"], format_mass_kg(bundle.mass["propellant_mass_kg"]))
+    c4.metric(UI_TEXT["wet_mass"], format_mass_kg(bundle.mass["wet_mass_kg"]))
