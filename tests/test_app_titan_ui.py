@@ -572,6 +572,24 @@ class TestMissionSetupPage(unittest.TestCase):
 
 
 class TestTrajectory3DPage(unittest.TestCase):
+    def test_trajectory_hub_makes_3d_and_launch_window_pareto_access_visible(self):
+        app = run_app(page_path="pages/trajectory.py")
+
+        self.assertFalse(app.exception)
+        self.assertTrue(
+            any(sub.value == "Direct trajectory in 3D" for sub in app.subheader)
+        )
+        self.assertTrue(
+            any(sub.value == "Explore launch windows" for sub in app.subheader)
+        )
+        links = app.get("page_link")
+        routes_by_label = {link.proto.label: link.proto.page for link in links}
+        self.assertIn("trajectory_3d", routes_by_label["Open 3D trajectory"])
+        self.assertIn(
+            "launch_windows",
+            routes_by_label["Explore launch windows and Pareto front"],
+        )
+
     def test_direct_mode_renders_animated_heliocentric_and_static_saturn_scenes(self):
         app = run_app(page_path="pages/trajectory_3d.py")
 

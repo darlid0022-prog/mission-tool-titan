@@ -55,6 +55,38 @@ def test_transitional_destinations_have_title_and_explanation() -> None:
         assert UI_V030_TEXT[introduction_key]
 
 
+def test_trajectory_hub_exposes_3d_and_real_launch_window_pareto_routes() -> None:
+    source = (ROOT / "pages/trajectory.py").read_text()
+    assert '"trajectory_direct_3d_section"' in source
+    assert '"trajectory_launch_windows_section"' in source
+    assert '"pages/trajectory_3d.py"' in source
+    assert '"pages/launch_windows.py"' in source
+    assert UI_V030_TEXT["trajectory_open_3d"] == "Open 3D trajectory"
+    assert (
+        UI_V030_TEXT["trajectory_launch_windows"]
+        == "Explore launch windows and Pareto front"
+    )
+
+
+def test_trajectory_routes_keep_existing_capabilities_connected() -> None:
+    trajectory_3d_source = (ROOT / "pages/trajectory_3d.py").read_text()
+    launch_windows_source = (ROOT / "pages/launch_windows.py").read_text()
+    for capability in (
+        '"Animated"',
+        '"Static"',
+        "build_direct_animation_figure",
+        "scene_figure_to_standalone_html",
+        "build_scene_table",
+    ):
+        assert capability in trajectory_3d_source
+    for capability in (
+        "build_candidates_chart",
+        "pareto_candidate_ranks=result.pareto_candidate_ranks",
+        '"Use selected candidate as active scenario"',
+    ):
+        assert capability in launch_windows_source
+
+
 def test_status_copy_is_not_color_only() -> None:
     for key in (
         "status_current",

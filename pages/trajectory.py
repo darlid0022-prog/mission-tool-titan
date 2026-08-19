@@ -22,16 +22,23 @@ render_mission_progress(UI_V030_TEXT["trajectory_title"])
 render_calculation_status(state)
 render_scenario_summary(state)
 st.info(UI_V030_TEXT["trajectory_transition_note"])
-with st.container(horizontal=True):
-    st.page_link(
-        "pages/launch_windows.py",
-        label=UI_V030_TEXT["trajectory_launch_windows"],
-        icon=":material/search:",
-    )
+
+with st.container(border=True):
+    st.subheader(UI_V030_TEXT["trajectory_direct_3d_section"])
+    st.write(UI_V030_TEXT["trajectory_direct_3d_description"])
     st.page_link(
         "pages/trajectory_3d.py",
         label=UI_V030_TEXT["trajectory_open_3d"],
         icon=":material/3d_rotation:",
+    )
+
+with st.container(border=True):
+    st.subheader(UI_V030_TEXT["trajectory_launch_windows_section"])
+    st.write(UI_V030_TEXT["trajectory_launch_windows_description"])
+    st.page_link(
+        "pages/launch_windows.py",
+        label=UI_V030_TEXT["trajectory_launch_windows"],
+        icon=":material/search:",
     )
 render_navigation_actions(
     previous=("pages/mission_setup.py", UI_V030_TEXT["return_to_mission"]),
