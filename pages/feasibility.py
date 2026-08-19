@@ -12,6 +12,10 @@ if bundle is None:
     st.stop()
 
 single_stage_feasibility = bundle.single_stage_feasibility
+saturn_subtotal_m_s = (
+    bundle.complete_dv_budget.saturn_capture_to_ellipse_m_s
+    + bundle.complete_dv_budget.saturn_staging_circularisation_m_s
+)
 
 st.header(UI_TEXT["single_stage_feasibility_header"])
 st.caption(UI_TEXT["single_stage_feasibility_caption"])
@@ -38,3 +42,16 @@ with st.container(border=True):
             model_version=single_stage_feasibility.model_version
         )
     )
+    if single_stage_feasibility.maximum_feasible_delta_v_m_s > 0.0:
+        vehicle_bound = single_stage_feasibility.threshold_exceedance_factor
+        launcher_bound = (
+            saturn_subtotal_m_s / single_stage_feasibility.maximum_feasible_delta_v_m_s
+        )
+        st.caption(
+            UI_TEXT["single_stage_allocation_bracket"].format(
+                vehicle_bound=vehicle_bound,
+                required_delta_v_m_s=single_stage_feasibility.required_delta_v_m_s,
+                launcher_bound=launcher_bound,
+                saturn_subtotal_m_s=saturn_subtotal_m_s,
+            )
+        )

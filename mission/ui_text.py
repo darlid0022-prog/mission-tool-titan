@@ -137,6 +137,15 @@ UI_TEXT: Final[dict[str, str]] = {
         "is outside the current scope."
     ),
     "single_stage_model_source": "Calibrated mass-model version: {model_version}.",
+    "single_stage_allocation_bracket": (
+        "Single-stage exceedance by allocation (not determined by the model): "
+        "· entire Earth injection charged to the spacecraft: {vehicle_bound:.3f}× "
+        "({required_delta_v_m_s:,.3f} m/s) "
+        "· entire Earth injection charged to the launcher: {launcher_bound:.3f}× "
+        "({saturn_subtotal_m_s:,.3f} m/s). "
+        "Both bounds are conditional. The current model does not determine the "
+        "allocation among a launcher, upper stage, and spacecraft."
+    ),
     "trajectory_3d_header": "Complete mission trajectory — interactive 3D view",
     "trajectory_3d_caption": (
         "Drag to rotate, scroll to zoom, and double-click to reset. The heliocentric and "

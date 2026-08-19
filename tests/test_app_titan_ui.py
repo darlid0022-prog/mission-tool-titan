@@ -981,6 +981,15 @@ class TestFeasibilityPage(unittest.TestCase):
                 for info in app.info
             )
         )
+        # docs/audit_science_budget_v030.md wording-and-scope batch §2.2: the
+        # allocation bracket is a bare division of two already-displayed
+        # values (5,149.173 / 3,833.463), confined to this isolated study.
+        captions = " ".join(c.value for c in app.caption)
+        self.assertIn("3.269×", captions)
+        self.assertIn("12,530.653 m/s", captions)
+        self.assertIn("1.343×", captions)
+        self.assertIn("5,149.173 m/s", captions)
+        self.assertIn("not determine the allocation", captions)
 
 
 class TestOptimizationPage(unittest.TestCase):
