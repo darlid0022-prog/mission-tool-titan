@@ -51,7 +51,7 @@ from mission.titan_edl import TitanEdlResult, compute_titan_edl
 from mission.ui_text import UI_TEXT
 from trajectory import compute_trajectory
 
-PHYSICS_MODEL_VERSION = "deterministic-earth-saturn-v4"
+PHYSICS_MODEL_VERSION = "deterministic-earth-saturn-v5-retained-lambert-state"
 PARETO_MODEL_VERSION = "connected-pareto-v2-real-payload"
 LEGACY_SATURN_CAPTURE_ALTITUDE_KM = 2_000.0
 DEFAULT_LAUNCH_WINDOW_START = date(2026, 6, 1)

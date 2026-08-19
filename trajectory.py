@@ -66,6 +66,10 @@ def _legacy_dict_to_trajectory_result(solution: dict) -> TrajectoryResult:
         delta_v=None,
         method="lambert",
         notes="Legacy compatibility conversion.",
+        departure_position_m=solution.get("departure_position_m"),
+        arrival_position_m=solution.get("arrival_position_m"),
+        transfer_departure_velocity_m_s=solution.get("transfer_departure_velocity_m_s"),
+        central_mu_m3_s2=solution.get("central_mu_m3_s2"),
     )
 
 
@@ -312,7 +316,7 @@ def compute_trajectory(
         }
 
     # Compute all Lambert solutions over grid
-    solutions = _compute_lambert_grid(
+    solutions = PyKEPTrajectoryEngine().compute_trajectory(
         "Earth",
         destination,
         launch_start,
@@ -386,7 +390,13 @@ def compute_trajectory(
         v_inf_arrival=best_arrival_v_inf,
         delta_v=dv_from_leo,
         method="lambert",
-        notes=f"Earth-to-{destination_body.name} Lambert leg; delta_v contains Earth departure only.",
+        notes=(
+            f"Earth-to-{destination_body.name} Lambert leg; delta_v contains Earth departure only."
+        ),
+        departure_position_m=_result_value(best, "departure_position_m"),
+        arrival_position_m=_result_value(best, "arrival_position_m"),
+        transfer_departure_velocity_m_s=_result_value(best, "transfer_departure_velocity_m_s"),
+        central_mu_m3_s2=_result_value(best, "central_mu_m3_s2"),
     )
     earth_departure_event = Event(
         name="Earth departure",

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -10,6 +10,7 @@ import pykep as pk
 from plotly.subplots import make_subplots
 
 from . import colors
+from .direct_trajectory_animation import DirectTrajectoryTimeline3D
 from .gravity_assist import GravityAssistResult, MissionSegment, OrbitInsertionResult
 from .trajectory_scene import TrajectorySegment
 from .trajectory_visualization import (
@@ -58,7 +59,7 @@ CASSINI_LEG_DASHES = ("solid", "dot", "dash", "longdash", "dashdot")
 
 def _format_mjd2000(epoch_mjd2000: float) -> str:
     """Format a supplied MJD2000 epoch without recomputing an ephemeris."""
-    epoch = datetime(2000, 1, 1, tzinfo=timezone.utc) + timedelta(days=epoch_mjd2000)
+    epoch = datetime(2000, 1, 1, tzinfo=UTC) + timedelta(days=epoch_mjd2000)
     return epoch.strftime("%Y-%m-%d %H:%M UTC")
 
 
@@ -508,6 +509,203 @@ def build_scene_figure(
             "camera": CAMERA_PRESETS[view_preset],
         },
         uirevision=f"generic-scene-{view_preset}-{real_scale}",
+    )
+    return figure
+
+
+def _direct_animation_title(timeline: DirectTrajectoryTimeline3D, index: int) -> str:
+    frame = timeline.frames[index]
+    return f"Direct Earth → Saturn · {frame.date_utc} · elapsed {frame.elapsed_days:,.1f} days"
+
+
+def build_direct_animation_figure(
+    segments: tuple[TrajectorySegment, ...],
+    timeline: DirectTrajectoryTimeline3D,
+) -> go.Figure:
+    """Add lightweight Plotly frames to one existing heliocentric/AU scene."""
+    if not isinstance(timeline, DirectTrajectoryTimeline3D):
+        raise TypeError("timeline must be a DirectTrajectoryTimeline3D.")
+    if any(
+        segment.metadata.get("reference_frame") != timeline.reference_frame
+        or segment.metadata.get("distance_unit") != timeline.distance_unit
+        for segment in segments
+    ):
+        raise ValueError("Animated segments must match the timeline frame and unit.")
+
+    figure = build_scene_figure(segments, unit_label="AU")
+    first = timeline.frames[0]
+    last = timeline.frames[-1]
+    figure.add_traces(
+        (
+            go.Scatter3d(
+                x=[first.spacecraft_position_au[0]],
+                y=[first.spacecraft_position_au[1]],
+                z=[first.spacecraft_position_au[2]],
+                mode="markers+text",
+                name="Earth departure",
+                text=["Departure"],
+                textposition="top center",
+                marker={"color": colors.LAUNCH.dark, "size": 7},
+                hovertemplate=f"Earth departure<br>{first.date_utc}<extra></extra>",
+            ),
+            go.Scatter3d(
+                x=[last.spacecraft_position_au[0]],
+                y=[last.spacecraft_position_au[1]],
+                z=[last.spacecraft_position_au[2]],
+                mode="markers+text",
+                name="Saturn arrival",
+                text=["Arrival"],
+                textposition="top center",
+                marker={"color": colors.ARRIVAL.dark, "size": 7},
+                hovertemplate=f"Saturn arrival<br>{last.date_utc}<extra></extra>",
+            ),
+            go.Scatter3d(
+                x=[first.earth_position_au[0]],
+                y=[first.earth_position_au[1]],
+                z=[first.earth_position_au[2]],
+                mode="markers",
+                name="Earth — current ephemeris position",
+                marker={"color": colors.LANDMARK_BODY, "size": 6},
+                hovertemplate="Earth<br>%{text}<extra></extra>",
+                text=[first.date_utc],
+            ),
+            go.Scatter3d(
+                x=[first.saturn_position_au[0]],
+                y=[first.saturn_position_au[1]],
+                z=[first.saturn_position_au[2]],
+                mode="markers",
+                name="Saturn — current ephemeris position",
+                marker={"color": colors.REFERENCE_ORBIT_WARM, "size": 7},
+                hovertemplate="Saturn<br>%{text}<extra></extra>",
+                text=[first.date_utc],
+            ),
+            go.Scatter3d(
+                x=[first.spacecraft_position_au[0]],
+                y=[first.spacecraft_position_au[1]],
+                z=[first.spacecraft_position_au[2]],
+                mode="markers",
+                name="Spacecraft — sampled position",
+                marker={
+                    "color": colors.INTERPLANETARY_TRANSFER.dark,
+                    "size": 8,
+                    "line": {"color": colors.MARKER_RIM, "width": 1},
+                },
+                customdata=[[first.date_utc, first.elapsed_days]],
+                hovertemplate=(
+                    "Spacecraft<br>Date: %{customdata[0]}<br>"
+                    "Elapsed: %{customdata[1]:,.1f} days<extra></extra>"
+                ),
+            ),
+        )
+    )
+    dynamic_indices = tuple(range(len(figure.data) - 3, len(figure.data)))
+    frames = []
+    for index, instant in enumerate(timeline.frames):
+        frames.append(
+            go.Frame(
+                name=str(index),
+                traces=dynamic_indices,
+                data=(
+                    go.Scatter3d(
+                        x=[instant.earth_position_au[0]],
+                        y=[instant.earth_position_au[1]],
+                        z=[instant.earth_position_au[2]],
+                        text=[instant.date_utc],
+                    ),
+                    go.Scatter3d(
+                        x=[instant.saturn_position_au[0]],
+                        y=[instant.saturn_position_au[1]],
+                        z=[instant.saturn_position_au[2]],
+                        text=[instant.date_utc],
+                    ),
+                    go.Scatter3d(
+                        x=[instant.spacecraft_position_au[0]],
+                        y=[instant.spacecraft_position_au[1]],
+                        z=[instant.spacecraft_position_au[2]],
+                        customdata=[[instant.date_utc, instant.elapsed_days]],
+                    ),
+                ),
+                layout=go.Layout(title={"text": _direct_animation_title(timeline, index)}),
+            )
+        )
+    figure.frames = tuple(frames)
+
+    frame_duration_ms = max(70, round(4_800 / len(timeline.frames)))
+    figure.update_layout(
+        height=680,
+        title={"text": _direct_animation_title(timeline, 0), "x": 0.5},
+        margin={"l": 0, "r": 0, "t": 70, "b": 85},
+        updatemenus=[
+            {
+                "type": "buttons",
+                "direction": "left",
+                "x": 0.0,
+                "y": -0.14,
+                "buttons": [
+                    {
+                        "label": "Play",
+                        "method": "animate",
+                        "args": [
+                            None,
+                            {
+                                "fromcurrent": True,
+                                "frame": {"duration": frame_duration_ms, "redraw": True},
+                                "transition": {"duration": 0},
+                            },
+                        ],
+                    },
+                    {
+                        "label": "Pause",
+                        "method": "animate",
+                        "args": [
+                            [None],
+                            {
+                                "mode": "immediate",
+                                "frame": {"duration": 0, "redraw": False},
+                                "transition": {"duration": 0},
+                            },
+                        ],
+                    },
+                    {
+                        "label": "Reset",
+                        "method": "animate",
+                        "args": [
+                            ["0"],
+                            {
+                                "mode": "immediate",
+                                "frame": {"duration": 0, "redraw": True},
+                                "transition": {"duration": 0},
+                            },
+                        ],
+                    },
+                ],
+            }
+        ],
+        sliders=[
+            {
+                "active": 0,
+                "x": 0.0,
+                "y": -0.04,
+                "len": 1.0,
+                "currentvalue": {"prefix": "UTC: "},
+                "steps": [
+                    {
+                        "label": instant.date_utc[:10],
+                        "method": "animate",
+                        "args": [
+                            [str(index)],
+                            {
+                                "mode": "immediate",
+                                "frame": {"duration": 0, "redraw": True},
+                                "transition": {"duration": 0},
+                            },
+                        ],
+                    }
+                    for index, instant in enumerate(timeline.frames)
+                ],
+            }
+        ],
+        uirevision=f"direct-animation-{timeline.scenario_id}",
     )
     return figure
 
