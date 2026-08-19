@@ -287,3 +287,212 @@ UI_TEXT: Final[dict[str, str]] = {
     "assumptions": "**Assumptions**",
     "exclusions": "**Exclusions**",
 }
+
+
+# v0.3.0 copy is kept in a separate, namespaced catalogue while the existing
+# pages continue to consume UI_TEXT unchanged. Later UI batches can migrate one
+# screen at a time without duplicating visible strings in rendering code.
+UI_V030_TEXT: Final[dict[str, str]] = {
+    "product_description": (
+        "Preliminary Earth–Saturn mission design using a deterministic first-order model."
+    ),
+    "status_current": "Results up to date",
+    "status_stale": "Inputs changed — recalculation required",
+    "status_running": "Calculation in progress",
+    "status_empty": "No results available",
+    "badge_isolated": "Not connected to the active mission",
+    "badge_technical": "Technical detail",
+    "badge_connected": "Connected mission",
+    "badge_excluded": "Not included in connected total",
+    "mission_title": "Mission",
+    "mission_introduction": (
+        "Define the modeled objective, mission architecture, and primary inputs."
+    ),
+    "mission_final_state_heading": "Modeled final state",
+    "mission_final_state_value": ("Saturn-centered circular orbit at Titan's mean orbital radius"),
+    "mission_titan_warning": (
+        "This Saturn-centered circularization is not a Titan encounter, flyby, capture, "
+        "or Titan-centered orbit."
+    ),
+    "mission_architecture_heading": "Modeled mission architecture",
+    "mission_allocation_note": (
+        "Allocation of Earth injection and the other maneuvers to a launcher, upper "
+        "stage, or spacecraft depends on the selected architecture. This allocation is "
+        "not currently modeled."
+    ),
+    "mission_calculate": "Calculate mission",
+    "mission_recalculate": "Recalculate mission",
+    "mission_continue": "Continue to Trajectory",
+    "trajectory_title": "Trajectory",
+    "trajectory_introduction": (
+        "Review the dates, duration, transfer geometry, and arrival in the Saturn system."
+    ),
+    "trajectory_dates_heading": "Dates and duration",
+    "trajectory_window_heading": "Launch window",
+    "trajectory_3d_heading": "3D heliocentric trajectory",
+    "trajectory_arrival_heading": "Arrival at Saturn",
+    "trajectory_exploration_heading": "Explore launch windows",
+    "trajectory_method_note": (
+        "Playback interpolates the sampled trajectory points. It is not an independent "
+        "dynamical propagation."
+    ),
+    "trajectory_departure_marker": "Earth departure",
+    "trajectory_arrival_marker": "Arrival in the Saturn system",
+    "trajectory_spacecraft_marker": "Sampled spacecraft position",
+    "trajectory_play": "Play",
+    "trajectory_pause": "Pause",
+    "trajectory_reset": "Reset",
+    "trajectory_show_legend": "Show legend",
+    "trajectory_show_segments": "Show segment data",
+    "trajectory_apply": "Apply this scenario",
+    "trajectory_continue": "Continue to Budget",
+    "budget_title": "Budget",
+    "budget_introduction": (
+        "Separate departure energy, modeled Earth injection delta-v, and the Saturn "
+        "maneuvers in the connected mission chain."
+    ),
+    "budget_departure_heading": "Earth departure conditions",
+    "budget_c3_label": "Earth C3",
+    "budget_v_infinity_label": "Earth v∞",
+    "budget_injection_heading": "Modeled Earth injection",
+    "budget_allocation_explanation": (
+        "Allocation of this maneuver to a launcher, upper stage, or spacecraft depends "
+        "on the selected architecture. No real launch vehicle is currently modeled."
+    ),
+    "budget_saturn_heading": "Modeled Saturn maneuvers",
+    "budget_capture_label": "Saturn capture",
+    "budget_circularization_label": "Saturn-centered circularization",
+    "budget_saturn_subtotal": "Subtotal of modeled Saturn maneuvers",
+    "budget_total_heading": "Connected total",
+    "budget_total_explanation": (
+        "The connected total includes modeled Earth injection, Saturn capture, and "
+        "Saturn-centered circularization."
+    ),
+    "budget_energy_note": (
+        "C3 and v∞ characterize the departure energy conditions. They are not additional "
+        "delta-v contributions to the connected total."
+    ),
+    "budget_mass_heading": "Simplified mass estimate",
+    "budget_mass_note": (
+        "This estimate uses the application's simplified mass model. It is not a complete "
+        "vehicle design."
+    ),
+    "budget_continue": "Continue to Verdict",
+    "verdict_title": "Verdict",
+    "verdict_introduction": (
+        "This conclusion applies only to the calculated scenario and the scope of the "
+        "current model."
+    ),
+    "verdict_conclusion_heading": "Model conclusion",
+    "verdict_conclusion": (
+        "The calculated scenario describes a connected Earth–Saturn mission chain within "
+        "the scope and assumptions of the current model."
+    ),
+    "verdict_final_state_heading": "Calculated final state",
+    "verdict_final_state": (
+        "The model reaches a Saturn-centered circular orbit at Titan's mean orbital radius."
+    ),
+    "verdict_titan_exclusion": "This result does not demonstrate a Titan encounter.",
+    "verdict_allocation_limitation": (
+        "The current model does not determine how Earth injection or the other maneuvers "
+        "are allocated among a launcher, upper stage, and spacecraft."
+    ),
+    "verdict_demonstrated_heading": "What the model calculates",
+    "verdict_excluded_heading": "What the model does not demonstrate",
+    "verdict_limits_heading": "Model assumptions and limitations",
+    "verdict_details": "Open technical details",
+    "error_input_summary": "Correct the highlighted inputs before calculating.",
+    "error_no_solution": (
+        "The inputs are valid, but the model did not produce a solution for this scenario."
+    ),
+    "error_technical": (
+        "The calculation could not be completed because of a technical error. Previous "
+        "results were not replaced."
+    ),
+    "error_stale_results": (
+        "Inputs have changed. The displayed results are from the previous calculation."
+    ),
+}
+
+
+UI_V030_TOOLTIPS: Final[dict[str, str]] = {
+    "earth_c3": (
+        "Characteristic energy of Earth departure. For a hyperbolic departure, C3 is the "
+        "square of the hyperbolic excess speed. It is not a delta-v."
+    ),
+    "earth_v_infinity": (
+        "Hyperbolic excess speed relative to Earth. It characterizes the departure state "
+        "but is not itself a propulsive maneuver."
+    ),
+    "modeled_earth_injection": (
+        "Earth injection delta-v calculated by the model. Its allocation to a launcher, "
+        "upper stage, or spacecraft depends on the selected architecture."
+    ),
+    "saturn_arrival_v_infinity": (
+        "Hyperbolic excess speed relative to Saturn before the capture maneuver."
+    ),
+    "saturn_capture": (
+        "Modeled propulsive maneuver from hyperbolic Saturn arrival into the "
+        "Saturn-centered capture orbit."
+    ),
+    "saturn_circularization": (
+        "Modeled propulsive maneuver into a circular Saturn-centered orbit at Titan's mean "
+        "orbital radius. It is not a Titan encounter."
+    ),
+    "saturn_subtotal": (
+        "Sum of Saturn capture and Saturn-centered circularization. It excludes modeled "
+        "Earth injection."
+    ),
+    "connected_total": (
+        "Sum of modeled Earth injection, Saturn capture, and Saturn-centered circularization."
+    ),
+    "saturn_periapsis_radius": (
+        "Minimum distance from Saturn's center on the relevant trajectory. It is a radius, "
+        "not an altitude."
+    ),
+    "periapsis_altitude": (
+        "Distance above the reference surface. It differs from a radius measured from the "
+        "body's center."
+    ),
+    "final_saturn_orbital_radius": (
+        "Distance from Saturn's center to the modeled final circular orbit."
+    ),
+    "titan_mean_orbital_radius": (
+        "Radial reference used for the final Saturn-centered orbit. It does not imply an "
+        "encounter with Titan."
+    ),
+    "simplified_wet_mass": (
+        "Wet mass estimated by the simplified model, including propellant. It is not a "
+        "complete vehicle design."
+    ),
+    "pareto_front": (
+        "Set of scenarios that are non-dominated for the displayed objectives. No point is "
+        "universally optimal without an additional preference."
+    ),
+    "heliocentric_speed_gain": (
+        "Change in heliocentric speed during an isolated flyby. It is not directly a "
+        "propulsive delta-v saving."
+    ),
+    "mjd2000_epoch": (
+        "Technical epoch representation used by the calculations. Civil UTC dates remain "
+        "the primary display."
+    ),
+}
+
+
+UI_SYMBOLS: Final[dict[str, str]] = {
+    "c3": "C3",
+    "v_infinity": "v∞",
+    "delta_v": "Δv",
+    "utc": "UTC",
+    "mjd2000": "MJD2000",
+}
+
+
+UI_UNITS: Final[dict[str, str]] = {
+    "metres_per_second": "m/s",
+    "kilometres_per_second": "km/s",
+    "square_kilometres_per_square_second": "km²/s²",
+    "kilometres": "km",
+    "days": "days",
+}
