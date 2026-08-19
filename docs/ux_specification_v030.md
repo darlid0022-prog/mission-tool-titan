@@ -390,6 +390,28 @@ A feasibility conclusion (including “mission impossible,” “scientifically 
 
 An unscoped feasibility conclusion remains prohibited.
 
+### External review claims require the same verification as internal models
+
+A review or critique of this application — external or internal, human or
+automated — is not applied to the code or its documentation until it has
+been checked against the code itself or by measurement. No claim is exempt
+from this because of who or what produced it.
+
+Two claims from an external verification review of this batch turned out
+to be false and were only caught because they were checked rather than
+applied directly:
+
+- "a zero data rate zeroes out downstream Data Handling sizing" — false;
+  Data Handling mass is driven by payload mass, not data rate
+  (`mission/mass_model.py`).
+- "commits 1 through 6 of the previous batch fail individually" — false;
+  verified empirically by running the test suite against each commit in
+  isolation.
+
+This is a method, not a one-time exception: every future review claim
+about this codebase — including claims in this same document — gets the
+same treatment before it changes anything.
+
 ## 8. Scientific terminology and tooltips
 
 | Scientific concept | Visible English label | English tooltip |
