@@ -1013,6 +1013,18 @@ class TestOptimizationPage(unittest.TestCase):
         )
         self.assertEqual(len(table), 35)
 
+    def test_baseline_coinciding_with_sampled_minimum_avoids_a_zero_comparison(self):
+        # docs/audit_science_budget_v030.md wording-and-scope batch §2.5: the
+        # reference baseline is the sampled minimum-delta-v point, so the old
+        # "requires 0.000 m/s more (+0.00%)" comparison read as a bug.
+        app = run_app(page_path="pages/optimization.py")
+
+        self.assertFalse(app.exception)
+        captions = " ".join(c.value for c in app.caption)
+        self.assertIn("coincides with the sampled minimum-delta-v point", captions)
+        self.assertIn("1,176 points evaluated, 38 non-dominated", captions)
+        self.assertNotIn("0.000 m/s more", captions)
+
     def test_pareto_chart_renders_38_front_points_and_highlights_references(self):
         pareto_result = compute_connected_pareto_front()
         captured = {}

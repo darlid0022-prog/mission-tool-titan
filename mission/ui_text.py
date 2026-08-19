@@ -113,6 +113,10 @@ UI_TEXT: Final[dict[str, str]] = {
         "calibrated model's conclusion on this mission's delta-v budget."
     ),
     "pareto_spinner": "Loading the deterministic Pareto front…",
+    "pareto_baseline_is_sampled_minimum": (
+        "The connected reference baseline coincides with the sampled minimum-delta-v "
+        "point (1,176 points evaluated, 38 non-dominated)."
+    ),
     "pareto_comparison": (
         "The reproducible 2,856-day Earth → Saturn baseline is kept as the connected "
         "mission reference. Relative to the sampled minimum-delta-v point, it requires "

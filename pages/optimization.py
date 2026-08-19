@@ -5,6 +5,8 @@ inputs (locked launch window, fixed default payload) - see
 mission/pareto.py - so this page needs no session_state from other pages.
 """
 
+import math
+
 import streamlit as st
 
 from app_services import PARETO_MODEL_VERSION, compute_cached_pareto_front
@@ -38,16 +40,21 @@ with st.container(border=True):
         st.dataframe(build_pareto_table(pareto_figure), width="stretch")
     baseline = pareto_highlights.baseline
     optimum = pareto_highlights.delta_v_optimum
-    delta_v_percent = 100.0 * (baseline.total_delta_v_m_s / optimum.total_delta_v_m_s - 1.0)
-    duration_percent = 100.0 * (baseline.total_duration_days / optimum.total_duration_days - 1.0)
-    mass_percent = 100.0 * (baseline.wet_mass_kg / optimum.wet_mass_kg - 1.0)
-    st.caption(
-        UI_TEXT["pareto_comparison"].format(
-            delta_v_difference=baseline.total_delta_v_m_s - optimum.total_delta_v_m_s,
-            delta_v_percent=delta_v_percent,
-            duration_difference=baseline.total_duration_days - optimum.total_duration_days,
-            duration_percent=duration_percent,
-            mass_difference=baseline.wet_mass_kg - optimum.wet_mass_kg,
-            mass_percent=mass_percent,
+    if math.isclose(baseline.total_delta_v_m_s, optimum.total_delta_v_m_s, abs_tol=1e-6):
+        st.caption(UI_TEXT["pareto_baseline_is_sampled_minimum"])
+    else:
+        delta_v_percent = 100.0 * (baseline.total_delta_v_m_s / optimum.total_delta_v_m_s - 1.0)
+        duration_percent = 100.0 * (
+            baseline.total_duration_days / optimum.total_duration_days - 1.0
         )
-    )
+        mass_percent = 100.0 * (baseline.wet_mass_kg / optimum.wet_mass_kg - 1.0)
+        st.caption(
+            UI_TEXT["pareto_comparison"].format(
+                delta_v_difference=baseline.total_delta_v_m_s - optimum.total_delta_v_m_s,
+                delta_v_percent=delta_v_percent,
+                duration_difference=baseline.total_duration_days - optimum.total_duration_days,
+                duration_percent=duration_percent,
+                mass_difference=baseline.wet_mass_kg - optimum.wet_mass_kg,
+                mass_percent=mass_percent,
+            )
+        )
