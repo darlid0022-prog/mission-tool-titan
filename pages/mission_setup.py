@@ -30,11 +30,13 @@ from mission.constants import (
 from mission.payload_catalog import catalog_by_label, catalog_row
 from mission.pdf_report import MissionPdfReport, generate_mission_summary_pdf
 from mission.sizing import compute_mass_budget
-from mission.ui_components import render_mission_progress
+from mission.ui_components import render_calculation_status, render_mission_progress
 from mission.ui_session_state import load_ui_state, store_ui_state
 from mission.ui_state import (
+    CalculationErrorKind,
     activate_cassini_historical_reference,
     begin_calculation,
+    calculation_failed,
     calculation_succeeded,
     return_to_baseline,
     update_draft_inputs,
@@ -47,6 +49,7 @@ from mission.ui_text import UI_TEXT, UI_V030_TEXT
 # that budget at all (see its as_dict()), for either trajectory type offered
 # on this page, so they are never silently implied to contribute below.
 _CONNECTED_BUDGET_PHASES = (colors.LAUNCH, colors.INTERPLANETARY_TRANSFER, colors.ARRIVAL)
+LAST_VALID_MISSION_BUNDLE_STATE_KEY = "mission_last_valid_bundle_v030"
 
 
 def _format_mjd2000_as_utc_date(epoch_mjd2000: float) -> str:
@@ -60,11 +63,12 @@ def _format_mjd2000_as_utc_date(epoch_mjd2000: float) -> str:
 st.title(UI_V030_TEXT["mission_title"])
 st.caption(UI_V030_TEXT["mission_introduction"])
 render_mission_progress(UI_V030_TEXT["mission_title"])
+calculation_status_slot = st.empty()
 scorecard_slot = st.empty()
 stored_inputs = app_services.load_mission_setup_inputs()
 default_destination = stored_inputs.destination if stored_inputs else "Saturn"
 
-with st.form("orbital_inputs"):
+with st.container():
     st.header(UI_TEXT["architecture_header"])
     destination = st.selectbox(
         UI_TEXT["destination_label"],
@@ -175,7 +179,7 @@ with st.form("orbital_inputs"):
             else app_services.DEFAULT_LAUNCH_WINDOW_END
         ),
     )
-    submitted = st.form_submit_button(UI_TEXT["calculate"], icon=":material/calculate:")
+    submitted = st.button(UI_TEXT["calculate"], icon=":material/calculate:")
 
 st.info(UI_TEXT["titan_scope"])
 
@@ -255,12 +259,36 @@ instruments_df = st.data_editor(
 )
 
 if launch_window_end < launch_window_start:
+    ui_state = calculation_failed(
+        load_ui_state(st.session_state),
+        kind=CalculationErrorKind.INPUT_ERROR,
+        message=UI_TEXT["invalid_dates"],
+    )
+    store_ui_state(st.session_state, ui_state)
+    with calculation_status_slot.container():
+        render_calculation_status(ui_state)
     st.error(UI_TEXT["invalid_dates"])
     st.stop()
 if connected_saturn_periapsis_radius_km * 1_000.0 <= F_RING_REFERENCE_RADIUS_M:
+    ui_state = calculation_failed(
+        load_ui_state(st.session_state),
+        kind=CalculationErrorKind.INPUT_ERROR,
+        message="Connected Saturn periapsis must lie strictly outside the reference F ring.",
+    )
+    store_ui_state(st.session_state, ui_state)
+    with calculation_status_slot.container():
+        render_calculation_status(ui_state)
     st.error("Connected Saturn periapsis must lie strictly outside the reference F ring.")
     st.stop()
 if connected_capture_apoapsis_radius_km <= connected_saturn_periapsis_radius_km:
+    ui_state = calculation_failed(
+        load_ui_state(st.session_state),
+        kind=CalculationErrorKind.INPUT_ERROR,
+        message="Connected capture-ellipse apoapsis must exceed its periapsis.",
+    )
+    store_ui_state(st.session_state, ui_state)
+    with calculation_status_slot.container():
+        render_calculation_status(ui_state)
     st.error("Connected capture-ellipse apoapsis must exceed its periapsis.")
     st.stop()
 
@@ -280,12 +308,20 @@ mission_inputs = app_services.MissionSetupInputs(
     connected_saturn_periapsis_radius_km=connected_saturn_periapsis_radius_km,
     connected_capture_apoapsis_radius_km=connected_capture_apoapsis_radius_km,
 )
-app_services.store_mission_setup_inputs(mission_inputs)
 ui_state = update_draft_inputs(
     load_ui_state(st.session_state), snapshot_from_inputs(mission_inputs)
 )
 store_ui_state(st.session_state, ui_state)
+with calculation_status_slot.container():
+    render_calculation_status(ui_state)
+
+# The legacy input key remains the source for scientific pages and therefore
+# represents only inputs that have actually been calculated. Draft edits live
+# exclusively in the primitive v0.3 snapshot until the explicit button is used.
+if stored_inputs is None:
+    app_services.store_mission_setup_inputs(mission_inputs)
 if submitted:
+    app_services.store_mission_setup_inputs(mission_inputs)
     submitted_query = app_services.encode_mission_setup_query(mission_inputs)
     st.query_params[app_services.MISSION_QUERY_PARAM] = submitted_query[
         app_services.MISSION_QUERY_PARAM
@@ -296,8 +332,6 @@ if submitted:
     )
 
 active_launch_candidate = st.session_state.get(lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY)
-if submitted and not isinstance(active_launch_candidate, lw.LaunchWindowCandidate):
-    store_ui_state(st.session_state, begin_calculation(load_ui_state(st.session_state)))
 if isinstance(active_launch_candidate, lw.LaunchWindowCandidate):
     candidate_id = active_launch_candidate.scenario_id or (
         f"candidate #{active_launch_candidate.rank}"
@@ -362,19 +396,57 @@ if isinstance(active_launch_candidate, lw.LaunchWindowCandidate):
             st.rerun()
     st.stop()
 
-bundle = app_services.require_mission_bundle()
-if bundle is None:
-    st.stop()
-if submitted:
-    ui_state = calculation_succeeded(
-        load_ui_state(st.session_state), calculated_at=datetime.now(UTC)
-    )
-    ui_state = (
-        activate_cassini_historical_reference(ui_state)
-        if trajectory_type == app_services.TRAJECTORY_TYPE_CASSINI_HISTORICAL
-        else return_to_baseline(ui_state)
-    )
-    store_ui_state(st.session_state, ui_state)
+should_calculate = submitted or LAST_VALID_MISSION_BUNDLE_STATE_KEY not in st.session_state
+if should_calculate:
+    store_ui_state(st.session_state, begin_calculation(load_ui_state(st.session_state)))
+    previous_bundle = st.session_state.get(LAST_VALID_MISSION_BUNDLE_STATE_KEY)
+    calculation_completed = False
+    try:
+        bundle = app_services.require_mission_bundle()
+        calculation_completed = bundle is not None
+    except Exception as exc:  # noqa: BLE001 - preserve the last valid UI result
+        if stored_inputs is not None:
+            app_services.store_mission_setup_inputs(stored_inputs)
+        ui_state = calculation_failed(
+            load_ui_state(st.session_state),
+            kind=CalculationErrorKind.TECHNICAL_ERROR,
+            message=str(exc),
+        )
+        store_ui_state(st.session_state, ui_state)
+        with calculation_status_slot.container():
+            render_calculation_status(ui_state)
+        if previous_bundle is None:
+            st.stop()
+        bundle = previous_bundle
+    if bundle is None:
+        if stored_inputs is not None:
+            app_services.store_mission_setup_inputs(stored_inputs)
+        ui_state = calculation_failed(
+            load_ui_state(st.session_state),
+            kind=CalculationErrorKind.NO_SOLUTION,
+            message=UI_V030_TEXT["error_no_solution"],
+        )
+        store_ui_state(st.session_state, ui_state)
+        with calculation_status_slot.container():
+            render_calculation_status(ui_state)
+        if previous_bundle is None:
+            st.stop()
+        bundle = previous_bundle
+    elif calculation_completed:
+        st.session_state[LAST_VALID_MISSION_BUNDLE_STATE_KEY] = bundle
+        ui_state = calculation_succeeded(
+            load_ui_state(st.session_state), calculated_at=datetime.now(UTC)
+        )
+        ui_state = (
+            activate_cassini_historical_reference(ui_state)
+            if trajectory_type == app_services.TRAJECTORY_TYPE_CASSINI_HISTORICAL
+            else return_to_baseline(ui_state)
+        )
+        store_ui_state(st.session_state, ui_state)
+        with calculation_status_slot.container():
+            render_calculation_status(ui_state)
+else:
+    bundle = st.session_state[LAST_VALID_MISSION_BUNDLE_STATE_KEY]
 
 displayed_dv_rows = list(bundle.complete_dv_budget.as_dict().items())
 if trajectory_type == app_services.TRAJECTORY_TYPE_CASSINI_HISTORICAL:

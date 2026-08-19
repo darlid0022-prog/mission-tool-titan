@@ -21,6 +21,8 @@ from mission.launch_search_ephemeris import solve_earth_saturn_lambert
 from mission.models import Leg, TrajectoryResult
 from mission.pareto import compute_connected_pareto_front
 from mission.pareto_plot import build_pareto_front_figure
+from mission.ui_session_state import UI_MISSION_STATE_KEY, deserialize_ui_state
+from mission.ui_state import CalculationStatus
 
 APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
 
@@ -102,6 +104,150 @@ def _plotly_marker_sizes(chart_element) -> dict[str, object]:
 
 
 class TestMissionSetupPage(unittest.TestCase):
+    def test_scientific_edit_marks_results_stale_without_recalculation(self):
+        app = AppTest.from_file(APP_PATH)
+        with patch(
+            "app_services.compute_cached_trajectory", return_value=earth_saturn_result()
+        ) as trajectory_mock:
+            app.run(timeout=30)
+            self.assertEqual(trajectory_mock.call_count, 1)
+            self.assertEqual(
+                deserialize_ui_state(app.session_state[UI_MISSION_STATE_KEY]).calculation_status,
+                CalculationStatus.CURRENT,
+            )
+
+            isp = next(
+                widget
+                for widget in app.number_input
+                if widget.label == "Main engine specific impulse (s)"
+            )
+            isp.set_value(321).run(timeout=30)
+
+            self.assertEqual(trajectory_mock.call_count, 1)
+            self.assertEqual(
+                deserialize_ui_state(app.session_state[UI_MISSION_STATE_KEY]).calculation_status,
+                CalculationStatus.STALE,
+            )
+            self.assertTrue(any("Inputs changed" in warning.value for warning in app.warning))
+            self.assertEqual(
+                {metric.label: metric.value for metric in app.metric}["Connected delta-v"],
+                "12,531 m/s",
+            )
+
+    def test_returning_to_calculated_value_restores_current_without_calculation(self):
+        app = AppTest.from_file(APP_PATH)
+        with patch(
+            "app_services.compute_cached_trajectory", return_value=earth_saturn_result()
+        ) as trajectory_mock:
+            app.run(timeout=30)
+            isp = next(
+                widget
+                for widget in app.number_input
+                if widget.label == "Main engine specific impulse (s)"
+            )
+            isp.set_value(321).run(timeout=30)
+            isp = next(
+                widget
+                for widget in app.number_input
+                if widget.label == "Main engine specific impulse (s)"
+            )
+            isp.set_value(320).run(timeout=30)
+
+        self.assertEqual(trajectory_mock.call_count, 1)
+        self.assertEqual(
+            deserialize_ui_state(app.session_state[UI_MISSION_STATE_KEY]).calculation_status,
+            CalculationStatus.CURRENT,
+        )
+
+    def test_calculate_promotes_visible_draft_and_returns_to_current(self):
+        app = AppTest.from_file(APP_PATH)
+        with patch(
+            "app_services.compute_cached_trajectory", return_value=earth_saturn_result()
+        ) as trajectory_mock:
+            app.run(timeout=30)
+            next(
+                widget
+                for widget in app.number_input
+                if widget.label == "Main engine specific impulse (s)"
+            ).set_value(321).run(timeout=30)
+            next(button for button in app.button if "Calculate" in button.label).click().run(
+                timeout=30
+            )
+
+        self.assertEqual(trajectory_mock.call_count, 2)
+        self.assertEqual(app.session_state[MISSION_SETUP_STATE_KEY].isp_s, 321)
+        self.assertEqual(
+            deserialize_ui_state(app.session_state[UI_MISSION_STATE_KEY]).calculation_status,
+            CalculationStatus.CURRENT,
+        )
+
+    def test_visual_session_change_does_not_mark_results_stale_or_recalculate(self):
+        app = AppTest.from_file(APP_PATH)
+        with patch(
+            "app_services.compute_cached_trajectory", return_value=earth_saturn_result()
+        ) as trajectory_mock:
+            app.run(timeout=30)
+            app.session_state["mission_visual_preference"] = "expanded"
+            app.run(timeout=30)
+
+        self.assertEqual(trajectory_mock.call_count, 1)
+        self.assertEqual(
+            deserialize_ui_state(app.session_state[UI_MISSION_STATE_KEY]).calculation_status,
+            CalculationStatus.CURRENT,
+        )
+
+    def test_technical_failure_preserves_previous_results_and_status(self):
+        app = AppTest.from_file(APP_PATH)
+        with patch(
+            "app_services.compute_cached_trajectory", return_value=earth_saturn_result()
+        ) as trajectory_mock:
+            app.run(timeout=30)
+            next(
+                widget
+                for widget in app.number_input
+                if widget.label == "Main engine specific impulse (s)"
+            ).set_value(321).run(timeout=30)
+            trajectory_mock.side_effect = RuntimeError("test engine failure")
+            next(button for button in app.button if "Calculate" in button.label).click().run(
+                timeout=30
+            )
+
+        self.assertFalse(app.exception)
+        self.assertEqual(app.session_state[MISSION_SETUP_STATE_KEY].isp_s, 320)
+        self.assertEqual(
+            deserialize_ui_state(app.session_state[UI_MISSION_STATE_KEY]).calculation_status,
+            CalculationStatus.TECHNICAL_ERROR,
+        )
+        self.assertEqual(
+            {metric.label: metric.value for metric in app.metric}["Connected delta-v"],
+            "12,531 m/s",
+        )
+
+    def test_no_solution_preserves_previous_results_and_has_distinct_status(self):
+        app = AppTest.from_file(APP_PATH)
+        with patch("app_services.compute_cached_trajectory", return_value=earth_saturn_result()):
+            app.run(timeout=30)
+            next(
+                widget
+                for widget in app.number_input
+                if widget.label == "Main engine specific impulse (s)"
+            ).set_value(321).run(timeout=30)
+            with patch("app_services.require_mission_bundle", return_value=None):
+                next(button for button in app.button if "Calculate" in button.label).click().run(
+                    timeout=30
+                )
+
+        self.assertFalse(app.exception)
+        self.assertEqual(app.session_state[MISSION_SETUP_STATE_KEY].isp_s, 320)
+        self.assertEqual(
+            deserialize_ui_state(app.session_state[UI_MISSION_STATE_KEY]).calculation_status,
+            CalculationStatus.NO_SOLUTION,
+        )
+        self.assertEqual(
+            {metric.label: metric.value for metric in app.metric}["Connected delta-v"],
+            "12,531 m/s",
+        )
+
     def test_trajectory_type_choice_defaults_to_direct_for_saturn(self):
         app = run_app()
 
