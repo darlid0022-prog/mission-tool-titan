@@ -377,7 +377,17 @@ class TestMissionSetupPage(unittest.TestCase):
         self.assertEqual(metrics["Total reference-scenario duration"], "2,859.4 days")
         self.assertEqual(metrics["Connected Saturn periapsis"], "150,000 km")
         self.assertEqual(metrics["Final Saturn-centred radius"], "1,221,870 km")
-        self.assertEqual(metrics["Single-stage exceedance"], "3.27×")
+        # The isolated single-stage feasibility study no longer contributes a
+        # numeric KPI to the connected scorecard (see docs/audit_science_budget_v030.md,
+        # wording-and-scope batch §2.1) - only a non-numeric, explicitly isolated
+        # reference remains.
+        self.assertNotIn("Single-stage exceedance", metrics)
+        self.assertTrue(
+            any(
+                "Single-stage feasibility: see the isolated study" in caption.value
+                for caption in app.caption
+            )
+        )
         self.assertTrue(
             any(
                 "Active scenario: Mission setup baseline" in caption.value

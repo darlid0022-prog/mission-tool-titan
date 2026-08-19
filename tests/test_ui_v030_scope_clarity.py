@@ -150,12 +150,19 @@ class TestMassRatioScopeAndLabel(unittest.TestCase):
         self.assertNotIn("5.16", ratio_metric.value)
         self.assertNotIn("5.15", ratio_metric.value)
 
-    def test_single_stage_exceedance_is_scoped_as_conditional_not_a_verdict(self) -> None:
+    def test_single_stage_exceedance_is_not_a_connected_scorecard_metric(self) -> None:
+        # Superseded by docs/audit_science_budget_v030.md wording-and-scope batch
+        # §2.1: this KPI no longer lives on the connected scorecard at all, so
+        # there is no "conditional result" help text left to assert on here.
         app = _run_calculated_app()
         self.assertFalse(app.exception)
-        exceedance_metric = next(m for m in app.metric if m.label == "Single-stage exceedance")
-        self.assertIn("conditional result", exceedance_metric.help)
-        self.assertIn("not a verdict", exceedance_metric.help)
+        self.assertFalse(any(m.label == "Single-stage exceedance" for m in app.metric))
+        self.assertTrue(
+            any(
+                "Single-stage feasibility: see the isolated study" in c.value
+                for c in app.caption
+            )
+        )
 
     def test_no_metric_anywhere_on_mission_setup_presents_5_16_as_the_mission_ratio(self) -> None:
         app = _run_calculated_app()

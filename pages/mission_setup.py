@@ -568,16 +568,9 @@ with scorecard_slot.container(border=True):
         ),
         border=True,
     )
-    st.metric(
-        "Single-stage exceedance",
-        f"{bundle.single_stage_feasibility.threshold_exceedance_factor:.2f}×",
-        help=(
-            "A conditional result of the simplified single-stage rocket-equation model "
-            "only: how far the full connected delta-v exceeds that one hypothetical "
-            "stage's maximum feasible delta-v. It is not a verdict on any real launch "
-            "vehicle or staged architecture."
-        ),
-        border=True,
+    st.caption(
+        "Single-stage feasibility: see the isolated study (not included in the "
+        "connected budget)."
     )
     st.caption("Live connected-budget values for the active baseline scenario.")
     st.caption(
@@ -662,7 +655,8 @@ if bundle.mass_ratio > 20:
     st.warning(
         f"The mass ratio above ({bundle.mass_ratio:,.0f}) indicates that one "
         f"non-discarding chemical stage at {isp_s:.0f} s is unsuitable for the modeled "
-        "delta-v; see the calibrated feasibility study below."
+        "delta-v; see the isolated calibrated feasibility study below (not included "
+        "in the connected budget)."
     )
 with st.container(key="mass_budget_metrics_row"):
     c1, c2, c3, c4 = st.columns(4)
