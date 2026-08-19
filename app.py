@@ -12,15 +12,15 @@ import app_services
 from mission.ui_session_state import store_ui_state
 from mission.ui_state import initial_ui_state
 from mission.ui_state_migration import UiStateMigrationError, initialize_or_migrate_ui_state
-from mission.ui_text import UI_TEXT, UI_V030_TEXT
+from mission.ui_style import apply_ui_shell_style
+from mission.ui_text import UI_V030_TEXT
 
 st.set_page_config(
     page_title="Mission Design — Titan",
     page_icon=":material/satellite_alt:",
     layout="wide",
 )
-st.title(":material/satellite_alt: Mission Design Calculator")
-st.caption(UI_TEXT["app_caption"])
+apply_ui_shell_style()
 
 # Shared URLs restore their validated, simple mission inputs before navigation
 # selects and renders any page. Derived physics/results are intentionally rebuilt

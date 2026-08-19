@@ -87,6 +87,20 @@ def test_trajectory_routes_keep_existing_capabilities_connected() -> None:
         assert capability in launch_windows_source
 
 
+def test_shell_style_is_centralized_and_cache_independent() -> None:
+    app_source = (ROOT / "app.py").read_text()
+    component_source = (ROOT / "mission/ui_components.py").read_text()
+    style_source = (ROOT / "mission/ui_style.py").read_text()
+    theme_source = (ROOT / ".streamlit/config.toml").read_text()
+
+    assert "apply_ui_shell_style()" in app_source
+    assert "st.title(" not in app_source
+    assert "<style>" not in component_source
+    assert "UI_SHELL_STYLE" in style_source
+    assert "data-testid" in style_source
+    assert "fonts.googleapis.com" not in theme_source
+
+
 def test_status_copy_is_not_color_only() -> None:
     for key in (
         "status_current",

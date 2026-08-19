@@ -582,12 +582,35 @@ class TestTrajectory3DPage(unittest.TestCase):
         self.assertTrue(
             any(sub.value == "Explore launch windows" for sub in app.subheader)
         )
-        links = app.get("page_link")
-        routes_by_label = {link.proto.label: link.proto.page for link in links}
-        self.assertIn("trajectory_3d", routes_by_label["Open 3D trajectory"])
-        self.assertIn(
-            "launch_windows",
-            routes_by_label["Explore launch windows and Pareto front"],
+        action_labels = {button.label for button in app.button}
+        self.assertIn("Open 3D trajectory", action_labels)
+        self.assertIn("Explore launch windows and Pareto front", action_labels)
+
+    def test_trajectory_hub_3d_action_opens_the_existing_view(self):
+        app = run_app(page_path="pages/trajectory.py")
+        action = next(button for button in app.button if button.label == "Open 3D trajectory")
+        app = action.click().run(timeout=30)
+
+        self.assertFalse(app.exception)
+        self.assertTrue(
+            any(
+                heading.value == "Complete mission trajectory — interactive 3D view"
+                for heading in app.header
+            )
+        )
+
+    def test_trajectory_hub_pareto_action_opens_launch_window_search(self):
+        app = run_app(page_path="pages/trajectory.py")
+        action = next(
+            button
+            for button in app.button
+            if button.label == "Explore launch windows and Pareto front"
+        )
+        app = action.click().run(timeout=30)
+
+        self.assertFalse(app.exception)
+        self.assertTrue(
+            any("Launch window search" in heading.value for heading in app.header)
         )
 
     def test_direct_mode_renders_animated_heliocentric_and_static_saturn_scenes(self):

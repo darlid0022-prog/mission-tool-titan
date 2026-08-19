@@ -18,17 +18,6 @@ from mission.ui_text import UI_V030_TEXT, UI_V030_TOOLTIPS
 
 PRIMARY_STEPS = ("Mission", "Trajectory", "Budget", "Verdict")
 
-_RESPONSIVE_METRIC_STYLE = """
-<style>
-div[data-testid="stMetricValue"] > div {
-    white-space: normal;
-    overflow-wrap: anywhere;
-    font-size: clamp(1.2rem, 5vw, 2rem);
-}
-</style>
-"""
-
-
 def render_scope_badge(text_key: str) -> None:
     """Render a textual scope badge whose meaning never depends on color."""
     st.badge(UI_V030_TEXT[text_key])
@@ -36,23 +25,26 @@ def render_scope_badge(text_key: str) -> None:
 
 def render_step_header(*, title_key: str, introduction_key: str, scope_key: str) -> None:
     st.title(UI_V030_TEXT[title_key])
-    render_scope_badge(scope_key)
     st.caption(UI_V030_TEXT[introduction_key])
+    render_scope_badge(scope_key)
 
 
 def render_mission_progress(active_step: str) -> None:
-    labels = [f"{index}. {step}" for index, step in enumerate(PRIMARY_STEPS, start=1)]
-    st.caption(f"{UI_V030_TEXT['progress_label']}: " + " → ".join(labels))
-    st.caption(f"{UI_V030_TEXT['current_step']}: {active_step}")
+    labels = [
+        f"**{index}. {step}**" if step == active_step else f"{index}. {step}"
+        for index, step in enumerate(PRIMARY_STEPS, start=1)
+    ]
+    st.caption(f"{UI_V030_TEXT['progress_label']} · " + " → ".join(labels))
 
 
 def render_scenario_summary(state: MissionUiState) -> None:
-    with st.container(border=True):
-        st.subheader(UI_V030_TEXT["active_scenario"])
-        st.write(state.active_scenario.source_label)
-        st.caption(f"{UI_V030_TEXT['scenario_id']}: {state.active_scenario.scenario_id}")
-        if state.calculated_at is not None:
-            st.caption(f"{UI_V030_TEXT['calculated_at']}: {state.calculated_at.isoformat()}")
+    details = (
+        f"{UI_V030_TEXT['active_scenario']} · {state.active_scenario.source_label} · "
+        f"{UI_V030_TEXT['scenario_id']}: {state.active_scenario.scenario_id}"
+    )
+    if state.calculated_at is not None:
+        details += f" · {UI_V030_TEXT['calculated_at']}: {state.calculated_at.isoformat()}"
+    st.caption(details)
 
 
 def render_calculation_status(state: MissionUiState) -> None:
@@ -74,7 +66,7 @@ def render_calculation_status(state: MissionUiState) -> None:
     elif state.calculation_status in {CalculationStatus.STALE, CalculationStatus.NO_SOLUTION}:
         st.warning(message)
     else:
-        st.info(message)
+        st.caption(f"{UI_V030_TEXT['calculation_status_label']} · {message}")
     if state.last_error is not None:
         st.caption(state.last_error.message)
 
@@ -99,9 +91,6 @@ def render_assumptions_and_limitations(lines: Iterable[str]) -> None:
 
 
 def render_departure_energy(values: MissionBudgetPresentation) -> None:
-    # Streamlit's default metric value is nowrap and clips the audited C3/v∞
-    # strings at 320 px. This local presentation rule preserves the full text.
-    st.html(_RESPONSIVE_METRIC_STYLE)
     st.header(UI_V030_TEXT["budget_departure_heading"])
     st.caption(UI_V030_TEXT["budget_energy_note"])
     with st.container(horizontal=True):

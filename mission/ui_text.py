@@ -311,19 +311,24 @@ UI_V030_TEXT: Final[dict[str, str]] = {
     "technical_details_disclosure": "Technical details",
     "progress_label": "Mission progress",
     "current_step": "Current step",
+    "calculation_status_label": "Calculation status",
     "status_input_error": "Input error — previous results preserved",
     "status_no_solution": "No solution — previous results preserved",
     "status_technical_error": "Technical error — previous results preserved",
     "trajectory_direct_3d_section": "Direct trajectory in 3D",
     "trajectory_direct_3d_description": (
-        "Open the active scenario's static 3D trajectory or Direct animation, with "
-        "playback controls, UTC timing, segment details, and standalone HTML export."
+        "Inspect the active scenario in static 3D or Direct animation, with playback, "
+        "segment details, and standalone HTML export."
     ),
     "trajectory_launch_windows_section": "Explore launch windows",
     "trajectory_launch_windows_description": (
-        "Search the connected Earth → Saturn model, inspect its real Pareto front, select "
-        "a candidate, and apply it only through the explicit confirmation action."
+        "Search the connected Earth → Saturn model, inspect its real Pareto front, and "
+        "explicitly apply a selected candidate."
     ),
+    "trajectory_reference_duration": "Reference duration",
+    "trajectory_last_search": "Last search",
+    "trajectory_no_search": "No launch-window search in this session",
+    "trajectory_search_candidates": "candidates available",
     "trajectory_launch_windows": "Explore launch windows and Pareto front",
     "trajectory_open_3d": "Open 3D trajectory",
     "trajectory_transition_note": (
