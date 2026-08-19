@@ -12,6 +12,7 @@ st.page_link(
     "pages/saturn_system_studies.py",
     label=UI_V030_TEXT["technical_saturn"],
     icon=":material/public:",
+    query_params={"section": "technical"},
 )
 st.page_link(
     "pages/optimization.py", label=UI_V030_TEXT["technical_pareto"], icon=":material/query_stats:"

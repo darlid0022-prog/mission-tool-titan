@@ -8,9 +8,12 @@ is suitable as a scientific input.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from mission.ui_text import UI_UNITS
+
+DEFAULT_DURATION_TOLERANCE_DAYS = 1e-3
 
 
 def _finite_number(value: float, *, name: str) -> float:
@@ -97,3 +100,84 @@ def format_datetime_utc(value: datetime) -> str:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("value must be timezone-aware.")
     return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
+
+
+def format_short_date_utc(value: datetime) -> str:
+    """Format an aware datetime as a bare civil UTC date (no time-of-day)."""
+    if not isinstance(value, datetime):
+        raise TypeError("value must be a datetime.")
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("value must be timezone-aware.")
+    return value.astimezone(UTC).date().isoformat()
+
+
+@dataclass(frozen=True)
+class DurationBreakdown:
+    """Display-only decomposition of one already-computed total duration.
+
+    Every field here is copied from raw, already-validated day counts the
+    caller computed elsewhere (a Lambert leg's own MJD2000 difference, and
+    the existing Saturn capture ellipse's own periapsis-to-apoapsis time of
+    flight) - this dataclass never re-derives a duration and never solves a
+    trajectory. `__post_init__` only checks that the three numbers the
+    caller supplied are already mutually consistent to within tolerance; it
+    is a presentation-layer sanity guard, not a source of truth.
+    """
+
+    total_days: float
+    interplanetary_days: float
+    saturn_phase_days: float
+    tolerance_days: float
+
+    def __post_init__(self) -> None:
+        for name in ("total_days", "interplanetary_days", "saturn_phase_days", "tolerance_days"):
+            _finite_number(getattr(self, name), name=name)
+        if self.tolerance_days < 0.0:
+            raise ValueError("tolerance_days must be non-negative.")
+        residual = self.total_days - (self.interplanetary_days + self.saturn_phase_days)
+        if abs(residual) > self.tolerance_days:
+            raise ValueError(
+                "Duration breakdown is inconsistent: total_days "
+                f"({self.total_days!r}) does not equal interplanetary_days + "
+                f"saturn_phase_days ({self.interplanetary_days!r} + "
+                f"{self.saturn_phase_days!r}) within tolerance_days "
+                f"({self.tolerance_days!r}); residual={residual!r}."
+            )
+
+    @property
+    def synthesis_text(self) -> str:
+        """One-line summary: total only, one decimal, no hedging word."""
+        return f"{self.total_days:,.1f} {UI_UNITS['days']} complete"
+
+    @property
+    def detail_text(self) -> str:
+        """Full three-decimal breakdown; "approximately" only qualifies the
+        Saturn capture-ellipse component, never the complete total or the
+        interplanetary leg (both are exact differences of validated epochs).
+        """
+        return (
+            f"{self.total_days:,.3f} = {self.interplanetary_days:,.3f} + "
+            f"approximately {self.saturn_phase_days:,.3f} {UI_UNITS['days']}"
+        )
+
+
+def build_duration_breakdown(
+    *,
+    total_days: float,
+    interplanetary_days: float,
+    saturn_phase_days: float,
+    tolerance_days: float = DEFAULT_DURATION_TOLERANCE_DAYS,
+) -> DurationBreakdown:
+    """Validate and package an existing total/interplanetary/Saturn-phase split.
+
+    Raises ValueError if the three supplied day counts are not mutually
+    consistent within `tolerance_days` - this is the "coherence guard": it
+    never adjusts a value to make the equation hold, it only refuses to
+    display a breakdown that does not already hold.
+    """
+    return DurationBreakdown(
+        total_days=total_days,
+        interplanetary_days=interplanetary_days,
+        saturn_phase_days=saturn_phase_days,
+        tolerance_days=tolerance_days,
+    )

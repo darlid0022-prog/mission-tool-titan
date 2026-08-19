@@ -33,6 +33,15 @@ titan_transfer = bundle.titan_transfer
 titan_edl = bundle.titan_edl
 connected = bundle.connected_first_order
 
+# Two menu pages (Technical details, Isolated studies) both link here today -
+# this reads back which one the reader came from (see the query_params on
+# each st.page_link) to say why, without merging or duplicating this page.
+_entry_section = st.query_params.get("section")
+if _entry_section == "technical":
+    st.caption(UI_TEXT["saturn_studies_entry_technical"])
+elif _entry_section == "isolated":
+    st.caption(UI_TEXT["saturn_studies_entry_isolated"])
+
 st.header(UI_TEXT["connected_first_order_header"])
 st.badge(colors.ARRIVAL.label, color=colors.BADGE_COLOR[colors.ARRIVAL.label])
 if connected is None:

@@ -10,8 +10,16 @@ import math
 from dataclasses import dataclass
 
 from mission.models import TrajectoryResult
+from mission.ui_keys import LAST_VALID_MISSION_BUNDLE_STATE_KEY
 
-LAST_VALID_MISSION_BUNDLE_STATE_KEY = "mission_last_valid_bundle_v030"
+__all__ = [
+    "LAST_VALID_MISSION_BUNDLE_STATE_KEY",
+    "LambertDeparturePresentation",
+    "MissionBudgetPresentation",
+    "build_candidate_budget_presentation",
+    "build_lambert_departure_presentation",
+    "build_mission_budget_presentation",
+]
 
 
 @dataclass(frozen=True)
@@ -83,31 +91,21 @@ def build_mission_budget_presentation(
 ) -> MissionBudgetPresentation:
     """Adapt an already-calculated mission bundle without invoking a solver."""
     departure = (
-        build_lambert_departure_presentation(trajectory)
-        if trajectory.method == "lambert"
-        else None
+        build_lambert_departure_presentation(trajectory) if trajectory.method == "lambert" else None
     )
     return MissionBudgetPresentation(
         earth_v_infinity_m_s=(
-            departure.earth_v_infinity_m_s
-            if departure is not None
-            else trajectory.v_inf_depart
+            departure.earth_v_infinity_m_s if departure is not None else trajectory.v_inf_depart
         ),
         c3_m2_s2=departure.c3_m2_s2 if departure is not None else None,
         earth_injection_m_s=float(earth_injection_m_s),
-        saturn_capture_m_s=(
-            float(saturn_capture_m_s) if saturn_capture_m_s is not None else None
-        ),
+        saturn_capture_m_s=(float(saturn_capture_m_s) if saturn_capture_m_s is not None else None),
         saturn_circularization_m_s=(
-            float(saturn_circularization_m_s)
-            if saturn_circularization_m_s is not None
-            else None
+            float(saturn_circularization_m_s) if saturn_circularization_m_s is not None else None
         ),
         connected_total_m_s=float(connected_total_m_s),
         dry_mass_kg=float(dry_mass_kg) if dry_mass_kg is not None else None,
-        propellant_mass_kg=(
-            float(propellant_mass_kg) if propellant_mass_kg is not None else None
-        ),
+        propellant_mass_kg=(float(propellant_mass_kg) if propellant_mass_kg is not None else None),
         wet_mass_kg=float(wet_mass_kg) if wet_mass_kg is not None else None,
     )
 

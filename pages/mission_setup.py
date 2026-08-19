@@ -31,6 +31,7 @@ from mission.payload_catalog import catalog_by_label, catalog_row
 from mission.pdf_report import MissionPdfReport, generate_mission_summary_pdf
 from mission.sizing import compute_mass_budget
 from mission.ui_components import render_calculation_status, render_mission_progress
+from mission.ui_keys import LAST_VALID_MISSION_BUNDLE_STATE_KEY
 from mission.ui_session_state import load_ui_state, store_ui_state
 from mission.ui_state import (
     CalculationErrorKind,
@@ -49,7 +50,6 @@ from mission.ui_text import UI_TEXT, UI_V030_TEXT
 # that budget at all (see its as_dict()), for either trajectory type offered
 # on this page, so they are never silently implied to contribute below.
 _CONNECTED_BUDGET_PHASES = (colors.LAUNCH, colors.INTERPLANETARY_TRANSFER, colors.ARRIVAL)
-LAST_VALID_MISSION_BUNDLE_STATE_KEY = "mission_last_valid_bundle_v030"
 
 
 def _format_mjd2000_as_utc_date(epoch_mjd2000: float) -> str:
@@ -570,6 +570,12 @@ with scorecard_slot.container(border=True):
     st.metric(
         "Single-stage exceedance",
         f"{bundle.single_stage_feasibility.threshold_exceedance_factor:.2f}×",
+        help=(
+            "A conditional result of the simplified single-stage rocket-equation model "
+            "only: how far the full connected delta-v exceeds that one hypothetical "
+            "stage's maximum feasible delta-v. It is not a verdict on any real launch "
+            "vehicle or staged architecture."
+        ),
         border=True,
     )
     st.caption("Live connected-budget values for the active baseline scenario.")
@@ -640,9 +646,19 @@ st.subheader(UI_TEXT["mass_budget"])
 st.warning(UI_TEXT["mass_model_warning"], icon=":material/warning:")
 if departure_type == "Direct":
     st.warning(UI_TEXT["direct_warning"])
+st.metric(
+    "Simplified mass ratio using the full connected Δv",
+    f"{bundle.mass_ratio:,.2f}",
+    help=(
+        "This ratio applies the simplified single-stage rocket equation to the full "
+        "connected total. Allocation among a launcher, upper stage, and spacecraft is "
+        "not modeled, so this is not a vehicle feasibility verdict."
+    ),
+    border=True,
+)
 if bundle.mass_ratio > 20:
     st.warning(
-        f"Simplified mass ratio: {bundle.mass_ratio:,.0f}. This indicates that one "
+        f"The mass ratio above ({bundle.mass_ratio:,.0f}) indicates that one "
         f"non-discarding chemical stage at {isp_s:.0f} s is unsuitable for the modeled "
         "delta-v; see the calibrated feasibility study below."
     )

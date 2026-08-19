@@ -154,6 +154,14 @@ UI_TEXT: Final[dict[str, str]] = {
     ),
     "current_elapsed_time": "Current mission-elapsed time",
     "current_mission_phase": "Current mission phase",
+    "saturn_studies_entry_technical": (
+        "Arrived from Technical details — reviewing the connected model's arrival "
+        "geometry, reference frames, hyperbola, and ellipse parameters."
+    ),
+    "saturn_studies_entry_isolated": (
+        "Arrived from Isolated studies — reviewing legacy and Titan/EDL results that "
+        "are excluded from the connected budget below."
+    ),
     "connected_first_order_header": "Saturn hyperbolic arrival & capture — authoritative model",
     "connected_first_order_warning": (
         "This model feeds the connected delta-v budget and mission duration shown on "
@@ -306,6 +314,7 @@ UI_V030_TEXT: Final[dict[str, str]] = {
     "active_scenario": "Active scenario",
     "scenario_id": "Scenario ID",
     "calculated_at": "Calculated at",
+    "scenario_technical_metadata": "Scenario technical metadata",
     "model_scope": "Model scope",
     "assumptions_and_limitations": "Assumptions and limitations",
     "technical_details_disclosure": "Technical details",
@@ -326,6 +335,12 @@ UI_V030_TEXT: Final[dict[str, str]] = {
         "explicitly apply a selected candidate."
     ),
     "trajectory_reference_duration": "Reference duration",
+    "trajectory_duration_complete": "Complete reference scenario duration",
+    "trajectory_duration_interplanetary": "Earth–Saturn interplanetary flight time",
+    "trajectory_duration_saturn_phase": "Saturn periapsis-to-apoapsis transfer",
+    "trajectory_duration_unavailable": (
+        "A Saturn periapsis-to-apoapsis breakdown is not available for this scenario."
+    ),
     "trajectory_last_search": "Last search",
     "trajectory_no_search": "No launch-window search in this session",
     "trajectory_search_candidates": "candidates available",
@@ -557,6 +572,12 @@ UI_V030_TEXT: Final[dict[str, str]] = {
 
 
 UI_V030_TOOLTIPS: Final[dict[str, str]] = {
+    "badge_connected": (
+        '"Connected" means Earth injection, Saturn capture, and Saturn-centered '
+        "circularization are summed into one reproducible total for the active "
+        "scenario - as opposed to an isolated study, which is not summed into that "
+        "total."
+    ),
     "earth_c3": (
         "Characteristic energy of Earth departure. For a hyperbolic departure, C3 is the "
         "square of the hyperbolic excess speed. It is not a delta-v."

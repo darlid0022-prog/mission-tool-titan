@@ -21,4 +21,5 @@ st.page_link(
     "pages/saturn_system_studies.py",
     label=UI_V030_TEXT["isolated_saturn"],
     icon=":material/public:",
+    query_params={"section": "isolated"},
 )

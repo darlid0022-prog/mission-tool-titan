@@ -11,6 +11,7 @@ from mission.ui_format import (
     format_approximate_speed_km_s,
     format_delta_v_m_s,
     format_mass_kg,
+    format_short_date_utc,
 )
 from mission.ui_presentation import MissionBudgetPresentation
 from mission.ui_state import CalculationStatus, MissionUiState
@@ -18,9 +19,16 @@ from mission.ui_text import UI_V030_TEXT, UI_V030_TOOLTIPS
 
 PRIMARY_STEPS = ("Mission", "Trajectory", "Budget", "Verdict")
 
+
 def render_scope_badge(text_key: str) -> None:
-    """Render a textual scope badge whose meaning never depends on color."""
-    st.badge(UI_V030_TEXT[text_key])
+    """Render a textual scope badge whose meaning never depends on color.
+
+    Defines its scope at first encounter via a hover tooltip when one is
+    catalogued for this badge (see UI_V030_TOOLTIPS) - e.g. "connected" is
+    jargon-adjacent enough that it should not rely on the reader having
+    already seen it defined elsewhere on a different page.
+    """
+    st.badge(UI_V030_TEXT[text_key], help=UI_V030_TOOLTIPS.get(text_key))
 
 
 def render_step_header(*, title_key: str, introduction_key: str, scope_key: str) -> None:
@@ -38,13 +46,23 @@ def render_mission_progress(active_step: str) -> None:
 
 
 def render_scenario_summary(state: MissionUiState) -> None:
-    details = (
-        f"{UI_V030_TEXT['active_scenario']} · {state.active_scenario.source_label} · "
-        f"{UI_V030_TEXT['scenario_id']}: {state.active_scenario.scenario_id}"
-    )
+    """Compact, first-level scenario identity: name and a short date only.
+
+    Calculation status (current/stale) is rendered separately by
+    render_calculation_status(), called immediately before this on every
+    page that uses it - this function does not repeat it. The scenario ID
+    and full ISO timestamp are technical serialization details, not part of
+    the first-level summary: they remain fully accessible, unmodified, in a
+    collapsed (but keyboard-operable) expander below it.
+    """
+    summary = f"{UI_V030_TEXT['active_scenario']} · {state.active_scenario.source_label}"
     if state.calculated_at is not None:
-        details += f" · {UI_V030_TEXT['calculated_at']}: {state.calculated_at.isoformat()}"
-    st.caption(details)
+        summary += f" · {format_short_date_utc(state.calculated_at)}"
+    st.caption(summary)
+    with st.expander(UI_V030_TEXT["scenario_technical_metadata"]):
+        st.caption(f"{UI_V030_TEXT['scenario_id']}: {state.active_scenario.scenario_id}")
+        if state.calculated_at is not None:
+            st.caption(f"{UI_V030_TEXT['calculated_at']}: {state.calculated_at.isoformat()}")
 
 
 def render_calculation_status(state: MissionUiState) -> None:
