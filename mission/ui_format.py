@@ -11,7 +11,8 @@ import math
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from mission.ui_text import UI_UNITS
+from mission.pareto import ParetoPoint
+from mission.ui_text import UI_TEXT, UI_UNITS
 
 DEFAULT_DURATION_TOLERANCE_DAYS = 1e-3
 
@@ -199,4 +200,33 @@ def build_duration_breakdown(
         interplanetary_days=interplanetary_days,
         saturn_phase_days=saturn_phase_days,
         tolerance_days=tolerance_days,
+    )
+
+
+def build_baseline_comparison_caption(baseline: ParetoPoint, optimum: ParetoPoint) -> str:
+    """Report the relationship between the locked baseline and the delta-v optimum.
+
+    `baseline` (locked minimum departure v-infinity) and `optimum` (minimum
+    total delta-v) are selected by different criteria over different
+    candidate sets - see mission.pareto_plot.select_pareto_highlights().
+    Their coincidence is a property of the current data, not a structural
+    guarantee, so this function reports whichever relationship the two
+    points actually have today instead of assuming one. Pure and
+    page-independent so it can be tested with hand-built points, without
+    any page-level seam.
+    """
+    if math.isclose(baseline.total_delta_v_m_s, optimum.total_delta_v_m_s, abs_tol=1e-6):
+        return UI_TEXT["pareto_baseline_is_sampled_minimum"]
+    delta_v_percent = 100.0 * (baseline.total_delta_v_m_s / optimum.total_delta_v_m_s - 1.0)
+    duration_percent = 100.0 * (
+        baseline.total_duration_days / optimum.total_duration_days - 1.0
+    )
+    mass_percent = 100.0 * (baseline.wet_mass_kg / optimum.wet_mass_kg - 1.0)
+    return UI_TEXT["pareto_comparison"].format(
+        delta_v_difference=baseline.total_delta_v_m_s - optimum.total_delta_v_m_s,
+        delta_v_percent=delta_v_percent,
+        duration_difference=baseline.total_duration_days - optimum.total_duration_days,
+        duration_percent=duration_percent,
+        mass_difference=baseline.wet_mass_kg - optimum.wet_mass_kg,
+        mass_percent=mass_percent,
     )

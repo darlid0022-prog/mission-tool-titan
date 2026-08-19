@@ -1,11 +1,29 @@
 import unittest
 
-from mission.pareto import compute_connected_pareto_front
+from mission.pareto import ParetoPoint, compute_connected_pareto_front
 from mission.pareto_plot import (
     build_pareto_front_figure,
     build_pareto_table,
     select_pareto_highlights,
 )
+from mission.ui_format import build_baseline_comparison_caption
+from mission.ui_text import UI_TEXT
+
+
+def _point(**overrides) -> ParetoPoint:
+    """TEST FIXTURE ONLY - a hand-built point, never engine output."""
+    fields = dict(
+        departure_mjd2000=9_681.0,
+        earth_saturn_tof_years=2_856.0 / 365.25,
+        earth_saturn_arrival_mjd2000=9_681.0 + 2_856.0,
+        earth_departure_v_infinity_m_s=10_432.3,
+        saturn_arrival_v_infinity_m_s=6_490.7,
+        total_delta_v_m_s=12_530.653,
+        total_duration_days=2_859.354,
+        wet_mass_kg=12_137.5,
+    )
+    fields.update(overrides)
+    return ParetoPoint(**fields)
 
 
 class TestParetoFrontFigure(unittest.TestCase):
@@ -15,7 +33,7 @@ class TestParetoFrontFigure(unittest.TestCase):
         cls.highlights = select_pareto_highlights(cls.result)
         cls.figure = build_pareto_front_figure(cls.result)
 
-    def test_highlights_locked_baseline_and_minimum_delta_v_point(self):
+    def test_highlights_are_both_anchored_to_the_2856_day_reference_leg(self):
         self.assertAlmostEqual(
             self.highlights.baseline.earth_saturn_tof_years * 365.25,
             2_856.0,
@@ -26,7 +44,24 @@ class TestParetoFrontFigure(unittest.TestCase):
             2_856.0,
             delta=1e-9,
         )
-        self.assertEqual(self.highlights.baseline, self.highlights.delta_v_optimum)
+
+    def test_the_comparison_caption_correctly_reports_whatever_the_real_relationship_is(self):
+        # baseline (locked minimum departure v-infinity) and delta_v_optimum
+        # (minimum total delta-v) are selected by DIFFERENT criteria over
+        # different candidate sets (select_pareto_highlights) - their
+        # coincidence is a property of today's data, not a design invariant.
+        # This does NOT hardcode "they must be equal": whichever relationship
+        # the real data actually has, the pure caption function must report
+        # it correctly - see docs/audit_science_budget_v030.md, wording-and-
+        # scope batch §2.5b.
+        caption = build_baseline_comparison_caption(
+            self.highlights.baseline, self.highlights.delta_v_optimum
+        )
+        if self.highlights.baseline == self.highlights.delta_v_optimum:
+            self.assertEqual(caption, UI_TEXT["pareto_baseline_is_sampled_minimum"])
+        else:
+            self.assertIn("more", caption)
+            self.assertNotEqual(caption, UI_TEXT["pareto_baseline_is_sampled_minimum"])
 
     def test_figure_contains_34_front_points_plus_the_baseline(self):
         traces = {trace.meta["role"]: trace for trace in self.figure.data}
@@ -47,6 +82,46 @@ class TestParetoFrontFigure(unittest.TestCase):
                 self.assertIn("Earth → Saturn TOF", trace.hovertemplate)
                 self.assertIn("Earth departure date", trace.hovertemplate)
                 self.assertEqual(len(trace.customdata), len(trace.x))
+
+
+class TestBaselineComparisonCaption(unittest.TestCase):
+    """Pure-function coverage of both branches of build_baseline_comparison_caption,
+    with hand-built points - no page-level seam added to pages/optimization.py
+    to make this testable (docs/audit_science_budget_v030.md, wording-and-scope
+    batch §2.5c)."""
+
+    def test_coinciding_points_produce_the_coincidence_caption(self):
+        same_point = _point()
+        caption = build_baseline_comparison_caption(same_point, same_point)
+        self.assertEqual(caption, UI_TEXT["pareto_baseline_is_sampled_minimum"])
+        self.assertIn("distinct criteria", caption)
+        self.assertIn("can diverge", caption)
+
+    def test_differing_points_produce_the_numeric_comparison(self):
+        baseline = _point(
+            total_delta_v_m_s=12_530.653,
+            total_duration_days=2_859.354,
+            wet_mass_kg=12_137.5,
+        )
+        optimum = _point(
+            total_delta_v_m_s=12_000.0,
+            total_duration_days=2_800.0,
+            wet_mass_kg=12_000.0,
+        )
+        caption = build_baseline_comparison_caption(baseline, optimum)
+        self.assertNotEqual(caption, UI_TEXT["pareto_baseline_is_sampled_minimum"])
+        self.assertIn("530.653 m/s more", caption)
+        self.assertIn("59 more days", caption)
+        self.assertIn("137.500 kg more", caption)
+
+    def test_a_baseline_below_the_optimum_still_reports_correctly(self):
+        # The optimum is, by construction, the minimum delta-v point of its
+        # own front - but this function takes two arbitrary points, so it
+        # must not assume the difference is always non-negative.
+        baseline = _point(total_delta_v_m_s=11_000.0)
+        optimum = _point(total_delta_v_m_s=12_000.0)
+        caption = build_baseline_comparison_caption(baseline, optimum)
+        self.assertIn("-1000.000 m/s more", caption)
 
 
 class TestParetoTable(unittest.TestCase):
