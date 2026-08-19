@@ -382,7 +382,13 @@ All strings in this section are required v0.3.0 English copy and must be central
 | Technical error | “The calculation could not be completed because of a technical error. Previous results were not replaced.” | Unexpected application or engine failure |
 | Stale results | “Inputs have changed. The displayed results are from the previous calculation.” | Inputs no longer match the displayed results |
 
-Do not use “mission impossible,” “scientifically impossible,” or “not feasible” unless the existing scientific engine explicitly produces that conclusion.
+A feasibility conclusion (including “mission impossible,” “scientifically impossible,” or “not feasible”) is allowed if and only if:
+- it is explicitly scoped (architecture, Isp, and scope of applicability);
+- it cites the maneuvers and the total it derives from;
+- it states the model that produces it and that model's version;
+- it stays inside the study that produces it, if that study is isolated from the connected budget.
+
+An unscoped feasibility conclusion remains prohibited.
 
 ## 8. Scientific terminology and tooltips
 
