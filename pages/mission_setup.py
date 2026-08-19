@@ -342,7 +342,7 @@ if isinstance(active_launch_candidate, lw.LaunchWindowCandidate):
         mission_inputs.instruments_df,
     )
     with scorecard_slot.container(border=True):
-        st.subheader(":material/dashboard: Mission scorecard")
+        st.subheader("Mission scorecard")
         st.caption(f"Active scenario: {lw.MISSION_SCENARIO_LAUNCH_WINDOW_LABEL} — {candidate_id}.")
         st.caption(
             "Date source: selected Launch windows Lambert solution "
@@ -495,7 +495,7 @@ pdf_report = MissionPdfReport(
 pdf_bytes = generate_mission_summary_pdf(pdf_report)
 
 with scorecard_slot.container(border=True):
-    st.subheader(":material/dashboard: Mission scorecard")
+    st.subheader("Mission scorecard")
     active_label = (
         lw.MISSION_SCENARIO_CASSINI_LABEL
         if trajectory_type == app_services.TRAJECTORY_TYPE_CASSINI_HISTORICAL
@@ -527,11 +527,12 @@ with scorecard_slot.container(border=True):
             "Date source: Mission setup Earth → Saturn trajectory solution "
             f"({departure_date_str} → {arrival_date_str} UTC)."
         )
-        st.caption(
-            "MJD2000 epoch reference (technical): "
-            f"{bundle.earth_saturn_trajectory.departure_mjd2000:.3f} → "
-            f"{bundle.earth_saturn_trajectory.arrival_mjd2000:.3f}."
-        )
+        with st.expander("Technical epoch reference"):
+            st.caption(
+                "MJD2000 epoch reference (technical): "
+                f"{bundle.earth_saturn_trajectory.departure_mjd2000:.3f} → "
+                f"{bundle.earth_saturn_trajectory.arrival_mjd2000:.3f}."
+            )
         with st.container(horizontal=True):
             st.metric(
                 "Connected Saturn periapsis",
