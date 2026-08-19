@@ -877,6 +877,14 @@ class TestSaturnSystemStudiesPage(unittest.TestCase):
         self.assertEqual(metrics["Hyperbola eccentricity"], "1.167")
         self.assertEqual(metrics["Hyperbola deflection angle"], "118.0°")
         self.assertEqual(metrics["Margin outside F ring"], "9,820 km")
+        # docs/audit_science_budget_v030.md wording-and-scope batch §2.6: the
+        # scalar F-ring margin is not a 3D ring-plane clearance claim.
+        self.assertTrue(
+            any(
+                "does not characterize the three-dimensional geometry" in c.value
+                for c in app.caption
+            )
+        )
         self.assertEqual(metrics["Insertion delta-v"], "2,183.0 m/s")
         self.assertEqual(metrics["Ellipse periapsis radius"], "150,000 km")
         self.assertEqual(metrics["Ellipse apoapsis radius"], "1,221,870 km")

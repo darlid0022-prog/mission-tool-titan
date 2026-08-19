@@ -197,6 +197,12 @@ UI_TEXT: Final[dict[str, str]] = {
         "center. A positive margin means periapsis stays outside the F ring in this "
         "scalar, coplanar model — it is not a three-dimensional ring-plane clearance."
     ),
+    "f_ring_margin_scalar_limit": (
+        "This margin is a scalar margin at periapsis. It does not characterize the "
+        "three-dimensional geometry of the ring plane: the capture ellipse crosses "
+        "this plane on every orbit, including within the E ring's extent. 3D "
+        "clearance is not evaluated by this model."
+    ),
     "insertion_delta_v": "Insertion delta-v",
     "circularization_delta_v": "Circularization delta-v",
     "propulsive_insertion_subheader": "Propulsive capture-to-ellipse insertion",

@@ -91,6 +91,7 @@ else:
             help=UI_TEXT["f_ring_margin_help"],
             border=True,
         )
+        st.caption(UI_TEXT["f_ring_margin_scalar_limit"])
 
         st.subheader(UI_TEXT["propulsive_insertion_subheader"])
         st.caption(UI_TEXT["propulsive_insertion_help"])
