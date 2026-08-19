@@ -8,7 +8,7 @@ app_services.require_mission_bundle() without recomputing or duplicating any
 business logic here.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 import streamlit as st
@@ -30,7 +30,17 @@ from mission.constants import (
 from mission.payload_catalog import catalog_by_label, catalog_row
 from mission.pdf_report import MissionPdfReport, generate_mission_summary_pdf
 from mission.sizing import compute_mass_budget
-from mission.ui_text import UI_TEXT
+from mission.ui_components import render_mission_progress
+from mission.ui_session_state import load_ui_state, store_ui_state
+from mission.ui_state import (
+    activate_cassini_historical_reference,
+    begin_calculation,
+    calculation_succeeded,
+    return_to_baseline,
+    update_draft_inputs,
+)
+from mission.ui_state_migration import restore_baseline_scenario, snapshot_from_inputs
+from mission.ui_text import UI_TEXT, UI_V030_TEXT
 
 # Phases the connected delta-v budget (mission.dv_budget.MissionDeltaVBudget)
 # structurally contributes to - Lunar transfer and Landing have no field in
@@ -43,10 +53,13 @@ def _format_mjd2000_as_utc_date(epoch_mjd2000: float) -> str:
     """Pure formatting, same MJD2000 epoch/conversion already used across this
     app (e.g. mission/trajectory_plot.py's _format_mjd2000) - not a new or
     re-derived date, just a calendar-date rendering of the existing epoch."""
-    epoch = datetime(2000, 1, 1, tzinfo=timezone.utc) + timedelta(days=epoch_mjd2000)
+    epoch = datetime(2000, 1, 1, tzinfo=UTC) + timedelta(days=epoch_mjd2000)
     return epoch.date().isoformat()
 
 
+st.title(UI_V030_TEXT["mission_title"])
+st.caption(UI_V030_TEXT["mission_introduction"])
+render_mission_progress(UI_V030_TEXT["mission_title"])
 scorecard_slot = st.empty()
 stored_inputs = app_services.load_mission_setup_inputs()
 default_destination = stored_inputs.destination if stored_inputs else "Saturn"
@@ -268,6 +281,10 @@ mission_inputs = app_services.MissionSetupInputs(
     connected_capture_apoapsis_radius_km=connected_capture_apoapsis_radius_km,
 )
 app_services.store_mission_setup_inputs(mission_inputs)
+ui_state = update_draft_inputs(
+    load_ui_state(st.session_state), snapshot_from_inputs(mission_inputs)
+)
+store_ui_state(st.session_state, ui_state)
 if submitted:
     submitted_query = app_services.encode_mission_setup_query(mission_inputs)
     st.query_params[app_services.MISSION_QUERY_PARAM] = submitted_query[
@@ -278,9 +295,9 @@ if submitted:
         submitted_query,
     )
 
-active_launch_candidate = st.session_state.get(
-    lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY
-)
+active_launch_candidate = st.session_state.get(lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY)
+if submitted and not isinstance(active_launch_candidate, lw.LaunchWindowCandidate):
+    store_ui_state(st.session_state, begin_calculation(load_ui_state(st.session_state)))
 if isinstance(active_launch_candidate, lw.LaunchWindowCandidate):
     candidate_id = active_launch_candidate.scenario_id or (
         f"candidate #{active_launch_candidate.rank}"
@@ -292,9 +309,7 @@ if isinstance(active_launch_candidate, lw.LaunchWindowCandidate):
     )
     with scorecard_slot.container(border=True):
         st.subheader(":material/dashboard: Mission scorecard")
-        st.caption(
-            f"Active scenario: {lw.MISSION_SCENARIO_LAUNCH_WINDOW_LABEL} — {candidate_id}."
-        )
+        st.caption(f"Active scenario: {lw.MISSION_SCENARIO_LAUNCH_WINDOW_LABEL} — {candidate_id}.")
         st.caption(
             "Date source: selected Launch windows Lambert solution "
             f"({active_launch_candidate.departure_datetime.date().isoformat()} → "
@@ -342,15 +357,24 @@ if isinstance(active_launch_candidate, lw.LaunchWindowCandidate):
             "budget is recomputed while this scenario is active."
         )
         if st.button("Return to mission baseline", icon=":material/undo:"):
-            st.session_state.pop(
-                lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, None
-            )
+            st.session_state.pop(lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, None)
+            restore_baseline_scenario(st.session_state)
             st.rerun()
     st.stop()
 
 bundle = app_services.require_mission_bundle()
 if bundle is None:
     st.stop()
+if submitted:
+    ui_state = calculation_succeeded(
+        load_ui_state(st.session_state), calculated_at=datetime.now(UTC)
+    )
+    ui_state = (
+        activate_cassini_historical_reference(ui_state)
+        if trajectory_type == app_services.TRAJECTORY_TYPE_CASSINI_HISTORICAL
+        else return_to_baseline(ui_state)
+    )
+    store_ui_state(st.session_state, ui_state)
 
 displayed_dv_rows = list(bundle.complete_dv_budget.as_dict().items())
 if trajectory_type == app_services.TRAJECTORY_TYPE_CASSINI_HISTORICAL:
@@ -453,9 +477,8 @@ with scorecard_slot.container(border=True):
         st.metric("Final Saturn-centred radius", "Not applicable", border=True)
     st.metric("Connected delta-v", f"{bundle.dv_total:,.0f} m/s", border=True)
     st.metric("Wet mass (simplified)", f"{bundle.mass['wet_mass_kg']:,.0f} kg", border=True)
-    earth_saturn_flight_days = (
-        float(bundle.earth_saturn_trajectory.arrival_mjd2000)
-        - float(bundle.earth_saturn_trajectory.departure_mjd2000)
+    earth_saturn_flight_days = float(bundle.earth_saturn_trajectory.arrival_mjd2000) - float(
+        bundle.earth_saturn_trajectory.departure_mjd2000
     )
     st.metric(
         "Earth → Saturn flight time",
@@ -527,9 +550,7 @@ st.caption("Mission-phase key — the same colors used on every page and chart b
 with st.container(horizontal=True):
     for phase in colors.PHASE_ORDER:
         label = (
-            phase.label
-            if phase in _CONNECTED_BUDGET_PHASES
-            else f"{phase.label} (not included)"
+            phase.label if phase in _CONNECTED_BUDGET_PHASES else f"{phase.label} (not included)"
         )
         st.badge(label, color=colors.BADGE_COLOR[phase.label])
 st.caption(

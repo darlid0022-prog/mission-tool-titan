@@ -293,6 +293,46 @@ UI_TEXT: Final[dict[str, str]] = {
 # pages continue to consume UI_TEXT unchanged. Later UI batches can migrate one
 # screen at a time without duplicating visible strings in rendering code.
 UI_V030_TEXT: Final[dict[str, str]] = {
+    "navigation_primary": "Mission workflow",
+    "navigation_secondary": "Reference",
+    "technical_details_title": "Technical details",
+    "technical_details_introduction": (
+        "Inspect the scientific outputs and diagnostics that support the active scenario."
+    ),
+    "isolated_studies_title": "Isolated studies",
+    "isolated_studies_introduction": (
+        "Explore reference studies that do not contribute to the connected mission total."
+    ),
+    "active_scenario": "Active scenario",
+    "scenario_id": "Scenario ID",
+    "calculated_at": "Calculated at",
+    "model_scope": "Model scope",
+    "assumptions_and_limitations": "Assumptions and limitations",
+    "technical_details_disclosure": "Technical details",
+    "progress_label": "Mission progress",
+    "current_step": "Current step",
+    "status_input_error": "Input error — previous results preserved",
+    "status_no_solution": "No solution — previous results preserved",
+    "status_technical_error": "Technical error — previous results preserved",
+    "trajectory_launch_windows": "Explore launch windows",
+    "trajectory_open_3d": "Open 3D trajectory",
+    "trajectory_transition_note": (
+        "The existing launch-window search and 3D views remain available during this transition."
+    ),
+    "budget_transition_note": (
+        "Detailed budget presentation will be reorganized in a later update. Existing calculated "
+        "results remain available from Mission."
+    ),
+    "verdict_transition_note": (
+        "The consolidated model conclusion will be completed in a later update. No new "
+        "feasibility threshold is introduced here."
+    ),
+    "technical_saturn": "Saturn and Titan model details",
+    "technical_pareto": "Fixed Pareto study",
+    "isolated_gravity": "Gravity-assist demonstrations",
+    "isolated_feasibility": "Single-stage feasibility study",
+    "isolated_saturn": "Legacy Saturn and Titan studies",
+    "return_to_mission": "Return to Mission",
     "product_description": (
         "Preliminary Earth–Saturn mission design using a deterministic first-order model."
     ),
@@ -302,7 +342,7 @@ UI_V030_TEXT: Final[dict[str, str]] = {
     "status_empty": "No results available",
     "badge_isolated": "Not connected to the active mission",
     "badge_technical": "Technical detail",
-    "badge_connected": "Connected mission",
+    "badge_connected": "Mission connected",
     "badge_excluded": "Not included in connected total",
     "mission_title": "Mission",
     "mission_introduction": (

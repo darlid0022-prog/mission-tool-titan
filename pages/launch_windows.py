@@ -10,13 +10,19 @@ parallel, on a separate branch). This page never fabricates example search
 results; when no engine is connected it says so explicitly instead.
 """
 
-from datetime import timezone
+from datetime import UTC
 
 import streamlit as st
 
 import app_services
 import launch_window_plot
 import launch_window_service as lw
+from mission.ui_state_migration import (
+    apply_legacy_candidate,
+    clear_unapplied_candidate_for_new_search,
+    restore_baseline_scenario,
+    select_legacy_candidate,
+)
 
 RESULT_STATE_KEY = "launch_window_result"
 SELECTED_RANK_KEY = "launch_window_selected_rank"
@@ -39,7 +45,7 @@ def _clear_stale_results() -> None:
     st.session_state.pop(RESULT_STATE_KEY, None)
     st.session_state.pop(SELECTED_RANK_KEY, None)
     st.session_state.pop(lw.SELECTED_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, None)
-    st.session_state.pop(lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, None)
+    clear_unapplied_candidate_for_new_search(st.session_state)
 
 
 st.header(":material/search: Launch window search")
@@ -132,8 +138,7 @@ if submitted:
     else:
         if service is None:
             st.info(
-                "Cannot search: no launch-window search engine is connected. "
-                "See the notice above."
+                "Cannot search: no launch-window search engine is connected. See the notice above."
             )
         else:
             # st.status (not st.spinner) so the loading/complete/error state
@@ -176,7 +181,7 @@ else:
 
     def _format_rank_option(rank: int, _candidates=candidates) -> str:
         candidate = next(c for c in _candidates if c.rank == rank)
-        launch_date = candidate.departure_datetime.astimezone(timezone.utc).date().isoformat()
+        launch_date = candidate.departure_datetime.astimezone(UTC).date().isoformat()
         return f"#{rank} — {launch_date}"
 
     stored_selected_rank = st.session_state.get(SELECTED_RANK_KEY)
@@ -203,23 +208,17 @@ else:
     with st.container(horizontal=True):
         st.metric(
             "Best launch date/time (UTC)",
-            selected_candidate.departure_datetime.astimezone(timezone.utc).strftime(
-                "%Y-%m-%d %H:%M"
-            ),
+            selected_candidate.departure_datetime.astimezone(UTC).strftime("%Y-%m-%d %H:%M"),
             border=True,
         )
         st.metric(
             "Saturn arrival (UTC)",
-            selected_candidate.saturn_arrival_datetime.astimezone(timezone.utc).strftime(
-                "%Y-%m-%d %H:%M"
-            ),
+            selected_candidate.saturn_arrival_datetime.astimezone(UTC).strftime("%Y-%m-%d %H:%M"),
             border=True,
         )
         st.metric(
             "Scenario end (UTC)",
-            selected_candidate.scenario_end_datetime.astimezone(timezone.utc).strftime(
-                "%Y-%m-%d %H:%M"
-            ),
+            selected_candidate.scenario_end_datetime.astimezone(UTC).strftime("%Y-%m-%d %H:%M"),
             border=True,
         )
     with st.container(horizontal=True):
@@ -243,12 +242,8 @@ else:
         )
     with st.container(horizontal=True):
         st.metric("C3", f"{selected_candidate.c3_km2_s2:,.2f} km²/s²", border=True)
-        st.metric(
-            "v∞ Earth", f"{selected_candidate.v_infinity_earth_m_s:,.1f} m/s", border=True
-        )
-        st.metric(
-            "v∞ Saturn", f"{selected_candidate.v_infinity_saturn_m_s:,.1f} m/s", border=True
-        )
+        st.metric("v∞ Earth", f"{selected_candidate.v_infinity_earth_m_s:,.1f} m/s", border=True)
+        st.metric("v∞ Saturn", f"{selected_candidate.v_infinity_saturn_m_s:,.1f} m/s", border=True)
     st.caption(
         "C3 reflects only this trajectory's departure energy. No compatibility with any "
         "specific launch vehicle's C3-vs-payload-mass performance envelope has been "
@@ -268,9 +263,7 @@ else:
             f"{selected_candidate.delta_v_titan_circularization_m_s:,.1f} m/s",
             border=True,
         )
-        st.metric(
-            "Delta-v total", f"{selected_candidate.delta_v_total_m_s:,.1f} m/s", border=True
-        )
+        st.metric("Delta-v total", f"{selected_candidate.delta_v_total_m_s:,.1f} m/s", border=True)
     st.caption(
         "Earth departure Δv follows the configured Earth parking orbit — see Assumptions "
         "below for the exact altitude used. Saturn-centered circularization Δv is "
@@ -317,9 +310,7 @@ else:
         st.caption(f"Engine: {result.engine_name}")
 
     st.divider()
-    active_candidate = st.session_state.get(
-        lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY
-    )
+    active_candidate = st.session_state.get(lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY)
     with st.container(horizontal=True):
         if st.button(
             "Use selected candidate as active scenario",
@@ -329,9 +320,8 @@ else:
                 "scorecard. It does not rerun either trajectory engine."
             ),
         ):
-            st.session_state[lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY] = (
-                selected_candidate
-            )
+            st.session_state[lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY] = selected_candidate
+            apply_legacy_candidate(st.session_state, selected_candidate)
             active_candidate = selected_candidate
             st.success(
                 f"Active scenario set to candidate "
@@ -341,9 +331,8 @@ else:
             "Return to mission baseline",
             icon=":material/undo:",
         ):
-            st.session_state.pop(
-                lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, None
-            )
+            st.session_state.pop(lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, None)
+            restore_baseline_scenario(st.session_state)
             active_candidate = None
             st.success("Mission setup baseline restored as the active scenario.")
 
@@ -372,9 +361,8 @@ else:
                 "page already uses, not a second one."
             ),
         ):
-            st.session_state[lw.SELECTED_LAUNCH_WINDOW_CANDIDATE_STATE_KEY] = (
-                selected_candidate
-            )
+            select_legacy_candidate(st.session_state, selected_candidate)
+            st.session_state[lw.SELECTED_LAUNCH_WINDOW_CANDIDATE_STATE_KEY] = selected_candidate
             updated_inputs = lw.apply_candidate_to_mission_setup(
                 selected_candidate, mission_setup_inputs
             )

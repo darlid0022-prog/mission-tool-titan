@@ -9,11 +9,10 @@ active, get_launch_window_service() returns None and the page shows its
 """
 
 import unittest
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 from unittest.mock import patch
 
-import pandas as pd
 from streamlit.testing.v1 import AppTest
 
 import app_services
@@ -62,9 +61,9 @@ def _make_candidate(rank: int, **overrides: object) -> LaunchWindowCandidate:
     """TEST FIXTURE ONLY - a hand-built candidate, never engine output."""
     kwargs = dict(
         rank=rank,
-        departure_datetime=datetime(2026, 7, rank, 12, 0, tzinfo=timezone.utc),
-        saturn_arrival_datetime=datetime(2033, 9, 1, 6, 0, tzinfo=timezone.utc),
-        scenario_end_datetime=datetime(2033, 9, 20, 0, 0, tzinfo=timezone.utc),
+        departure_datetime=datetime(2026, 7, rank, 12, 0, tzinfo=UTC),
+        saturn_arrival_datetime=datetime(2033, 9, 1, 6, 0, tzinfo=UTC),
+        scenario_end_datetime=datetime(2033, 9, 20, 0, 0, tzinfo=UTC),
         time_of_flight_days=2_618.75,
         c3_km2_s2=98.4,
         v_infinity_earth_m_s=10_432.3,
@@ -103,7 +102,9 @@ class _EmptyFixtureLaunchWindowService:
     """TEST FIXTURE ONLY. Always reports zero candidates found."""
 
     def search(self, request):
-        return LaunchWindowSearchResult(request=request, candidates=(), engine_name="test-fixture-v0")
+        return LaunchWindowSearchResult(
+            request=request, candidates=(), engine_name="test-fixture-v0"
+        )
 
 
 class _ErrorFixtureLaunchWindowService:
@@ -140,7 +141,10 @@ class TestEngineNotConnectedState(unittest.TestCase):
 
         self.assertFalse(app.exception)
         self.assertTrue(
-            any("Cannot search: no launch-window search engine is connected" in i.value for i in app.info)
+            any(
+                "Cannot search: no launch-window search engine is connected" in i.value
+                for i in app.info
+            )
         )
         self.assertFalse(app.dataframe)
 
@@ -154,9 +158,7 @@ class TestInitialState(unittest.TestCase):
             app = _run_to_launch_windows(AppTest.from_file(APP_PATH))
 
         self.assertFalse(app.exception)
-        self.assertTrue(
-            any("No search has been run yet" in i.value for i in app.info)
-        )
+        self.assertTrue(any("No search has been run yet" in i.value for i in app.info))
 
 
 class TestDateValidation(unittest.TestCase):
@@ -172,9 +174,7 @@ class TestDateValidation(unittest.TestCase):
             app = _submit_search(app)
 
         self.assertFalse(app.exception)
-        self.assertTrue(
-            any("search_window_end" in e.value for e in app.error)
-        )
+        self.assertTrue(any("search_window_end" in e.value for e in app.error))
         self.assertNotIn("launch_window_result", app.session_state)
 
     def test_rejects_a_maximum_time_of_flight_below_the_minimum(self):
@@ -295,11 +295,12 @@ class TestSendSelectionTo3D(unittest.TestCase):
             app = _submit_search(app)
 
         self.assertFalse(app.exception)
-        self.assertFalse(
-            any(b.label == "Send selected candidate to 3D view" for b in app.button)
-        )
+        self.assertFalse(any(b.label == "Send selected candidate to 3D view" for b in app.button))
         self.assertTrue(
-            any("Configure and calculate a mission on the Mission setup page first" in i.value for i in app.info)
+            any(
+                "Configure and calculate a mission on the Mission setup page first" in i.value
+                for i in app.info
+            )
         )
 
     def test_sending_the_selection_narrows_the_launch_window_and_opens_the_3d_page(self):
@@ -325,10 +326,7 @@ class TestSendSelectionTo3D(unittest.TestCase):
         self.assertEqual(updated_inputs.launch_window_end, date(2026, 7, 2))
         self.assertEqual(updated_inputs.trajectory_type, app_services.TRAJECTORY_TYPE_DIRECT)
         self.assertTrue(
-            any(
-                h.value == "Complete mission trajectory — interactive 3D view"
-                for h in app.header
-            )
+            any(h.value == "Complete mission trajectory — interactive 3D view" for h in app.header)
         )
 
     def test_selected_engine_segments_render_as_two_separate_3d_scenes(self):
@@ -365,16 +363,10 @@ class TestSendSelectionTo3D(unittest.TestCase):
         self.assertFalse(app.exception)
         self.assertEqual(len(app.get("plotly_chart")), 2)
         self.assertTrue(
-            any(
-                header.value == "Earth → Saturn (heliocentric)"
-                for header in app.subheader
-            )
+            any(header.value == "Earth → Saturn (heliocentric)" for header in app.subheader)
         )
         self.assertTrue(
-            any(
-                header.value == "Saturn capture (Saturn-centred)"
-                for header in app.subheader
-            )
+            any(header.value == "Saturn capture (Saturn-centred)" for header in app.subheader)
         )
 
     def test_activated_candidate_is_the_scorecard_source_of_truth_across_navigation(self):
@@ -390,9 +382,7 @@ class TestSendSelectionTo3D(unittest.TestCase):
             app = app.switch_page("pages/launch_windows.py").run(timeout=30)
             app = _submit_search(app)
             activate_button = next(
-                b
-                for b in app.button
-                if b.label == "Use selected candidate as active scenario"
+                b for b in app.button if b.label == "Use selected candidate as active scenario"
             )
             app = activate_button.click().run(timeout=30)
             # A page switch/rerun must preserve the active immutable candidate.
@@ -416,8 +406,7 @@ class TestSendSelectionTo3D(unittest.TestCase):
         self.assertNotIn("Single-stage exceedance", metrics)
         self.assertTrue(
             any(
-                "Active scenario: Selected launch-window candidate — launch-fixture-1"
-                in c.value
+                "Active scenario: Selected launch-window candidate — launch-fixture-1" in c.value
                 for c in app.caption
             )
         )
@@ -447,24 +436,18 @@ class TestSendSelectionTo3D(unittest.TestCase):
             )
             app = activate.click().run(timeout=30)
             app = app.switch_page("pages/mission_setup.py").run(timeout=30)
-            return_button = next(
-                b for b in app.button if b.label == "Return to mission baseline"
-            )
+            return_button = next(b for b in app.button if b.label == "Return to mission baseline")
             app = return_button.click().run(timeout=30)
 
         self.assertFalse(app.exception)
-        self.assertNotIn(
-            lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, app.session_state
-        )
+        self.assertNotIn(lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, app.session_state)
         metrics = {metric.label: metric.value for metric in app.metric}
         self.assertEqual(metrics["Connected delta-v"], "12,531 m/s")
         self.assertIn("Wet mass (simplified)", metrics)
 
     def test_active_candidate_does_not_recompute_the_baseline_bundle(self):
         app = AppTest.from_file(APP_PATH)
-        app.session_state[lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY] = (
-            _make_candidate(1)
-        )
+        app.session_state[lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY] = _make_candidate(1)
 
         with patch(
             "app_services.require_mission_bundle",
@@ -511,7 +494,7 @@ class TestStaleResultsClearOnScenarioChange(unittest.TestCase):
         self.assertEqual(second_metrics["Delta-v total"], "1,234.5 m/s")
         self.assertNotEqual(second_metrics["Delta-v total"], first_metrics["Delta-v total"])
 
-    def test_a_new_search_invalidates_the_previously_active_candidate(self):
+    def test_a_new_search_preserves_the_previously_active_candidate(self):
         with patch(
             "launch_window_service.get_launch_window_service",
             return_value=_FixtureLaunchWindowService(candidate_count=1),
@@ -522,14 +505,14 @@ class TestStaleResultsClearOnScenarioChange(unittest.TestCase):
                 b for b in app.button if b.label == "Use selected candidate as active scenario"
             )
             app = activate.click().run(timeout=30)
-            self.assertIn(
-                lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, app.session_state
-            )
+            self.assertIn(lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, app.session_state)
             app = _submit_search(app)
 
         self.assertFalse(app.exception)
-        self.assertNotIn(
-            lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, app.session_state
+        self.assertIn(lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY, app.session_state)
+        self.assertEqual(
+            app.session_state[lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY].scenario_id,
+            "launch-fixture-1",
         )
 
 
@@ -584,10 +567,7 @@ class TestUnitsAndLabels(unittest.TestCase):
         ):
             self.assertIn(expected_label, metric_labels)
         self.assertTrue(
-            any(
-                "does not guarantee a phased encounter with Titan" in w.value
-                for w in app.warning
-            )
+            any("does not guarantee a phased encounter with Titan" in w.value for w in app.warning)
         )
         self.assertTrue(
             any(
@@ -596,10 +576,7 @@ class TestUnitsAndLabels(unittest.TestCase):
             )
         )
         self.assertTrue(
-            any(
-                "follows the configured Earth parking orbit" in c.value
-                for c in app.caption
-            )
+            any("follows the configured Earth parking orbit" in c.value for c in app.caption)
         )
 
     def test_flight_time_and_total_duration_are_never_the_same_displayed_value(self):
