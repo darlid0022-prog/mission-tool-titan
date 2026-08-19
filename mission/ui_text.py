@@ -494,10 +494,6 @@ UI_V030_TEXT: Final[dict[str, str]] = {
         "current model."
     ),
     "verdict_conclusion_heading": "Model conclusion",
-    "verdict_conclusion": (
-        "The calculated scenario describes a connected Earth–Saturn mission chain within "
-        "the scope and assumptions of the current model."
-    ),
     "verdict_final_state_heading": "Calculated final state",
     "verdict_final_state": (
         "The model reaches a Saturn-centered circular orbit at Titan's mean orbital radius."

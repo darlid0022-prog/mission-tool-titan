@@ -1125,8 +1125,12 @@ class TestBudgetAndVerdictV030(unittest.TestCase):
             )
             for element in collection
         )
-        self.assertIn("Model conclusion", visible)
-        self.assertIn("within the scope and assumptions of the current model", visible)
+        # "Model conclusion" (with its former tautological sentence) is no longer
+        # rendered for the connected Earth-Saturn-Titan case: the two lists below
+        # are the verdict (docs/audit_science_budget_v030.md, wording-and-scope
+        # batch §2.4). The header is retained only for the historical/non-Saturn
+        # branches, which this default connected scenario does not exercise.
+        self.assertNotIn("Model conclusion", visible)
         self.assertIn("This result does not demonstrate a Titan encounter", visible)
         self.assertIn("What the model calculates", visible)
         self.assertIn("What the model does not demonstrate", visible)

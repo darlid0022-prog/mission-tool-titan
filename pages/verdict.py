@@ -84,27 +84,12 @@ elif isinstance(bundle, app_services.MissionBundle):
 if values is None:
     st.info(UI_V030_TEXT["verdict_no_result_note"])
 else:
-    st.header(UI_V030_TEXT["verdict_conclusion_heading"])
-    if state.active_scenario.kind is ActiveScenarioKind.CASSINI_HISTORICAL_REFERENCE:
-        st.write(UI_V030_TEXT["verdict_historical_conclusion"])
-    elif has_saturn_endpoint:
-        st.write(UI_V030_TEXT["verdict_conclusion"])
-    else:
-        st.write(UI_V030_TEXT["verdict_non_saturn_conclusion"])
-
-    st.header(UI_V030_TEXT["verdict_final_state_heading"])
-    if state.active_scenario.kind is ActiveScenarioKind.CASSINI_HISTORICAL_REFERENCE:
-        st.write(UI_V030_TEXT["verdict_historical_final_state"])
-    elif has_saturn_endpoint:
-        st.write(UI_V030_TEXT["verdict_final_state"])
-        st.warning(UI_V030_TEXT["verdict_titan_exclusion"])
-    else:
-        st.write(UI_V030_TEXT["verdict_non_saturn_final_state"])
-
-    render_departure_energy(values)
-    render_connected_budget(values)
-    st.caption(UI_V030_TEXT["verdict_allocation_limitation"])
-
+    # The two lists below are the verdict: precise, honest statements of what
+    # the model does and does not establish. They sit immediately under the
+    # page title, ahead of every conclusion, final-state, and budget block,
+    # so a reader hits them before anything else (see the docs/audit_science
+    # _budget_v030.md wording-and-scope batch, §2.4: the previous "Model
+    # conclusion" tautology added no information beyond these lists).
     st.header(UI_V030_TEXT["verdict_demonstrated_heading"])
     calculated_keys = [
         "verdict_calculates_departure",
@@ -132,6 +117,31 @@ else:
             "verdict_not_vehicle_design",
         )
     )
+
+    # "Model conclusion" is retained only for scenarios where it states real
+    # information (which historical model, or which non-Saturn scope
+    # applies). The connected Earth-Saturn-Titan case previously repeated
+    # only the scope already established above, so it is not rendered here.
+    if state.active_scenario.kind is ActiveScenarioKind.CASSINI_HISTORICAL_REFERENCE:
+        st.header(UI_V030_TEXT["verdict_conclusion_heading"])
+        st.write(UI_V030_TEXT["verdict_historical_conclusion"])
+    elif not has_saturn_endpoint:
+        st.header(UI_V030_TEXT["verdict_conclusion_heading"])
+        st.write(UI_V030_TEXT["verdict_non_saturn_conclusion"])
+
+    st.header(UI_V030_TEXT["verdict_final_state_heading"])
+    if state.active_scenario.kind is ActiveScenarioKind.CASSINI_HISTORICAL_REFERENCE:
+        st.write(UI_V030_TEXT["verdict_historical_final_state"])
+    elif has_saturn_endpoint:
+        st.write(UI_V030_TEXT["verdict_final_state"])
+        st.warning(UI_V030_TEXT["verdict_titan_exclusion"])
+    else:
+        st.write(UI_V030_TEXT["verdict_non_saturn_final_state"])
+
+    render_departure_energy(values)
+    render_connected_budget(values)
+    st.caption(UI_V030_TEXT["verdict_allocation_limitation"])
+
     render_assumptions_and_limitations(
         (
             UI_V030_TEXT["verdict_assumption_dynamics"],

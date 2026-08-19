@@ -130,7 +130,6 @@ def test_lot4_visible_copy_is_centralized() -> None:
         "budget_saturn_subtotal",
         "budget_total_explanation",
         "budget_mass_note",
-        "verdict_conclusion",
         "verdict_final_state",
         "verdict_titan_exclusion",
         "verdict_allocation_limitation",
