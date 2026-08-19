@@ -25,7 +25,7 @@ from mission.trajectory_scene import (
     segments_from_cassini_tour,
     segments_from_launch_search,
 )
-from mission.ui_text import UI_TEXT
+from mission.ui_text import UI_TEXT, UI_V030_TEXT
 
 # Camera presets scoped to Saturn-centred geometry (Rings/Periapsis/Titan) are
 # only offered once the segments themselves are Saturn-centred; a heliocentric
@@ -78,6 +78,19 @@ def render_generic_scene_section(
             )
             st.caption(animation_timeline.interpolation_notice)
         if display_mode == "Animated" and animation_timeline is not None:
+            # The trajectory type, UTC date range, and total elapsed time
+            # used to be redrawn into the Plotly figure's own title on every
+            # frame, which could get clipped at narrow widths. They are
+            # rendered once here instead; the figure itself keeps only the
+            # per-frame date/elapsed pair, inside its slider (see
+            # mission/trajectory_plot.py::build_direct_animation_figure).
+            first_frame = animation_timeline.frames[0]
+            last_frame = animation_timeline.frames[-1]
+            st.markdown(f"**{UI_V030_TEXT['trajectory_3d_animated_transfer_label']}**")
+            st.caption(
+                f"{first_frame.date_utc} → {last_frame.date_utc} · "
+                f"elapsed {last_frame.elapsed_days:,.1f} days total"
+            )
             figure = build_direct_animation_figure(segments, animation_timeline)
         else:
             figure = build_scene_figure(
@@ -114,9 +127,7 @@ if bundle is None:
 
 mission_inputs = app_services.load_mission_setup_inputs()
 active_launch_candidate = st.session_state.get(lw.ACTIVE_LAUNCH_WINDOW_CANDIDATE_STATE_KEY)
-selected_launch_candidate = st.session_state.get(
-    lw.SELECTED_LAUNCH_WINDOW_CANDIDATE_STATE_KEY
-)
+selected_launch_candidate = st.session_state.get(lw.SELECTED_LAUNCH_WINDOW_CANDIDATE_STATE_KEY)
 display_launch_candidate = (
     active_launch_candidate
     if isinstance(active_launch_candidate, lw.LaunchWindowCandidate)
@@ -143,8 +154,7 @@ if (
         else "Selected launch-window candidate"
     )
     st.caption(
-        f"{scenario_status} · {display_launch_candidate.scenario_id} · "
-        "scientific engine segments."
+        f"{scenario_status} · {display_launch_candidate.scenario_id} · scientific engine segments."
     )
     if heliocentric_source:
         heliocentric_timeline = build_direct_trajectory_timeline(

@@ -67,6 +67,18 @@ div[data-testid="stMetricValue"] > div {
     min-width: min(100%, 19rem);
 }
 
+/* The mass-ratio metric's label is a full sentence fragment ("Simplified
+   mass ratio using the full connected Δv") that must stay readable in
+   full - wrap it instead of letting Streamlit's default single-line
+   ellipsis truncate it on narrow screens. */
+.st-key-mass_ratio_metric [data-testid="stMetricLabel"],
+.st-key-mass_ratio_metric [data-testid="stMetricLabel"] * {
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+    text-overflow: clip !important;
+    overflow: visible !important;
+}
+
 @media (max-width: 48rem) {
     [data-testid="stMainBlockContainer"] {
         width: 100%;
@@ -80,6 +92,42 @@ div[data-testid="stMetricValue"] > div {
     .st-key-trajectory_direct_card,
     .st-key-trajectory_launch_card {
         min-width: 100%;
+    }
+
+    /* Instrument/dry/propellant/wet mass metrics: 4-across on desktop is
+       too tight around 768px and truncates labels/values - fold to a
+       2x2 grid at this breakpoint instead. */
+    .st-key-mass_budget_metrics_row [data-testid="stHorizontalBlock"] {
+        flex-wrap: wrap !important;
+    }
+
+    .st-key-mass_budget_metrics_row [data-testid="stColumn"] {
+        flex: 1 1 45% !important;
+        min-width: 45% !important;
+    }
+}
+
+@media (max-width: 26rem) {
+    /* Narrower still: even a 2x2 grid can crowd these labels, so drop to
+       one metric per row. */
+    .st-key-mass_budget_metrics_row [data-testid="stColumn"] {
+        flex: 1 1 100% !important;
+        min-width: 100% !important;
+    }
+}
+
+@media (max-width: 31.25rem) {
+    /* Below ~500px, Streamlit's sidebar drawer can be narrower than the
+       viewport, leaving a strip of the main content visible on its right
+       edge while the sidebar is open. Force full coverage and pin the
+       sidebar's own configured background (.streamlit/config.toml
+       [theme.sidebar].backgroundColor) so nothing can show through.
+       Scoped to this breakpoint only - no desktop impact. */
+    [data-testid="stSidebar"] {
+        width: 100vw !important;
+        min-width: 100vw !important;
+        max-width: 100vw !important;
+        background-color: #0A1626 !important;
     }
 }
 </style>

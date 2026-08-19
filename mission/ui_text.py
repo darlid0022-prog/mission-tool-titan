@@ -341,6 +341,7 @@ UI_V030_TEXT: Final[dict[str, str]] = {
     "trajectory_duration_unavailable": (
         "A Saturn periapsis-to-apoapsis breakdown is not available for this scenario."
     ),
+    "trajectory_3d_animated_transfer_label": "Direct Earth–Saturn Lambert transfer",
     "trajectory_last_search": "Last search",
     "trajectory_no_search": "No launch-window search in this session",
     "trajectory_search_candidates": "candidates available",

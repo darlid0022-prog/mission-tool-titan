@@ -647,24 +647,26 @@ st.subheader(UI_TEXT["mass_budget"])
 st.warning(UI_TEXT["mass_model_warning"], icon=":material/warning:")
 if departure_type == "Direct":
     st.warning(UI_TEXT["direct_warning"])
-st.metric(
-    "Simplified mass ratio using the full connected Δv",
-    f"{bundle.mass_ratio:,.2f}",
-    help=(
-        "This ratio applies the simplified single-stage rocket equation to the full "
-        "connected total. Allocation among a launcher, upper stage, and spacecraft is "
-        "not modeled, so this is not a vehicle feasibility verdict."
-    ),
-    border=True,
-)
+with st.container(key="mass_ratio_metric"):
+    st.metric(
+        "Simplified mass ratio using the full connected Δv",
+        f"{bundle.mass_ratio:,.2f}",
+        help=(
+            "This ratio applies the simplified single-stage rocket equation to the full "
+            "connected total. Allocation among a launcher, upper stage, and spacecraft is "
+            "not modeled, so this is not a vehicle feasibility verdict."
+        ),
+        border=True,
+    )
 if bundle.mass_ratio > 20:
     st.warning(
         f"The mass ratio above ({bundle.mass_ratio:,.0f}) indicates that one "
         f"non-discarding chemical stage at {isp_s:.0f} s is unsuitable for the modeled "
         "delta-v; see the calibrated feasibility study below."
     )
-c1, c2, c3, c4 = st.columns(4)
-c1.metric(UI_TEXT["instrument_mass"], f"{bundle.mass['instrument_mass_kg']:.1f} kg")
-c2.metric(UI_TEXT["dry_mass"], f"{bundle.mass['dry_mass_kg']:.1f} kg")
-c3.metric(UI_TEXT["propellant_mass"], f"{bundle.mass['propellant_mass_kg']:.1f} kg")
-c4.metric(UI_TEXT["wet_mass"], f"{bundle.mass['wet_mass_kg']:.1f} kg")
+with st.container(key="mass_budget_metrics_row"):
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric(UI_TEXT["instrument_mass"], f"{bundle.mass['instrument_mass_kg']:.1f} kg")
+    c2.metric(UI_TEXT["dry_mass"], f"{bundle.mass['dry_mass_kg']:.1f} kg")
+    c3.metric(UI_TEXT["propellant_mass"], f"{bundle.mass['propellant_mass_kg']:.1f} kg")
+    c4.metric(UI_TEXT["wet_mass"], f"{bundle.mass['wet_mass_kg']:.1f} kg")

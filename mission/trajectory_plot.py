@@ -10,7 +10,7 @@ import pykep as pk
 from plotly.subplots import make_subplots
 
 from . import colors
-from .direct_trajectory_animation import DirectTrajectoryTimeline3D
+from .direct_trajectory_animation import DirectTrajectoryFrame3D, DirectTrajectoryTimeline3D
 from .gravity_assist import GravityAssistResult, MissionSegment, OrbitInsertionResult
 from .trajectory_scene import TrajectorySegment
 from .trajectory_visualization import (
@@ -513,9 +513,13 @@ def build_scene_figure(
     return figure
 
 
-def _direct_animation_title(timeline: DirectTrajectoryTimeline3D, index: int) -> str:
-    frame = timeline.frames[index]
-    return f"Direct Earth → Saturn · {frame.date_utc} · elapsed {frame.elapsed_days:,.1f} days"
+def _direct_animation_slider_label(frame: DirectTrajectoryFrame3D) -> str:
+    """Date + elapsed time for one slider step - the only place this pair is
+    still shown inside the Plotly figure itself; the fixed trajectory-type
+    and date-range context now live in Streamlit above the chart (see
+    pages/trajectory_3d.py) so the long per-frame title this replaced can
+    never again get clipped at narrow widths."""
+    return f"{frame.date_utc[:10]} · +{frame.elapsed_days:,.0f} d"
 
 
 def build_direct_animation_figure(
@@ -565,6 +569,11 @@ def build_direct_animation_figure(
                 z=[first.earth_position_au[2]],
                 mode="markers",
                 name="Earth — current ephemeris position",
+                # Identified on hover and by its fixed marker color; kept out
+                # of the legend band so that band stays short enough to
+                # never wrap into the slider/button bands below it at
+                # narrow widths (see build_direct_animation_figure).
+                showlegend=False,
                 marker={"color": colors.LANDMARK_BODY, "size": 6},
                 hovertemplate="Earth<br>%{text}<extra></extra>",
                 text=[first.date_utc],
@@ -575,6 +584,7 @@ def build_direct_animation_figure(
                 z=[first.saturn_position_au[2]],
                 mode="markers",
                 name="Saturn — current ephemeris position",
+                showlegend=False,
                 marker={"color": colors.REFERENCE_ORBIT_WARM, "size": 7},
                 hovertemplate="Saturn<br>%{text}<extra></extra>",
                 text=[first.date_utc],
@@ -585,6 +595,7 @@ def build_direct_animation_figure(
                 z=[first.spacecraft_position_au[2]],
                 mode="markers",
                 name="Spacecraft — sampled position",
+                showlegend=False,
                 marker={
                     "color": colors.INTERPLANETARY_TRANSFER.dark,
                     "size": 8,
@@ -625,22 +636,33 @@ def build_direct_animation_figure(
                         customdata=[[instant.date_utc, instant.elapsed_days]],
                     ),
                 ),
-                layout=go.Layout(title={"text": _direct_animation_title(timeline, index)}),
             )
         )
     figure.frames = tuple(frames)
 
     frame_duration_ms = max(70, round(4_800 / len(timeline.frames)))
+    # Three distinct vertical bands below the 3D scene - legend, then the
+    # date/elapsed slider, then Play/Pause/Reset - each given its own y
+    # position with a wide, fixed gap to the next so none can visually
+    # collide regardless of container width (the figure's pixel height does
+    # not change across breakpoints, only its width does). No Plotly title
+    # is set here: the trajectory type, date range, and total elapsed time
+    # are rendered once in Streamlit above this figure (see
+    # pages/trajectory_3d.py) instead of a long per-frame title that could
+    # get clipped at narrow widths.
+    legend_band_y = -0.05
+    slider_band_y = -0.17
+    buttons_band_y = -0.27
     figure.update_layout(
         height=680,
-        title={"text": _direct_animation_title(timeline, 0), "x": 0.5},
-        margin={"l": 0, "r": 0, "t": 70, "b": 85},
+        margin={"l": 0, "r": 0, "t": 20, "b": 180},
+        legend={"orientation": "h", "y": legend_band_y, "x": 0.5, "xanchor": "center"},
         updatemenus=[
             {
                 "type": "buttons",
                 "direction": "left",
                 "x": 0.0,
-                "y": -0.14,
+                "y": buttons_band_y,
                 "buttons": [
                     {
                         "label": "Play",
@@ -685,12 +707,12 @@ def build_direct_animation_figure(
             {
                 "active": 0,
                 "x": 0.0,
-                "y": -0.04,
+                "y": slider_band_y,
                 "len": 1.0,
                 "currentvalue": {"prefix": "UTC: "},
                 "steps": [
                     {
-                        "label": instant.date_utc[:10],
+                        "label": _direct_animation_slider_label(instant),
                         "method": "animate",
                         "args": [
                             [str(index)],
