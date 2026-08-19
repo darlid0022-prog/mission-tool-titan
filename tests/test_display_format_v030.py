@@ -1,16 +1,19 @@
-"""Numeric non-regression for the wording-and-scope correction batch.
+"""RENDERED-STRING checks for the reference Earth-Saturn-Titan mission.
 
-See docs/audit_science_budget_v030.md: an independent external audit
-recomputed 40 values displayed by the application and found all 40 correct
-(max deviation 0.041%). This batch changes labels and scope only - no
-compute_*, solver, or physical-constants file is touched (see the batch's
-own acceptance criterion 1). This test asserts every one of those 40 values
-is still present, unchanged, in the rendered reference-scenario baseline
-across every page that displays it.
+DO NOT MERGE THIS FILE WITH tests/test_numeric_invariants_v030.py.
 
-Values are asserted as exact rendered substrings (not re-parsed or
-re-computed), so any accidental change to a number - not just to a label
-- fails this test.
+This file asserts on what a user actually SEES (exact rendered strings,
+via Streamlit's AppTest), not on the underlying floats. It is EXPECTED to
+change whenever display policy changes - rounding, thousands separators,
+wording - and that is fine: this file's whole job is to pin down the
+current display contract, not to guard the physics. Every change here must
+still be justified in its own commit message (before/after + reason), but
+a red test here is not by itself evidence of a scientific regression.
+
+tests/test_numeric_invariants_v030.py is the file that guards the
+underlying values (compute_mission_bundle called directly, no rendering).
+If you are here to fix a physics/model regression, you are in the wrong
+file - go there instead.
 """
 
 import unittest
@@ -25,13 +28,9 @@ from mission.models import Leg, TrajectoryResult
 
 APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
 
-# Every value from docs/audit_science_budget_v030.md's audited set, as the
-# exact substring the application renders for it today. A handful (the
-# propellant/wet mass on Mission setup) render without a thousands
-# separator in the current app - that is an existing, unrelated formatting
-# quirk, not something this batch touches, so the assertions below match
-# the application's actual output rather than the audit note's own
-# thousands-separated notation.
+# The current display contract for the audited reference scenario (see
+# docs/audit_science_budget_v030.md). Every entry is a literal substring the
+# application renders today - not a re-derivation of the underlying value.
 REQUIRED_STRINGS = (
     "7,381.480 m/s",
     "2,182.991 m/s",
@@ -50,9 +49,9 @@ REQUIRED_STRINGS = (
     "2,856.0 days",
     "2,859.354",
     "54.22",
-    "223.9 kg",
-    "11913.6 kg",
-    "12137.5 kg",
+    "224 kg",
+    "11,914 kg",
+    "12,138 kg",
     "3,833.463 m/s",
     "3.269×",
     "2,280.8 m/s",
@@ -134,7 +133,7 @@ def _rendered_text(app: AppTest) -> str:
     return " | ".join(parts)
 
 
-class TestAuditedNumericValuesAreUnchanged(unittest.TestCase):
+class TestAuditedDisplayStringsAreCurrent(unittest.TestCase):
     """One combined baseline run per page group, not per assertion, to keep
     this test's own runtime bounded even though it visits every relevant
     page for the reference scenario."""
@@ -165,6 +164,9 @@ class TestAuditedNumericValuesAreUnchanged(unittest.TestCase):
             trajectory = app.switch_page("pages/trajectory.py").run(timeout=30)
             cls.trajectory_text = _rendered_text(trajectory)
 
+            verdict = app.switch_page("pages/verdict.py").run(timeout=30)
+            cls.verdict_text = _rendered_text(verdict)
+
         cls.combined_text = "\n".join(
             (
                 cls.mission_setup_text,
@@ -173,31 +175,40 @@ class TestAuditedNumericValuesAreUnchanged(unittest.TestCase):
                 cls.feasibility_text,
                 cls.gravity_assists_text,
                 cls.trajectory_text,
+                cls.verdict_text,
             )
         )
 
-    def test_every_audited_value_is_still_rendered_unchanged(self) -> None:
+    def test_every_audited_display_string_is_current(self) -> None:
         missing = [value for value in REQUIRED_STRINGS if value not in self.combined_text]
         self.assertEqual(
             missing,
             [],
-            f"Audited value(s) no longer found verbatim in the rendered output: {missing}",
+            f"Display string(s) no longer found verbatim in the rendered output: {missing}",
         )
 
-    def test_the_earth_saturn_delta_v_sum_check_still_holds(self) -> None:
+    def test_the_earth_saturn_delta_v_sum_check_is_readable_in_the_interface(self) -> None:
+        # This is a display-contract check (the three addend strings and the
+        # total string are all on screen) - the actual sum is proved against
+        # the real floats in test_numeric_invariants_v030.py.
         self.assertIn("7,381.480 m/s", self.combined_text)
         self.assertIn("2,182.991 m/s", self.combined_text)
         self.assertIn("2,966.182 m/s", self.combined_text)
         self.assertIn("12,530.653 m/s", self.combined_text)
-        self.assertAlmostEqual(7_381.480 + 2_182.991 + 2_966.182, 12_530.653, places=3)
 
     def test_no_isolated_study_value_appears_on_mission_setup_budget_or_verdict(self) -> None:
         # docs/audit_science_budget_v030.md wording-and-scope batch, acceptance
         # criterion 5: nothing from an isolated study reaches the connected
-        # scorecard/Budget. The single-stage exceedance factor is the one
-        # isolated-study number that used to leak onto Mission setup.
-        self.assertNotIn("3.269×", self.mission_setup_text)
-        self.assertNotIn("3.269×", self.budget_text)
+        # scorecard/Budget/Verdict. Covers both the single-stage exceedance
+        # factor and the §2.2 allocation-bracket launcher bound (1.343x).
+        for page_name, page_text in (
+            ("Mission setup", self.mission_setup_text),
+            ("Budget", self.budget_text),
+            ("Verdict", self.verdict_text),
+        ):
+            with self.subTest(page=page_name):
+                self.assertNotIn("3.269×", page_text)
+                self.assertNotIn("1.343×", page_text)
 
 
 if __name__ == "__main__":

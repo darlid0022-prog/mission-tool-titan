@@ -221,6 +221,28 @@ Aucun échec. Aucune constante modifiée pour obtenir ces résultats.
 
 ---
 
+## 11bis. Tests critiques — ne pas supprimer lors d'un nettoyage
+
+Deux fichiers protègent délibérément des choses différentes et ne doivent
+jamais être fusionnés (chacun porte cet avertissement en tête) :
+
+- `tests/test_numeric_invariants_v030.py` — assertions sur les VALEURS
+  brutes retournées par les modèles (`app_services.compute_mission_bundle`,
+  `mission.gravity_assist`), sans passer par le rendu Streamlit. Ce sont les
+  invariants physiques audités ci-dessus : ils ne doivent jamais changer
+  sans une décision scientifique documentée.
+- `tests/test_display_format_v030.py` — assertions sur les CHAÎNES RENDUES
+  (ce que voit l'utilisateur). Peut évoluer avec la politique d'affichage ;
+  toute évolution doit être justifiée dans le message de commit qui la
+  produit.
+
+Un changement de format d'affichage doit faire échouer au plus le second
+fichier, jamais le premier. Si une modification fait échouer
+`test_numeric_invariants_v030.py`, c'est un signal d'alerte scientifique,
+pas un signal de nettoyage.
+
+---
+
 ## Incohérences relevées
 
 | # | Sévérité | Constat | Fichier |
