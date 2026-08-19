@@ -6,7 +6,7 @@ import pandas as pd
 
 import app_services
 import trajectory
-from tests.test_app_titan_ui import earth_saturn_leg, earth_saturn_result
+from tests.test_app_titan_ui import earth_saturn_result
 
 DEFAULT_LAUNCH_WINDOW_START = date(2026, 6, 1)
 DEFAULT_LAUNCH_WINDOW_END = date(2027, 6, 1)
@@ -79,6 +79,27 @@ class TestDirectTrajectoryTypeIsUnchanged(unittest.TestCase):
     def test_direct_mode_uses_the_lambert_states_with_shared_saturn_capture(self):
         bundle = app_services.compute_mission_bundle(_connected_titan_inputs())
 
+        budget = bundle.complete_dv_budget
+        self.assertAlmostEqual(budget.earth_departure_m_s, 7_381.480, delta=1e-3)
+        self.assertAlmostEqual(
+            budget.saturn_capture_to_ellipse_m_s, 2_182.991, delta=1e-3
+        )
+        self.assertAlmostEqual(
+            budget.saturn_staging_circularisation_m_s, 2_966.182, delta=1e-3
+        )
+        self.assertAlmostEqual(
+            budget.saturn_capture_to_ellipse_m_s
+            + budget.saturn_staging_circularisation_m_s,
+            5_149.173,
+            delta=1e-3,
+        )
+        self.assertAlmostEqual(
+            budget.earth_departure_m_s
+            + budget.saturn_capture_to_ellipse_m_s
+            + budget.saturn_staging_circularisation_m_s,
+            budget.total_m_s,
+            delta=1e-9,
+        )
         self.assertAlmostEqual(bundle.dv_total, 12_530.653004975673, delta=1e-3)
         self.assertAlmostEqual(bundle.mission_duration_days, 2_859.353993746092, delta=1e-3)
         self.assertIsNotNone(bundle.staging_result)

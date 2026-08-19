@@ -1028,9 +1028,86 @@ class TestGravityAssistsPage(unittest.TestCase):
         self.assertIn("Unpowered flyby", captions)
 
 
+class TestBudgetAndVerdictV030(unittest.TestCase):
+    def test_budget_displays_audited_baseline_values_and_scope(self):
+        app = run_app(page_path="pages/budget.py")
+
+        self.assertFalse(app.exception)
+        metrics = {metric.label: metric.value for metric in app.metric}
+        self.assertEqual(metrics["Earth C3"], "approximately 108.83 km²/s²")
+        self.assertEqual(metrics["Earth v∞"], "approximately 10.432 km/s")
+        self.assertEqual(metrics["Modeled Earth injection"], "7,381.480 m/s")
+        self.assertEqual(metrics["Saturn capture"], "2,182.991 m/s")
+        self.assertEqual(metrics["Saturn-centered circularization"], "2,966.182 m/s")
+        self.assertEqual(
+            metrics["Subtotal of modeled Saturn maneuvers"], "5,149.173 m/s"
+        )
+        self.assertEqual(metrics["Connected total"], "12,530.653 m/s")
+        captions = " ".join(item.value for item in app.caption)
+        self.assertIn("They are not additional delta-v contributions", captions)
+        self.assertIn("No real launch vehicle is currently modeled", captions)
+        self.assertIn("not a Titan encounter", captions)
+
+    def test_verdict_is_cautious_and_uses_the_complete_total(self):
+        app = run_app(page_path="pages/verdict.py")
+
+        self.assertFalse(app.exception)
+        metrics = {metric.label: metric.value for metric in app.metric}
+        self.assertEqual(metrics["Connected total"], "12,530.653 m/s")
+        visible = " ".join(
+            element.value
+            for collection in (
+                app.header,
+                app.markdown,
+                app.caption,
+                app.info,
+                app.warning,
+            )
+            for element in collection
+        )
+        self.assertIn("Model conclusion", visible)
+        self.assertIn("within the scope and assumptions of the current model", visible)
+        self.assertIn("This result does not demonstrate a Titan encounter", visible)
+        self.assertIn("What the model calculates", visible)
+        self.assertIn("What the model does not demonstrate", visible)
+        self.assertNotIn("Launchable", visible)
+        self.assertNotIn("Supported by a launch vehicle", visible)
+
+    def test_budget_and_verdict_render_without_recomputing_the_bundle(self):
+        app = AppTest.from_file(APP_PATH)
+        with patch(
+            "app_services.compute_cached_trajectory", return_value=earth_saturn_result()
+        ) as trajectory_mock:
+            app.run(timeout=30)
+            self.assertEqual(trajectory_mock.call_count, 1)
+            app.switch_page("pages/budget.py").run(timeout=30)
+            app.switch_page("pages/verdict.py").run(timeout=30)
+        self.assertEqual(trajectory_mock.call_count, 1)
+
+    def test_stale_budget_and_verdict_identify_previous_results(self):
+        app = run_app()
+        isp = next(
+            widget
+            for widget in app.number_input
+            if widget.label == "Main engine specific impulse (s)"
+        )
+        isp.set_value(321).run(timeout=30)
+
+        app.switch_page("pages/budget.py").run(timeout=30)
+        self.assertTrue(
+            any("previous calculation" in warning.value for warning in app.warning)
+        )
+        app.switch_page("pages/verdict.py").run(timeout=30)
+        self.assertTrue(
+            any("previous calculation" in warning.value for warning in app.warning)
+        )
+
+
 class TestNavigationAcrossAllPages(unittest.TestCase):
     def test_every_page_renders_without_exception(self):
         for page_path in (
+            "pages/budget.py",
+            "pages/verdict.py",
             "pages/launch_windows.py",
             "pages/trajectory_3d.py",
             "pages/saturn_system_studies.py",

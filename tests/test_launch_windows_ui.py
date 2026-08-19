@@ -208,6 +208,8 @@ class TestObjectiveChange(unittest.TestCase):
             app = _submit_search(app)
 
         self.assertFalse(app.exception)
+        self.assertIsNotNone(service.last_request)
+        assert service.last_request is not None
         self.assertEqual(service.last_request.objective, "min_c3")
 
 
@@ -410,6 +412,18 @@ class TestSendSelectionTo3D(unittest.TestCase):
                 for c in app.caption
             )
         )
+
+        app = app.switch_page("pages/budget.py").run(timeout=30)
+        self.assertFalse(app.exception)
+        budget_metrics = {metric.label: metric.value for metric in app.metric}
+        self.assertEqual(budget_metrics["Earth C3"], "approximately 98.40 km²/s²")
+        self.assertEqual(budget_metrics["Modeled Earth injection"], "3,620.100 m/s")
+        self.assertEqual(budget_metrics["Saturn capture"], "2,280.800 m/s")
+        self.assertEqual(
+            budget_metrics["Saturn-centered circularization"], "862.700 m/s"
+        )
+        self.assertEqual(budget_metrics["Connected total"], "6,753.600 m/s")
+        self.assertNotIn("Simplified wet mass", budget_metrics)
 
     def test_scorecard_explicitly_names_baseline_without_an_active_candidate(self):
         with patch("app_services.compute_cached_trajectory", return_value=_earth_saturn_result()):

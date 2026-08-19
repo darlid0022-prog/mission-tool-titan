@@ -66,3 +66,29 @@ def test_status_copy_is_not_color_only() -> None:
         "status_technical_error",
     ):
         assert len(UI_V030_TEXT[key].split()) >= 3
+
+
+def test_budget_and_verdict_are_read_only_presentations() -> None:
+    for path in ("pages/budget.py", "pages/verdict.py"):
+        source = (ROOT / path).read_text()
+        assert "compute_mission_bundle(" not in source
+        assert "require_mission_bundle(" not in source
+        assert "LAST_VALID_MISSION_BUNDLE_STATE_KEY" in source
+        assert "render_calculation_status(state)" in source
+
+
+def test_lot4_visible_copy_is_centralized() -> None:
+    required = (
+        "budget_energy_note",
+        "budget_allocation_explanation",
+        "budget_saturn_subtotal",
+        "budget_total_explanation",
+        "budget_mass_note",
+        "verdict_conclusion",
+        "verdict_final_state",
+        "verdict_titan_exclusion",
+        "verdict_allocation_limitation",
+        "verdict_demonstrated_heading",
+        "verdict_excluded_heading",
+    )
+    assert all(UI_V030_TEXT[key] for key in required)

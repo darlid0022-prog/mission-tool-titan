@@ -6,10 +6,27 @@ from collections.abc import Iterable
 
 import streamlit as st
 
+from mission.ui_format import (
+    format_approximate_c3_km2_s2,
+    format_approximate_speed_km_s,
+    format_delta_v_m_s,
+    format_mass_kg,
+)
+from mission.ui_presentation import MissionBudgetPresentation
 from mission.ui_state import CalculationStatus, MissionUiState
-from mission.ui_text import UI_V030_TEXT
+from mission.ui_text import UI_V030_TEXT, UI_V030_TOOLTIPS
 
 PRIMARY_STEPS = ("Mission", "Trajectory", "Budget", "Verdict")
+
+_RESPONSIVE_METRIC_STYLE = """
+<style>
+div[data-testid="stMetricValue"] > div {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font-size: clamp(1.2rem, 5vw, 2rem);
+}
+</style>
+"""
 
 
 def render_scope_badge(text_key: str) -> None:
@@ -79,6 +96,112 @@ def render_assumptions_and_limitations(lines: Iterable[str]) -> None:
     with st.expander(UI_V030_TEXT["assumptions_and_limitations"]):
         for line in lines:
             st.write(line)
+
+
+def render_departure_energy(values: MissionBudgetPresentation) -> None:
+    # Streamlit's default metric value is nowrap and clips the audited C3/v∞
+    # strings at 320 px. This local presentation rule preserves the full text.
+    st.html(_RESPONSIVE_METRIC_STYLE)
+    st.header(UI_V030_TEXT["budget_departure_heading"])
+    st.caption(UI_V030_TEXT["budget_energy_note"])
+    with st.container(horizontal=True):
+        if values.c3_m2_s2 is None:
+            st.info(UI_V030_TEXT["budget_c3_unavailable"])
+        else:
+            st.metric(
+                UI_V030_TEXT["budget_c3_label"],
+                format_approximate_c3_km2_s2(values.c3_m2_s2),
+                help=UI_V030_TOOLTIPS["earth_c3"],
+                border=True,
+            )
+        if values.earth_v_infinity_m_s is not None:
+            st.metric(
+                UI_V030_TEXT["budget_v_infinity_label"],
+                format_approximate_speed_km_s(values.earth_v_infinity_m_s),
+                help=UI_V030_TOOLTIPS["earth_v_infinity"],
+                border=True,
+            )
+
+
+def render_connected_budget(values: MissionBudgetPresentation) -> None:
+    st.header(UI_V030_TEXT["budget_injection_heading"])
+    st.metric(
+        UI_V030_TEXT["budget_injection_heading"],
+        format_delta_v_m_s(values.earth_injection_m_s),
+        help=UI_V030_TOOLTIPS["modeled_earth_injection"],
+        border=True,
+    )
+    st.caption(UI_V030_TEXT["budget_allocation_explanation"])
+
+    if values.saturn_capture_m_s is not None or values.saturn_circularization_m_s is not None:
+        st.header(UI_V030_TEXT["budget_saturn_heading"])
+        with st.container(horizontal=True):
+            if values.saturn_capture_m_s is not None:
+                st.metric(
+                    UI_V030_TEXT["budget_capture_label"],
+                    format_delta_v_m_s(values.saturn_capture_m_s),
+                    help=UI_V030_TOOLTIPS["saturn_capture"],
+                    border=True,
+                )
+            if values.saturn_circularization_m_s is not None:
+                st.metric(
+                    UI_V030_TEXT["budget_circularization_label"],
+                    format_delta_v_m_s(values.saturn_circularization_m_s),
+                    help=UI_V030_TOOLTIPS["saturn_circularization"],
+                    border=True,
+                )
+        if values.saturn_circularization_m_s is not None:
+            st.caption(UI_V030_TEXT["mission_titan_warning"])
+        subtotal = values.saturn_subtotal_m_s
+        if subtotal is not None:
+            st.metric(
+                UI_V030_TEXT["budget_saturn_subtotal"],
+                format_delta_v_m_s(subtotal),
+                help=UI_V030_TOOLTIPS["saturn_subtotal"],
+            )
+            st.caption(UI_V030_TEXT["budget_saturn_subtotal_explanation"])
+
+    with st.container(border=True):
+        st.subheader(UI_V030_TEXT["budget_total_heading"])
+        st.metric(
+            UI_V030_TEXT["budget_total_heading"],
+            format_delta_v_m_s(values.connected_total_m_s),
+            help=UI_V030_TOOLTIPS["connected_total"],
+        )
+        st.write(UI_V030_TEXT["budget_total_explanation"])
+
+
+def render_simplified_mass(values: MissionBudgetPresentation) -> None:
+    st.header(UI_V030_TEXT["budget_mass_heading"])
+    st.caption(UI_V030_TEXT["budget_mass_note"])
+    if (
+        values.dry_mass_kg is None
+        or values.propellant_mass_kg is None
+        or values.wet_mass_kg is None
+    ):
+        st.info(UI_V030_TEXT["budget_candidate_mass_unavailable"])
+        return
+    with st.container(horizontal=True):
+        st.metric(
+            UI_V030_TEXT["budget_dry_mass"],
+            format_mass_kg(values.dry_mass_kg),
+            border=True,
+        )
+        st.metric(
+            UI_V030_TEXT["budget_propellant_mass"],
+            format_mass_kg(values.propellant_mass_kg),
+            border=True,
+        )
+        st.metric(
+            UI_V030_TEXT["budget_wet_mass"],
+            format_mass_kg(values.wet_mass_kg),
+            help=UI_V030_TOOLTIPS["simplified_wet_mass"],
+            border=True,
+        )
+
+
+def render_bulleted_text(text_keys: Iterable[str]) -> None:
+    st.markdown("\n".join(f"- {UI_V030_TEXT[key]}" for key in text_keys))
 
 
 def render_navigation_actions(

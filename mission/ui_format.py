@@ -83,6 +83,13 @@ def format_duration_days(value_days: float, *, decimal_places: int = 1) -> str:
     return f"{value:,.{precision}f} {UI_UNITS['days']}"
 
 
+def format_mass_kg(value_kg: float, *, decimal_places: int = 0) -> str:
+    """Format an existing mass-model output in kilograms."""
+    value = _finite_number(value_kg, name="value_kg")
+    precision = _decimal_places(decimal_places)
+    return f"{value:,.{precision}f} {UI_UNITS['kilograms']}"
+
+
 def format_datetime_utc(value: datetime) -> str:
     """Format an aware datetime as a civil UTC timestamp."""
     if not isinstance(value, datetime):

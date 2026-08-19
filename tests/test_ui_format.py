@@ -10,9 +10,13 @@ from mission.ui_format import (
     format_delta_v_m_s,
     format_distance_km,
     format_duration_days,
+    format_mass_kg,
     format_speed_m_s,
 )
-from mission.ui_presentation import build_lambert_departure_presentation
+from mission.ui_presentation import (
+    build_candidate_budget_presentation,
+    build_lambert_departure_presentation,
+)
 
 
 class TestV030UiFormatting(unittest.TestCase):
@@ -33,6 +37,7 @@ class TestV030UiFormatting(unittest.TestCase):
             "approximately 108.83 km²/s²",
         )
         self.assertEqual(format_speed_m_s(10_432.306468285753), "10,432.306 m/s")
+        self.assertEqual(format_mass_kg(12_138.4), "12,138 kg")
 
     def test_distance_duration_and_utc_formats(self):
         self.assertEqual(format_distance_km(150_000_000.0), "150,000 km")
@@ -93,6 +98,20 @@ class TestLambertDeparturePresentation(unittest.TestCase):
             )
         with self.assertRaisesRegex(ValueError, "unavailable"):
             build_lambert_departure_presentation(TrajectoryResult(method="lambert"))
+
+    def test_candidate_budget_adapter_copies_raw_burns_and_total(self):
+        values = build_candidate_budget_presentation(
+            earth_v_infinity_m_s=10_500.0,
+            c3_km2_s2=110.25,
+            earth_injection_m_s=7_400.0,
+            saturn_capture_m_s=2_100.0,
+            saturn_circularization_m_s=3_000.0,
+            connected_total_m_s=12_500.0,
+        )
+        self.assertEqual(values.c3_m2_s2, 110_250_000.0)
+        self.assertEqual(values.earth_injection_m_s, 7_400.0)
+        self.assertEqual(values.saturn_subtotal_m_s, 5_100.0)
+        self.assertEqual(values.connected_total_m_s, 12_500.0)
 
 
 if __name__ == "__main__":

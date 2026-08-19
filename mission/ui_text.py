@@ -342,7 +342,7 @@ UI_V030_TEXT: Final[dict[str, str]] = {
     "status_empty": "No results available",
     "badge_isolated": "Not connected to the active mission",
     "badge_technical": "Technical detail",
-    "badge_connected": "Mission connected",
+    "badge_connected": "Connected mission",
     "badge_excluded": "Not included in connected total",
     "mission_title": "Mission",
     "mission_introduction": (
@@ -403,6 +403,9 @@ UI_V030_TEXT: Final[dict[str, str]] = {
     "budget_capture_label": "Saturn capture",
     "budget_circularization_label": "Saturn-centered circularization",
     "budget_saturn_subtotal": "Subtotal of modeled Saturn maneuvers",
+    "budget_saturn_subtotal_explanation": (
+        "This subtotal excludes Modeled Earth injection and is not the complete mission budget."
+    ),
     "budget_total_heading": "Connected total",
     "budget_total_explanation": (
         "The connected total includes modeled Earth injection, Saturn capture, and "
@@ -417,6 +420,33 @@ UI_V030_TEXT: Final[dict[str, str]] = {
         "This estimate uses the application's simplified mass model. It is not a complete "
         "vehicle design."
     ),
+    "budget_previous_result_note": (
+        "Inputs have changed. The values below belong to the previous calculation, not "
+        "to the current draft inputs."
+    ),
+    "budget_no_result_note": (
+        "Calculate a mission in Mission before reviewing its scientific budget."
+    ),
+    "budget_candidate_mass_unavailable": (
+        "A simplified mass estimate is not stored in the applied launch-window candidate. "
+        "This page does not recalculate it silently."
+    ),
+    "budget_c3_unavailable": (
+        "Earth C3 is not presented for this historical non-Lambert reference scenario."
+    ),
+    "budget_non_saturn_scope": (
+        "This destination currently provides the existing direct-arrival budget only. "
+        "Saturn capture and Saturn-centered circularization do not apply."
+    ),
+    "budget_historical_scope": (
+        "This historical reference keeps its own Earth-departure and Saturn Orbit "
+        "Insertion budget. It is not the direct baseline architecture."
+    ),
+    "budget_included": "Included in connected total",
+    "budget_not_applicable": "Not applicable to this scenario",
+    "budget_dry_mass": "Simplified dry mass",
+    "budget_propellant_mass": "Simplified propellant mass",
+    "budget_wet_mass": "Simplified wet mass",
     "budget_continue": "Continue to Verdict",
     "verdict_title": "Verdict",
     "verdict_introduction": (
@@ -441,6 +471,62 @@ UI_V030_TEXT: Final[dict[str, str]] = {
     "verdict_excluded_heading": "What the model does not demonstrate",
     "verdict_limits_heading": "Model assumptions and limitations",
     "verdict_details": "Open technical details",
+    "verdict_previous_result_note": (
+        "Inputs have changed. This conclusion describes the previous calculation, not "
+        "the current draft inputs."
+    ),
+    "verdict_no_result_note": (
+        "Calculate a mission in Mission before reviewing a model conclusion."
+    ),
+    "verdict_historical_conclusion": (
+        "The active scenario is the Cassini VVEJGA historical reference. Its dates, "
+        "budget, and terminal state remain specific to that historical model."
+    ),
+    "verdict_historical_final_state": (
+        "The historical reference ends in Cassini's modeled post-Saturn-Orbit-Insertion "
+        "state. It does not automatically reach the direct baseline's final orbit."
+    ),
+    "verdict_non_saturn_conclusion": (
+        "The calculated scenario describes a direct planetary-arrival result within "
+        "the scope and assumptions currently available for this destination."
+    ),
+    "verdict_non_saturn_final_state": (
+        "The model ends at the selected planet's direct-arrival state. No Saturn or "
+        "Titan endpoint is implied."
+    ),
+    "verdict_calculates_departure": "Earth departure conditions from the active result",
+    "verdict_calculates_dates": "Trajectory dates and time of flight",
+    "verdict_calculates_injection": "Modeled Earth injection",
+    "verdict_calculates_saturn": (
+        "Saturn capture and Saturn-centered circularization for the direct baseline"
+    ),
+    "verdict_calculates_total": "The complete connected total",
+    "verdict_calculates_final_state": (
+        "A Saturn-centered circular orbit at Titan's mean orbital radius"
+    ),
+    "verdict_calculates_mass": "The existing simplified mass estimate",
+    "verdict_not_launcher": "Compatibility with a real launch vehicle",
+    "verdict_not_allocation": (
+        "Definitive allocation among a launcher, upper stage, and spacecraft"
+    ),
+    "verdict_not_titan_encounter": "A Titan encounter or flyby",
+    "verdict_not_titan_capture": "Titan capture or a Titan-centered orbit",
+    "verdict_not_gravity_assist": "A connected gravity-assist trajectory",
+    "verdict_not_propagation": "Independent dynamical propagation of the 3D playback",
+    "verdict_not_vehicle_design": "A complete vehicle design",
+    "verdict_assumption_dynamics": (
+        "The connected baseline uses the existing deterministic first-order, impulsive, "
+        "coplanar model and its documented constants."
+    ),
+    "verdict_assumption_endpoint": (
+        "Titan's mean orbital radius is a Saturn-centered radial reference only."
+    ),
+    "verdict_assumption_isolated": (
+        "Gravity-assist demonstrators and legacy studies are excluded from the active "
+        "connected total."
+    ),
+    "verdict_open_isolated": "Open isolated studies",
+    "verdict_return_mission": "Edit mission",
     "error_input_summary": "Correct the highlighted inputs before calculating.",
     "error_no_solution": (
         "The inputs are valid, but the model did not produce a solution for this scenario."
@@ -535,4 +621,5 @@ UI_UNITS: Final[dict[str, str]] = {
     "square_kilometres_per_square_second": "km²/s²",
     "kilometres": "km",
     "days": "days",
+    "kilograms": "kg",
 }
